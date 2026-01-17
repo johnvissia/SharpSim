@@ -5,8 +5,6 @@ import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { DailyGame, CompletedGame } from '@/lib/types';
 
 const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
-// Using a proxy to bypass CORS issues in the browser
-const API_PROXY_URL = '/api/odds';
 
 /**
  * Fetches daily game odds and completed game scores from The Odds API
@@ -16,15 +14,13 @@ const API_PROXY_URL = '/api/odds';
  */
 export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: string = 'upcoming') {
   if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') {
-    const message = 'API Key for The Odds API is missing. Please add your key to .env.local and restart the development server.';
+    const message = 'API Key for The Odds API is missing. Please add your key to .env file and restart the development server.';
     console.error(message);
     throw new Error(message);
   }
 
   // --- 1. Fetch Upcoming Game Odds ---
   try {
-    // The API call is proxied through our Next.js backend to avoid CORS errors and hide the API key from the client if we wanted to.
-    // For this implementation, we will assume a simple client-side fetch. A real production app should proxy this.
     const oddsApiUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?regions=us&markets=h2h,spreads,totals&oddsFormat=american&apiKey=${API_KEY}`;
     const oddsResponse = await fetch(oddsApiUrl);
 
