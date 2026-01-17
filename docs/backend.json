@@ -131,6 +131,16 @@
       "required": [
         "last_updated_date"
       ]
+    },
+    "TeamRanking": {
+      "title": "TeamRanking",
+      "type": "object",
+      "description": "Represents a single team's rank in a poll (e.g., AP Top 25).",
+      "properties": {
+        "teamName": { "type": "string", "description": "The full name of the team." },
+        "rank": { "type": "number", "description": "The team's numerical rank." }
+      },
+      "required": ["teamName", "rank"]
     }
   },
   "auth": {
@@ -165,6 +175,12 @@
     "/users/{userId}/bets/{betId}": {
         "schema": { "$ref": "#/entities/UserBet" },
         "description": "Subcollection for storing bets placed by a specific user."
+    },
+    "/rankings/{teamName}": {
+      "schema": {
+        "$ref": "#/entities/TeamRanking"
+      },
+      "description": "Stores the weekly Top 25 rankings for teams. The document ID is the team's full name."
     }
   }
 }

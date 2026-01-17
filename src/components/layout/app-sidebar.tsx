@@ -16,6 +16,7 @@ import {
   Store,
   BookUser,
   Ticket,
+  Shield,
 } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
 import { AuthButton } from '@/components/auth/auth-button';
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/my-picks', label: 'My Picks', icon: Ticket },
   { href: '/store', label: 'Store', icon: Store },
   { href: '/coaching', label: 'Coaching', icon: BookUser },
+  { href: '/admin', label: 'Admin', icon: Shield },
 ];
 
 export function AppSidebar() {

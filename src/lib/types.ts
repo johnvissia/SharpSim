@@ -11,6 +11,7 @@ export type Team = {
   logo: string; // URL to logo
   record: string; // e.g., "10-5"
   players: Player[];
+  rank?: number;
 };
 
 export type Odds = {
@@ -85,4 +86,9 @@ export interface CompletedGame {
 
 export interface SystemStatus {
   last_updated_date: string;
+}
+
+export interface TeamRanking {
+  teamName: string;
+  rank: number;
 }

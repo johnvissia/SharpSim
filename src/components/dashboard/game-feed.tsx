@@ -2,19 +2,23 @@
 
 import { useMemo, useState } from 'react';
 import { GameCard } from './game-card';
-import type { Game, DailyGame, Team, SportsbookOdds, Odds, SportName } from '@/lib/types';
+import type { Game, DailyGame, Team, SportsbookOdds, Odds, SportName, TeamRanking } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { sportKeyMapping, sportNameMapping } from '@/lib/sports';
+import { sportNameMapping } from '@/lib/sports';
 import { getTeamLogoUrl } from '@/lib/team-logos';
 
 /**
  * Transforms raw DailyGame data from Firestore into the Game format required by UI components.
  * @param dailyGames - An array of DailyGame objects from Firestore.
+ * @param rankingsMap - A map of team names to their rank.
  * @returns An array of Game objects ready for display.
  */
-const transformDailyGamesToGames = (dailyGames: DailyGame[] | null): Game[] => {
+const transformDailyGamesToGames = (
+    dailyGames: DailyGame[] | null,
+    rankingsMap: Map<string, number>
+): Game[] => {
     if (!dailyGames) return [];
     
     return dailyGames.map((dg): Game | null => {
@@ -83,6 +87,7 @@ const transformDailyGamesToGames = (dailyGames: DailyGame[] | null): Game[] => {
             logo: getTeamLogoUrl(dg.homeTeam, sportName),
             record: '', // Data not available in daily_games collection
             players: [], // Data not available in daily_games collection
+            rank: rankingsMap.get(dg.homeTeam),
         };
 
         const awayTeam: Team = {
@@ -91,6 +96,7 @@ const transformDailyGamesToGames = (dailyGames: DailyGame[] | null): Game[] => {
             logo: getTeamLogoUrl(dg.awayTeam, sportName),
             record: '', // Data not available in daily_games collection
             players: [], // Data not available in daily_games collection
+            rank: rankingsMap.get(dg.awayTeam),
         };
 
         return {
@@ -118,14 +124,27 @@ export function GameFeed({ selectedSport }: GameFeedProps) {
     return query(collection(firestore, 'daily_games'), orderBy('commenceTime'));
   }, [firestore]);
   
-  const { data: dailyGames, isLoading } = useCollection<DailyGame>(dailyGamesQuery);
+  const { data: dailyGames, isLoading: isLoadingGames } = useCollection<DailyGame>(dailyGamesQuery);
+
+  const rankingsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'rankings');
+  }, [firestore]);
+
+  const { data: rankings, isLoading: isLoadingRankings } = useCollection<TeamRanking>(rankingsQuery);
+
+  const rankingsMap = useMemo(() => {
+    if (!rankings) return new Map<string, number>();
+    return new Map(rankings.map(r => [r.teamName, r.rank]));
+  }, [rankings]);
+
 
   // Mock user favorites, to be replaced with real data later
   const [favoriteSports, setFavoriteSports] = useState<string[]>(['NFL', 'NBA']);
   const [favoriteTeams, setFavoriteTeams] = useState<string[]>(['Golden State Warriors', 'Kansas City Chiefs']);
 
   // Transform the raw data from Firestore into the format the UI needs
-  const games = useMemo(() => transformDailyGamesToGames(dailyGames), [dailyGames]);
+  const games = useMemo(() => transformDailyGamesToGames(dailyGames, rankingsMap), [dailyGames, rankingsMap]);
 
   // Filter and sort games based on user selection and favorites
   const filteredAndSortedGames = useMemo(() => {
@@ -147,6 +166,8 @@ export function GameFeed({ selectedSport }: GameFeedProps) {
         return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
     });
   }, [games, selectedSport, favoriteSports, favoriteTeams]);
+
+  const isLoading = isLoadingGames || isLoadingRankings;
 
   // Show loading skeletons only on the initial load when there's no data yet.
   if (isLoading && !dailyGames) {

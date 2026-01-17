@@ -70,7 +70,10 @@ const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
           <FallbackIcon className="w-6 h-6 text-muted-foreground" />
         </div>
       )}
-      <div className="text-sm font-semibold h-10 flex items-center justify-center">{team.name}</div>
+      <div className="text-sm font-semibold h-10 flex items-center justify-center">
+        {team.rank && <span className="font-bold mr-1.5 text-primary">#{team.rank}</span>}
+        {team.name}
+      </div>
       <div className="text-xs text-muted-foreground">({team.record})</div>
       <InjuryIndicator team={team} />
     </div>
