@@ -71,7 +71,15 @@ export default function DashboardPage() {
         toast({ title: 'Sync Complete!', description: 'Odds and scores have been updated.' });
       } catch (error: any) {
         console.error(error);
-        toast({ variant: 'destructive', title: 'Sync Failed', description: error.message || 'Could not fetch data from The Odds API.' });
+        if (error.message?.includes('API Key for The Odds API is missing')) {
+            toast({
+                variant: 'destructive',
+                title: 'API Key Missing',
+                description: 'Please add your Odds API key to the .env file and restart the server.',
+            });
+        } else {
+            toast({ variant: 'destructive', title: 'Sync Failed', description: error.message || 'Could not fetch data from The Odds API.' });
+        }
       }
       setIsFetching(false);
   }
