@@ -1,9 +1,11 @@
-import type { Game, Team } from '@/lib/types';
+import type { Game, SportName, Team } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Star, Swords } from 'lucide-react';
+import Image from 'next/image';
+import { sportIconMap } from '@/lib/team-logos';
 
 const InjuryIndicator = ({ team }: { team: Team }) => {
   const outPlayers = team.players.filter(p => p.injuryStatus === 'Out');
@@ -50,13 +52,30 @@ const InjuryIndicator = ({ team }: { team: Team }) => {
 };
 
 
-const TeamDisplay = ({ team }: { team: Team }) => (
-  <div className="flex flex-col items-center text-center gap-2">
-    <div className="text-lg font-semibold">{team.name}</div>
-    <div className="text-sm text-muted-foreground">({team.record})</div>
-    <InjuryIndicator team={team} />
-  </div>
-);
+const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
+  const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
+
+  return (
+    <div className="flex flex-col items-center text-center gap-2 w-28">
+      {team.logo ? (
+        <Image
+          src={team.logo}
+          alt={`${team.name} logo`}
+          width={40}
+          height={40}
+          className="object-contain h-10 w-10"
+        />
+      ) : (
+        <div className="w-10 h-10 flex items-center justify-center bg-muted rounded-full">
+          <FallbackIcon className="w-6 h-6 text-muted-foreground" />
+        </div>
+      )}
+      <div className="text-sm font-semibold h-10 flex items-center justify-center">{team.name}</div>
+      <div className="text-xs text-muted-foreground">({team.record})</div>
+      <InjuryIndicator team={team} />
+    </div>
+  );
+};
 
 export function GameCard({ game }: { game: Game }) {
   const gameTime = new Date(game.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -72,11 +91,11 @@ export function GameCard({ game }: { game: Game }) {
       </CardHeader>
       <CardContent className="flex-grow p-4 flex flex-col justify-between">
         <div className="flex items-start justify-around text-center mb-4">
-          <TeamDisplay team={game.awayTeam} />
+          <TeamDisplay team={game.awayTeam} sport={game.sport}/>
           <div className="flex flex-col items-center self-center px-2">
             <Swords className="h-6 w-6 text-muted-foreground" />
           </div>
-          <TeamDisplay team={game.homeTeam} />
+          <TeamDisplay team={game.homeTeam} sport={game.sport} />
         </div>
         
         <div className="space-y-2">

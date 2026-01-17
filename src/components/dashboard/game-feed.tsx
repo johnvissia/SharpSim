@@ -6,13 +6,8 @@ import type { Game, DailyGame, Team, SportsbookOdds, Odds, SportName } from '@/l
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { sportKeyMapping } from '@/lib/sports';
-
-// Create a reverse mapping to get SportName from sport_key
-const sportNameMapping: { [key: string]: SportName | undefined } = Object.entries(sportKeyMapping).reduce((acc, [name, key]) => {
-    acc[key] = name as SportName;
-    return acc;
-}, {} as { [key: string]: SportName });
+import { sportKeyMapping, sportNameMapping } from '@/lib/sports';
+import { getTeamLogoUrl } from '@/lib/team-logos';
 
 /**
  * Transforms raw DailyGame data from Firestore into the Game format required by UI components.
@@ -85,7 +80,7 @@ const transformDailyGamesToGames = (dailyGames: DailyGame[] | null): Game[] => {
         const homeTeam: Team = {
             id: dg.homeTeam,
             name: dg.homeTeam,
-            logo: '',
+            logo: getTeamLogoUrl(dg.homeTeam, sportName),
             record: '', // Data not available in daily_games collection
             players: [], // Data not available in daily_games collection
         };
@@ -93,7 +88,7 @@ const transformDailyGamesToGames = (dailyGames: DailyGame[] | null): Game[] => {
         const awayTeam: Team = {
             id: dg.awayTeam,
             name: dg.awayTeam,
-            logo: '',
+            logo: getTeamLogoUrl(dg.awayTeam, sportName),
             record: '', // Data not available in daily_games collection
             players: [], // Data not available in daily_games collection
         };
