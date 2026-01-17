@@ -88,7 +88,7 @@ const mockGames: Game[] = [
   {
     id: 'g1',
     sport: 'NBA',
-    startTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    startTime: new Date('2026-01-16T19:00:00-05:00').toISOString(),
     awayTeam: lakers,
     homeTeam: warriors,
     allOdds: generateOdds({
@@ -101,7 +101,7 @@ const mockGames: Game[] = [
   {
     id: 'g2',
     sport: 'NFL',
-    startTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    startTime: new Date('2026-01-16T20:30:00-05:00').toISOString(),
     awayTeam: eagles,
     homeTeam: chiefs,
     allOdds: generateOdds({
@@ -114,7 +114,7 @@ const mockGames: Game[] = [
   {
     id: 'g3',
     sport: 'Soccer',
-    startTime: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+    startTime: new Date('2026-01-16T15:00:00-05:00').toISOString(),
     awayTeam: liverpool,
     homeTeam: manUtd,
     allOdds: generateOdds({
@@ -127,7 +127,7 @@ const mockGames: Game[] = [
   {
     id: 'g4',
     sport: 'WNBA',
-    startTime: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
+    startTime: new Date('2026-01-16T21:00:00-05:00').toISOString(),
     awayTeam: liberty,
     homeTeam: aces,
     allOdds: generateOdds({
@@ -140,7 +140,7 @@ const mockGames: Game[] = [
     {
     id: 'g5',
     sport: 'NCAAF',
-    startTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    startTime: new Date('2026-01-16T13:00:00-05:00').toISOString(),
     awayTeam: alabama,
     homeTeam: georgia,
     allOdds: generateOdds({
