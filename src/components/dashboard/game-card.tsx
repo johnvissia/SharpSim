@@ -81,7 +81,15 @@ const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
 };
 
 export function GameCard({ game }: { game: Game }) {
-  const gameTime = new Date(game.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const gameDate = new Date(game.startTime);
+  const now = new Date();
+  const isToday = now.getFullYear() === gameDate.getFullYear() &&
+                now.getMonth() === gameDate.getMonth() &&
+                now.getDate() === gameDate.getDate();
+
+  const gameTime = isToday
+    ? gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : gameDate.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   return (
     <Card className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200">
