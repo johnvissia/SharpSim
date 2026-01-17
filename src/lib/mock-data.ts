@@ -54,6 +54,12 @@ const georgiaPlayers = [createPlayer('p20', 'Carson Beck', 'QB')];
 const alabama = createTeam('t9', 'Alabama Crimson Tide', '3-0', alabamaPlayers);
 const georgia = createTeam('t10', 'Georgia Bulldogs', '3-0', georgiaPlayers);
 
+// NHL Teams
+const bruinsPlayers = [createPlayer('p21', 'Brad Marchand', 'LW'), createPlayer('p22', 'David Pastrnak', 'RW')];
+const mapleLeafsPlayers = [createPlayer('p23', 'Auston Matthews', 'C'), createPlayer('p24', 'Mitch Marner', 'RW')];
+const bruins = createTeam('t11', 'Boston Bruins', '9-1-2', bruinsPlayers);
+const mapleLeafs = createTeam('t12', 'Toronto Maple Leafs', '7-3-2', mapleLeafsPlayers);
+
 
 const generateOdds = (base: Odds): SportsbookOdds[] => {
   return sportsbooks.map(book => ({
@@ -147,6 +153,19 @@ const mockGames: Game[] = [
       moneyline: { away: 110, home: -130 },
       spread: { points: -2.5, home: -110, away: -110 },
       total: { points: 55.5, over: -110, under: -110 },
+    }),
+    get odds() { return getBestOdds(this.allOdds) }
+  },
+  {
+    id: 'g6',
+    sport: 'NHL',
+    startTime: new Date('2026-01-16T19:30:00-05:00').toISOString(),
+    awayTeam: mapleLeafs,
+    homeTeam: bruins,
+    allOdds: generateOdds({
+      moneyline: { away: 115, home: -135 },
+      spread: { points: -1.5, home: 180, away: -220 }, // Puck line
+      total: { points: 6.5, over: -110, under: -110 },
     }),
     get odds() { return getBestOdds(this.allOdds) }
   },
