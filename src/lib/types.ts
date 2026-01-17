@@ -12,6 +12,7 @@ export type Team = {
   record: string; // e.g., "10-5"
   players: Player[];
   rank?: number;
+  conference?: string;
 };
 
 export type Odds = {
@@ -91,4 +92,5 @@ export interface SystemStatus {
 export interface TeamRanking {
   teamName: string;
   rank: number;
+  conference: string;
 }

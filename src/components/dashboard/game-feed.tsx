@@ -12,12 +12,12 @@ import { getTeamLogoUrl } from '@/lib/team-logos';
 /**
  * Transforms raw DailyGame data from Firestore into the Game format required by UI components.
  * @param dailyGames - An array of DailyGame objects from Firestore.
- * @param rankingsMap - A map of team names to their rank.
+ * @param rankingsMap - A map of team names to their rank and conference.
  * @returns An array of Game objects ready for display.
  */
 const transformDailyGamesToGames = (
     dailyGames: DailyGame[] | null,
-    rankingsMap: Map<string, number>
+    rankingsMap: Map<string, { rank: number; conference: string }>
 ): Game[] => {
     if (!dailyGames) return [];
     
@@ -81,22 +81,26 @@ const transformDailyGamesToGames = (
 
         const bestOdds = allOdds[0].odds; // Use first bookmaker's odds as the "best" for now
 
+        const homeRankingInfo = rankingsMap.get(dg.homeTeam);
         const homeTeam: Team = {
             id: dg.homeTeam,
             name: dg.homeTeam,
             logo: getTeamLogoUrl(dg.homeTeam, sportName),
             record: '', // Data not available in daily_games collection
             players: [], // Data not available in daily_games collection
-            rank: rankingsMap.get(dg.homeTeam),
+            rank: homeRankingInfo?.rank,
+            conference: homeRankingInfo?.conference,
         };
-
+        
+        const awayRankingInfo = rankingsMap.get(dg.awayTeam);
         const awayTeam: Team = {
             id: dg.awayTeam,
             name: dg.awayTeam,
             logo: getTeamLogoUrl(dg.awayTeam, sportName),
             record: '', // Data not available in daily_games collection
             players: [], // Data not available in daily_games collection
-            rank: rankingsMap.get(dg.awayTeam),
+            rank: awayRankingInfo?.rank,
+            conference: awayRankingInfo?.conference,
         };
 
         return {
@@ -134,8 +138,8 @@ export function GameFeed({ selectedSport }: GameFeedProps) {
   const { data: rankings, isLoading: isLoadingRankings } = useCollection<TeamRanking>(rankingsQuery);
 
   const rankingsMap = useMemo(() => {
-    if (!rankings) return new Map<string, number>();
-    return new Map(rankings.map(r => [r.teamName, r.rank]));
+    if (!rankings) return new Map<string, { rank: number; conference: string }>();
+    return new Map(rankings.map(r => [r.teamName, { rank: r.rank, conference: r.conference }]));
   }, [rankings]);
 
 

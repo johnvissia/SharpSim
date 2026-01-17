@@ -135,12 +135,13 @@
     "TeamRanking": {
       "title": "TeamRanking",
       "type": "object",
-      "description": "Represents a single team's rank in a poll (e.g., AP Top 25).",
+      "description": "Represents a single team's rank and conference in a poll (e.g., AP Top 25).",
       "properties": {
         "teamName": { "type": "string", "description": "The full name of the team." },
-        "rank": { "type": "number", "description": "The team's numerical rank." }
+        "rank": { "type": "number", "description": "The team's numerical rank." },
+        "conference": { "type": "string", "description": "The team's athletic conference." }
       },
-      "required": ["teamName", "rank"]
+      "required": ["teamName", "rank", "conference"]
     }
   },
   "auth": {
