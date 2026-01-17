@@ -1,7 +1,6 @@
 {
   "entities": {
     "DailyGame": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "DailyGame",
       "type": "object",
       "description": "Represents the odds for a specific upcoming game fetched daily from the API.",
@@ -12,7 +11,7 @@
         },
         "sportKey": {
           "type": "string",
-          "description": "Key identifying the sport (e.g., 'NFL', 'NBA')."
+          "description": "Key identifying the sport (e.g., 'basketball_nba')."
         },
         "commenceTime": {
           "type": "string",
@@ -29,7 +28,7 @@
         },
         "bookmakerOdds": {
           "type": "array",
-          "description": "Array of odds from different bookmakers.",
+          "description": "Array of odds from different bookmakers, stored as JSON strings.",
           "items": {
             "type": "string"
           }
@@ -40,12 +39,10 @@
         "sportKey",
         "commenceTime",
         "homeTeam",
-        "awayTeam",
-        "bookmakerOdds"
+        "awayTeam"
       ]
     },
     "CompletedGame": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "CompletedGame",
       "type": "object",
       "description": "Represents the final scores of a completed game, fetched to check results.",
@@ -56,7 +53,7 @@
         },
         "sportKey": {
           "type": "string",
-          "description": "Key identifying the sport (e.g., 'NFL', 'NBA')."
+          "description": "Key identifying the sport (e.g., 'basketball_nba')."
         },
         "commenceTime": {
           "type": "string",
@@ -98,40 +95,13 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/daily_games/{gameId}",
-        "definition": {
-          "entityName": "DailyGame",
-          "schema": {
-            "$ref": "#/backend/entities/DailyGame"
-          },
-          "description": "Stores the odds for upcoming games fetched daily. The 'gameId' is used as the document ID. Since all clients read/write directly to this collection, ensure appropriate validation rules are configured on the client side to prevent abuse.",
-          "params": [
-            {
-              "name": "gameId",
-              "description": "Unique identifier for the game, derived from the API response."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/completed_games/{gameId}",
-        "definition": {
-          "entityName": "CompletedGame",
-          "schema": {
-            "$ref": "#/backend/entities/CompletedGame"
-          },
-          "description": "Stores the final scores of completed games, fetched to check results. The 'gameId' acts as the document ID. Since all clients read/write directly to this collection, ensure appropriate validation rules are configured on the client side to prevent abuse.",
-          "params": [
-            {
-              "name": "gameId",
-              "description": "Unique identifier for the game, derived from the API response."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed to accommodate the 'Bettor's Edge' application's data storage needs, focusing on simplicity and security. The primary collections are `daily_games` and `completed_games`, which store data fetched from the external Odds API. Because the application runs on the Firebase Spark plan and cannot use Cloud Functions, all data fetching and saving is done client-side. Therefore the security rules have been simplified for the minimal access required given the constraints. The structure prioritizes ease of data retrieval and updating by directly saving the fetched data into dedicated collections. Since no user-specific data or complex authorization is involved in this particular request (just storage of fetched data), Authorization Independence and complex access models are not applicable here. The application requirements explicitly mentions client-side data fetching and the use of the Spark plan, which limits server-side processing with Cloud Functions. Therefore, the rules below reflect this architecture where the data being written is assumed to be coming from a trusted source or validated client-side before writing."
+    "/daily_games/{gameId}": {
+        "schema": { "$ref": "#/entities/DailyGame" },
+        "description": "Stores odds for upcoming games. Clients write directly to this collection after fetching from an external API."
+    },
+    "/completed_games/{gameId}": {
+        "schema": { "$ref": "#/entities/CompletedGame" },
+        "description": "Stores final scores for completed games. Clients write directly to this collection."
+    }
   }
 }

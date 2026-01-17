@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SiteLayout } from '@/components/layout/site-layout';
+import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
   title: 'SharpSim: SportsEdge Trainer',
@@ -24,7 +25,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <SiteLayout>{children}</SiteLayout>
+        <FirebaseClientProvider>
+            <SiteLayout>{children}</SiteLayout>
+        </FirebaseClientProvider>
         <Toaster />
       </body>
     </html>

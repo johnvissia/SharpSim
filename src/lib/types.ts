@@ -55,3 +55,23 @@ export type UserBet = {
   status: 'pending' | 'won' | 'lost' | 'push';
   placedAt: string; // ISO 8601 string
 };
+
+// Types from backend.json for Firestore
+export interface DailyGame {
+  id: string;
+  sportKey: string;
+  commenceTime: string;
+  homeTeam: string;
+  awayTeam: string;
+  bookmakerOdds: string[];
+}
+
+export interface CompletedGame {
+  id: string;
+  sportKey: string;
+  commenceTime: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+}
