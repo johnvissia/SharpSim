@@ -153,23 +153,30 @@ export function GameFeed({ selectedSport, selectedConference, sortBy }: GameFeed
     const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
 
     const filtered = games.filter(game => {
-        // Filter by selected sport
+        // Filter by selected sport first
         const sportMatch = selectedSport === 'All' || game.sport === selectedSport;
         if (!sportMatch) return false;
 
         const isNCAAGame = ncaaSports.includes(game.sport as any);
 
-        // Filter by selected conference (only applies to NCAA games)
-        if (selectedConference !== 'All') {
-            const conferenceMatch = isNCAAGame && (game.homeTeam.conference === selectedConference || game.awayTeam.conference === selectedConference);
-            if (!conferenceMatch) return false;
-        }
+        // Apply special filters ONLY for NCAA games
+        if (isNCAAGame) {
+            // Rank Filter: Only show games with at least one ranked team
+            const hasRankedTeam = game.homeTeam.rank || game.awayTeam.rank;
+            if (!hasRankedTeam) {
+                return false;
+            }
 
-        // Default filter for NCAA games: only show matchups with at least one ranked team
-        if (isNCAAGame && !game.homeTeam.rank && !game.awayTeam.rank) {
-            return false;
+            // Conference Filter: Apply only if a specific conference is selected
+            if (selectedConference !== 'All') {
+                const conferenceMatch = game.homeTeam.conference === selectedConference || game.awayTeam.conference === selectedConference;
+                if (!conferenceMatch) {
+                    return false;
+                }
+            }
         }
         
+        // If it's not an NCAA game, or it's an NCAA game that passed the filters, show it.
         return true;
     });
 
