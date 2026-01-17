@@ -30,22 +30,22 @@ service cloud.firestore {
     // Public Collections
     // ------------------------------------------------------------------------
     match /daily_games/{gameId} {
-      allow get, list: if true;
+      allow read: if true;
       allow write: if isSignedIn();
     }
 
     match /completed_games/{gameId} {
-      allow get, list: if true;
+      allow read: if true;
       allow write: if isSignedIn();
     }
 
     match /system/{statusId} {
-      allow get, list: if true;
+      allow read: if true;
       allow write: if isSignedIn();
     }
 
     match /rankings/{teamName} {
-      allow get, list: if true;
+      allow read: if true;
       allow write: if isSignedIn(); // Allow authenticated users (admins) to update rankings
     }
     
