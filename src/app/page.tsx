@@ -25,9 +25,13 @@ import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 export default function DashboardPage() {
   const [sports, setSports] = useState<Sport[]>([]);
   const [selectedSport, setSelectedSport] = useState('All');
+  const [selectedConference, setSelectedConference] = useState('All');
+  const [sortBy, setSortBy] = useState('time');
   const [loadingSports, setLoadingSports] = useState(true);
   const [isFetchingManually, setIsFetchingManually] = useState(false);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+
+  const conferenceOptions = ["All", "SEC", "Big 10", "ACC", "Big 12"];
 
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -153,41 +157,23 @@ export default function DashboardPage() {
 
   const showLoadingSpinner = isStatusLoading || isAutoSyncing || isUserLoading;
 
+  const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
+  const isConferenceFilterEnabled = selectedSport === 'All' || ncaaSports.includes(selectedSport);
+
   return (
     <div className="flex flex-col gap-8 p-4 md:p-8">
-      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Today's Games
-          </h1>
-          <p className="text-muted-foreground">
-            {selectedSport === 'All'
-              ? 'All upcoming games'
-              : `Upcoming ${selectedSport} games`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {loadingSports ? (
-            <Skeleton className="h-10 w-48" />
-          ) : (
-            <Select
-              onValueChange={setSelectedSport}
-              defaultValue={selectedSport}
-              disabled={showLoadingSpinner}
-            >
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Select a sport" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Sports</SelectItem>
-                {sports.map((sport) => (
-                  <SelectItem key={sport.id} value={sport.name}>
-                    {sport.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Today's Games
+            </h1>
+            <p className="text-muted-foreground">
+              {selectedSport === 'All'
+                ? 'All upcoming games'
+                : `Upcoming ${selectedSport} games`}
+            </p>
+          </div>
           <Button
             onClick={() => handleManualFetch(selectedSport)}
             disabled={
@@ -201,6 +187,57 @@ export default function DashboardPage() {
             )}
             {isAutoSyncing ? 'Auto-Sync...' : isFetchingManually ? 'Syncing...' : 'Sync Data'}
           </Button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {loadingSports ? (
+                <Skeleton className="h-10" />
+            ) : (
+                <Select
+                onValueChange={setSelectedSport}
+                defaultValue={selectedSport}
+                disabled={showLoadingSpinner}
+                >
+                <SelectTrigger>
+                    <SelectValue placeholder="Select a sport" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="All">All Sports</SelectItem>
+                    {sports.map((sport) => (
+                    <SelectItem key={sport.id} value={sport.name}>
+                        {sport.name}
+                    </SelectItem>
+                    ))}
+                </SelectContent>
+                </Select>
+            )}
+            <Select
+                onValueChange={setSelectedConference}
+                defaultValue={selectedConference}
+                disabled={showLoadingSpinner || !isConferenceFilterEnabled}
+            >
+                <SelectTrigger>
+                    <SelectValue placeholder="Filter by Conference" />
+                </SelectTrigger>
+                <SelectContent>
+                    {conferenceOptions.map((conf) => (
+                        <SelectItem key={conf} value={conf}>{conf}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+
+            <Select
+                onValueChange={setSortBy}
+                defaultValue={sortBy}
+                disabled={showLoadingSpinner}
+            >
+                <SelectTrigger>
+                    <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="time">Sort by Time</SelectItem>
+                    <SelectItem value="rank">Sort by Rank</SelectItem>
+                </SelectContent>
+            </Select>
         </div>
       </header>
 
@@ -217,7 +254,11 @@ export default function DashboardPage() {
           </p>
         </div>
       ) : (
-        <GameFeed selectedSport={selectedSport} />
+        <GameFeed
+            selectedSport={selectedSport}
+            selectedConference={selectedConference}
+            sortBy={sortBy}
+        />
       )}
     </div>
   );

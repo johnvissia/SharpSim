@@ -117,12 +117,13 @@ const transformDailyGamesToGames = (
 
 type GameFeedProps = {
   selectedSport: string;
+  selectedConference: string;
+  sortBy: string;
 };
 
-export function GameFeed({ selectedSport }: GameFeedProps) {
+export function GameFeed({ selectedSport, selectedConference, sortBy }: GameFeedProps) {
   const firestore = useFirestore();
   
-  // Set up the real-time listener for the daily_games collection
   const dailyGamesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'daily_games'), orderBy('commenceTime'));
@@ -143,37 +144,65 @@ export function GameFeed({ selectedSport }: GameFeedProps) {
   }, [rankings]);
 
 
-  // Mock user favorites, to be replaced with real data later
   const [favoriteSports, setFavoriteSports] = useState<string[]>(['NFL', 'NBA']);
   const [favoriteTeams, setFavoriteTeams] = useState<string[]>(['Golden State Warriors', 'Kansas City Chiefs']);
 
-  // Transform the raw data from Firestore into the format the UI needs
   const games = useMemo(() => transformDailyGamesToGames(dailyGames, rankingsMap), [dailyGames, rankingsMap]);
 
-  // Filter and sort games based on user selection and favorites
   const filteredAndSortedGames = useMemo(() => {
-    const filteredGames = games.filter(game => 
-      selectedSport === 'All' || game.sport === selectedSport
-    );
+    const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
 
-    return [...filteredGames].sort((a, b) => {
+    const filtered = games.filter(game => {
+        // Filter by selected sport
+        const sportMatch = selectedSport === 'All' || game.sport === selectedSport;
+        if (!sportMatch) return false;
+
+        const isNCAAGame = ncaaSports.includes(game.sport as any);
+
+        // Filter by selected conference (only applies to NCAA games)
+        if (selectedConference !== 'All') {
+            const conferenceMatch = isNCAAGame && (game.homeTeam.conference === selectedConference || game.awayTeam.conference === selectedConference);
+            if (!conferenceMatch) return false;
+        }
+
+        // Default filter for NCAA games: only show matchups with at least one ranked team
+        if (isNCAAGame && !game.homeTeam.rank && !game.awayTeam.rank) {
+            return false;
+        }
+        
+        return true;
+    });
+
+    // Now, sort the `filtered` array
+    return [...filtered].sort((a, b) => {
+        // Favorite sorting comes first
         const aIsFavSport = favoriteSports.includes(a.sport);
         const bIsFavSport = favoriteSports.includes(b.sport);
-        const aIsFavTeam = favoriteTeams.includes(a.homeTeam.name) || favoriteTeams.includes(a.awayTeam.name);
-        const bIsFavTeam = favoriteTeams.includes(b.homeTeam.name) || favoriteTeams.includes(b.awayTeam.name);
-
         if (aIsFavSport && !bIsFavSport) return -1;
         if (!aIsFavSport && bIsFavSport) return 1;
+        
+        const aIsFavTeam = favoriteTeams.includes(a.homeTeam.name) || favoriteTeams.includes(a.awayTeam.name);
+        const bIsFavTeam = favoriteTeams.includes(b.homeTeam.name) || favoriteTeams.includes(b.awayTeam.name);
         if (aIsFavTeam && !bIsFavTeam) return -1;
         if (!aIsFavTeam && bIsFavTeam) return 1;
 
+        // Then, apply the main sort logic
+        if (sortBy === 'rank') {
+            const getGameRank = (game: Game) => Math.min(game.homeTeam.rank ?? Infinity, game.awayTeam.rank ?? Infinity);
+            const rankA = getGameRank(a);
+            const rankB = getGameRank(b);
+            if (rankA !== rankB) {
+                return rankA - rankB;
+            }
+        }
+
+        // Fallback to time sort
         return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
     });
-  }, [games, selectedSport, favoriteSports, favoriteTeams]);
+  }, [games, selectedSport, selectedConference, sortBy, favoriteSports, favoriteTeams]);
 
   const isLoading = isLoadingGames || isLoadingRankings;
 
-  // Show loading skeletons only on the initial load when there's no data yet.
   if (isLoading && !dailyGames) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -192,7 +221,7 @@ export function GameFeed({ selectedSport }: GameFeedProps) {
         ))
       ) : (
         <p className="text-muted-foreground md:col-span-2 lg:col-span-3 xl:col-span-4">
-            Loading today's lines...
+            Loading today's lines or no games match your filter...
         </p>
       )}
     </div>
