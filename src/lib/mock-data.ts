@@ -54,11 +54,29 @@ const georgiaPlayers = [createPlayer('p20', 'Carson Beck', 'QB')];
 const alabama = createTeam('t9', 'Alabama Crimson Tide', '3-0', alabamaPlayers);
 const georgia = createTeam('t10', 'Georgia Bulldogs', '3-0', georgiaPlayers);
 
-// NHL Teams
-const bruinsPlayers = [createPlayer('p21', 'Brad Marchand', 'LW'), createPlayer('p22', 'David Pastrnak', 'RW')];
-const mapleLeafsPlayers = [createPlayer('p23', 'Auston Matthews', 'C'), createPlayer('p24', 'Mitch Marner', 'RW')];
-const bruins = createTeam('t11', 'Boston Bruins', '9-1-2', bruinsPlayers);
-const mapleLeafs = createTeam('t12', 'Toronto Maple Leafs', '7-3-2', mapleLeafsPlayers);
+// --- NHL Teams from image ---
+const sharksPlayers = [createPlayer('p25', 'Tomas Hertl', 'C'), createPlayer('p26', 'Logan Couture', 'C')];
+const redWingsPlayers = [createPlayer('p27', 'Dylan Larkin', 'C'), createPlayer('p28', 'Lucas Raymond', 'RW')];
+const panthersPlayers = [createPlayer('p29', 'Aleksander Barkov', 'C'), createPlayer('p30', 'Matthew Tkachuk', 'LW')];
+const hurricanesPlayers = [createPlayer('p31', 'Sebastian Aho', 'C'), createPlayer('p32', 'Andrei Svechnikov', 'RW')];
+const lightningPlayers = [createPlayer('p33', 'Nikita Kucherov', 'RW'), createPlayer('p34', 'Brayden Point', 'C')];
+const bluesPlayers = [createPlayer('p35', 'Robert Thomas', 'C'), createPlayer('p36', 'Jordan Kyrou', 'RW')];
+const predatorsPlayers = [createPlayer('p37', 'Roman Josi', 'D'), createPlayer('p38', 'Filip Forsberg', 'LW')];
+const avalanchePlayers = [createPlayer('p39', 'Nathan MacKinnon', 'C'), createPlayer('p40', 'Cale Makar', 'D')];
+const ducksPlayers = [createPlayer('p41', 'Mason McTavish', 'C'), createPlayer('p42', 'Troy Terry', 'RW')];
+const kingsPlayers = [createPlayer('p43', 'Anze Kopitar', 'C'), createPlayer('p44', 'Kevin Fiala', 'LW')];
+
+const sharks = createTeam('t13', 'San Jose Sharks', '14-28-5', sharksPlayers);
+const redWings = createTeam('t14', 'Detroit Red Wings', '24-18-5', redWingsPlayers);
+const panthers = createTeam('t15', 'Florida Panthers', '28-14-4', panthersPlayers);
+const hurricanes = createTeam('t16', 'Carolina Hurricanes', '28-14-5', hurricanesPlayers);
+const lightning = createTeam('t17', 'Tampa Bay Lightning', '26-17-5', lightningPlayers);
+const blues = createTeam('t18', 'St. Louis Blues', '23-20-2', bluesPlayers);
+const predators = createTeam('t19', 'Nashville Predators', '22-20-4', predatorsPlayers);
+const avalanche = createTeam('t20', 'Colorado Avalanche', '33-4-8', avalanchePlayers);
+const ducks = createTeam('t21', 'Anaheim Ducks', '22-21-3', ducksPlayers);
+const kings = createTeam('t22', 'Los Angeles Kings', '19-16-11', kingsPlayers);
+// --- End NHL Teams ---
 
 
 const generateOdds = (base: Odds): SportsbookOdds[] => {
@@ -117,6 +135,71 @@ const mockGames: Game[] = [
     }),
     get odds() { return getBestOdds(this.allOdds) }
   },
+    {
+    id: 'g-nhl-1',
+    sport: 'NHL',
+    startTime: new Date('2026-01-16T19:00:00-05:00').toISOString(),
+    awayTeam: sharks,
+    homeTeam: redWings,
+    allOdds: generateOdds({
+        moneyline: { away: 180, home: -220 },
+        spread: { points: 1.5, home: -110, away: -110 },
+        total: { points: 6.5, over: -110, under: -110 },
+    }),
+    get odds() { return getBestOdds(this.allOdds) }
+  },
+  {
+    id: 'g-nhl-2',
+    sport: 'NHL',
+    startTime: new Date('2026-01-16T19:00:00-05:00').toISOString(),
+    awayTeam: panthers,
+    homeTeam: hurricanes,
+    allOdds: generateOdds({
+        moneyline: { away: 105, home: -125 },
+        spread: { points: 1.5, home: -110, away: -110 },
+        total: { points: 6.0, over: -110, under: -110 },
+    }),
+    get odds() { return getBestOdds(this.allOdds) }
+  },
+  {
+    id: 'g-nhl-3',
+    sport: 'NHL',
+    startTime: new Date('2026-01-16T20:00:00-05:00').toISOString(),
+    awayTeam: lightning,
+    homeTeam: blues,
+    allOdds: generateOdds({
+        moneyline: { away: -145, home: 125 },
+        spread: { points: -1.5, home: 170, away: -200 },
+        total: { points: 6.0, over: -110, under: -110 },
+    }),
+    get odds() { return getBestOdds(this.allOdds) }
+  },
+  {
+    id: 'g-nhl-4',
+    sport: 'NHL',
+    startTime: new Date('2026-01-16T21:00:00-05:00').toISOString(),
+    awayTeam: predators,
+    homeTeam: avalanche,
+    allOdds: generateOdds({
+        moneyline: { away: 265, home: -325 },
+        spread: { points: 1.5, home: 130, away: -150 },
+        total: { points: 6.5, over: -115, under: -105 },
+    }),
+    get odds() { return getBestOdds(this.allOdds) }
+  },
+  {
+    id: 'g-nhl-5',
+    sport: 'NHL',
+    startTime: new Date('2026-01-16T22:30:00-05:00').toISOString(),
+    awayTeam: ducks,
+    homeTeam: kings,
+    allOdds: generateOdds({
+        moneyline: { away: 128, home: -148 },
+        spread: { points: 1.5, home: -190, away: 160 },
+        total: { points: 6.0, over: -110, under: -110 },
+    }),
+    get odds() { return getBestOdds(this.allOdds) }
+  },
   {
     id: 'g3',
     sport: 'Soccer',
@@ -153,19 +236,6 @@ const mockGames: Game[] = [
       moneyline: { away: 110, home: -130 },
       spread: { points: -2.5, home: -110, away: -110 },
       total: { points: 55.5, over: -110, under: -110 },
-    }),
-    get odds() { return getBestOdds(this.allOdds) }
-  },
-  {
-    id: 'g6',
-    sport: 'NHL',
-    startTime: new Date('2026-01-16T19:30:00-05:00').toISOString(),
-    awayTeam: mapleLeafs,
-    homeTeam: bruins,
-    allOdds: generateOdds({
-      moneyline: { away: 115, home: -135 },
-      spread: { points: -1.5, home: 180, away: -220 }, // Puck line
-      total: { points: 6.5, over: -110, under: -110 },
     }),
     get odds() { return getBestOdds(this.allOdds) }
   },
