@@ -7,6 +7,9 @@ import { sportKeyMapping } from './sports';
 
 const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
 
+// Helper function to introduce a delay
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 /**
  * Fetches daily game odds and completed game scores from The Odds API
  * and saves them to Firestore. This function is designed to run on the client-side.
@@ -106,6 +109,11 @@ export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: stri
         // Catch network errors or other issues during fetch for a single sport
         console.error(`Error processing scores for ${key}:`, error);
         // Continue to the next sport
+      }
+      
+      // Introduce a delay to avoid hitting rate limits when fetching all sports.
+      if (sportKey === 'upcoming') {
+        await delay(1100); // Wait for ~1.1 second before the next request. Free plan allows roughly 1 req/sec.
       }
   }
   
