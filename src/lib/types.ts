@@ -75,3 +75,7 @@ export interface CompletedGame {
   homeScore: number;
   awayScore: number;
 }
+
+export interface SystemStatus {
+  last_updated_date: string;
+}

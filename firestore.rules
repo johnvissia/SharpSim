@@ -1,13 +1,14 @@
 /**
  * Core Philosophy: This ruleset supports a client-side data caching model for public sports data. Due to the architectural constraint of not using Cloud Functions (as per the Firebase Spark plan), clients are trusted to fetch data from an external API and write it directly to Firestore. The security model, therefore, allows any authenticated user to write data while making the data publicly readable by anyone.
  *
- * Data Structure: The database consists of two top-level collections:
+ * Data Structure: The database consists of these top-level collections:
  *   - /daily_games: Caches odds for upcoming games.
  *   - /completed_games: Caches final scores for completed games.
+ *   - /system: Stores system-wide status information.
  * There is no user-specific data or nesting.
  *
  * Key Security Decisions:
- *   - Public Read Access: All data in both collections is considered public and can be read by any client, including unauthenticated visitors.
+ *   - Public Read Access: All data in all collections is considered public and can be read by any client, including unauthenticated visitors.
  *   - Authenticated Writes: To provide a minimal layer of protection against anonymous abuse, all write operations (create, update, delete) require the user to be signed in. This architecture trusts that authenticated clients will provide valid data from the external API.
  *   - No Data Validation: In line with the prototyping philosophy, these rules do not validate the shape or type of the data being written. Authorization is the sole focus.
  */
@@ -37,15 +38,10 @@ service cloud.firestore {
      * @path /daily_games/{gameId}
      * @allow (get, list) by any user, including unauthenticated ones, to read public game data.
      * @allow (create, update, delete) by any authenticated user to cache or refresh data from the client-side.
-     * @deny (create, update, delete) by an unauthenticated user to prevent anonymous abuse.
-     * @principle Public read access for cached data, with writes restricted to authenticated users.
      */
     match /daily_games/{gameId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow write: if isSignedIn();
     }
 
     /**
@@ -53,15 +49,21 @@ service cloud.firestore {
      * @path /completed_games/{gameId}
      * @allow (get, list) by any user, including unauthenticated ones, to read historical game scores.
      * @allow (create, update, delete) by any authenticated user to cache or refresh data from the client-side.
-     * @deny (create, update, delete) by an unauthenticated user to prevent anonymous abuse.
-     * @principle Public read access for cached data, with writes restricted to authenticated users.
      */
     match /completed_games/{gameId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow write: if isSignedIn();
+    }
+
+    /**
+     * @description Controls access to the system status document, which tracks when the daily data was last updated.
+     * @path /system/{statusId}
+     * @allow (get, list) by any user to check the last update status.
+     * @allow (create, update, delete) by any authenticated user to update the status after a successful data fetch.
+     */
+    match /system/{statusId} {
+        allow get, list: if true;
+        allow write: if isSignedIn();
     }
   }
 }

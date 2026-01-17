@@ -86,6 +86,20 @@
         "homeScore",
         "awayScore"
       ]
+    },
+    "SystemStatus": {
+      "title": "SystemStatus",
+      "type": "object",
+      "description": "Stores system-wide status information, like the last time daily data was fetched.",
+      "properties": {
+        "last_updated_date": {
+          "type": "string",
+          "description": "The date (YYYY-MM-DD) when the daily data was last successfully fetched and saved."
+        }
+      },
+      "required": [
+        "last_updated_date"
+      ]
     }
   },
   "auth": {
@@ -96,12 +110,22 @@
   },
   "firestore": {
     "/daily_games/{gameId}": {
-        "schema": { "$ref": "#/entities/DailyGame" },
-        "description": "Stores odds for upcoming games. Clients write directly to this collection after fetching from an external API."
+      "schema": {
+        "$ref": "#/entities/DailyGame"
+      },
+      "description": "Stores odds for upcoming games. Clients write directly to this collection after fetching from an external API."
     },
     "/completed_games/{gameId}": {
-        "schema": { "$ref": "#/entities/CompletedGame" },
-        "description": "Stores final scores for completed games. Clients write directly to this collection."
+      "schema": {
+        "$ref": "#/entities/CompletedGame"
+      },
+      "description": "Stores final scores for completed games. Clients write directly to this collection."
+    },
+    "/system/{statusId}": {
+      "schema": {
+        "$ref": "#/entities/SystemStatus"
+      },
+      "description": "Stores system-wide status information. Only a single document with ID 'status' is expected."
     }
   }
 }
