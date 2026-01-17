@@ -1,6 +1,46 @@
+import * as React from 'react';
 import type { SportName } from './types';
 import type { LucideProps } from 'lucide-react';
-import { Baseball, Basketball, Futbol, IceSkate, Trophy } from 'lucide-react';
+import { Football, Futbol, IceSkate, Trophy } from 'lucide-react';
+
+const BaseballIcon = (props: LucideProps) => (
+    React.createElement('svg', {
+      xmlns: "http://www.w3.org/2000/svg",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      ...props
+    },
+      React.createElement('circle', { cx: "12", cy: "12", r: "10" }),
+      React.createElement('path', { d: "M12 2a7.5 7.5 0 0 0-7.5 7.5c0 1.15.26 2.24.73 3.22" }),
+      React.createElement('path', { d: "M12 2a7.5 7.5 0 0 1 7.5 7.5c0 1.15-.26 2.24-.73 3.22" }),
+      React.createElement('path', { d: "M2.5 9.56A7.5 7.5 0 0 1 12 22a7.5 7.5 0 0 1 9.5-12.44" })
+    )
+  );
+
+const BasketballIcon = (props: LucideProps) => (
+    React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg",
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: "2",
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        ...props
+    },
+        React.createElement('circle', { cx: '12', cy: '12', r: '10' }),
+        React.createElement('path', { d: 'M4.22 14c-1.22-2.8-1.03-6.6.93-8.8' }),
+        React.createElement('path', { d: 'M19.78 10c1.22 2.8 1.03 6.6-.93 8.8' }),
+        React.createElement('path', { d: 'M10 4.22c2.8 1.22 6.6 1.03 8.8-.93' }),
+        React.createElement('path', { d: 'M14 19.78c-2.8-1.22-6.6-1.03-8.8.93' }),
+        React.createElement('path', { d: 'M2 10h20' }),
+        React.createElement('path', { d: 'M12 2v20' })
+    )
+);
 
 const teamLogoSlugs: { [key: string]: string } = {
     // NFL
@@ -39,7 +79,7 @@ const teamLogoSlugs: { [key: string]: string } = {
     'Colorado Rockies': 'col', 'Detroit Tigers': 'det', 'Houston Astros': 'hou', 'Kansas City Royals': 'kc',
     'Los Angeles Angels': 'ana', 'Los Angeles Dodgers': 'lad', 'Miami Marlins': 'mia', 'Milwaukee Brewers': 'mil',
     'Minnesota Twins': 'min', 'New York Mets': 'nym', 'New York Yankees': 'nyy', 'Oakland Athletics': 'oak',
-    'Philadelphia Phillies': 'phi', 'Pittsburgh Pirates': 'pit', 'San Diego Padres': 'sd', 'San Francisco Giants': 'sf',
+    'Philadelphia Phillies': 'phi', 'Pittsburgh Steelers': 'pit', 'San Diego Padres': 'sd', 'San Francisco Giants': 'sf',
     'Seattle Mariners': 'sea', 'St. Louis Cardinals': 'stl', 'Tampa Bay Rays': 'tb', 'Texas Rangers': 'tex',
     'Toronto Blue Jays': 'tor', 'Washington Nationals': 'wsh',
 };
@@ -66,14 +106,14 @@ export function getTeamLogoUrl(teamName: string, sport: SportName): string {
 }
 
 export const sportIconMap: { [key: string]: React.ElementType<LucideProps> } = {
-    'NBA': Basketball,
-    'WNBA': Basketball,
-    'NCAAM': Basketball,
-    'NCAAW': Basketball,
-    'NFL': Futbol,
-    'NCAAF': Futbol,
+    'NBA': BasketballIcon,
+    'WNBA': BasketballIcon,
+    'NCAAM': BasketballIcon,
+    'NCAAW': BasketballIcon,
+    'NFL': Football,
+    'NCAAF': Football,
     'NHL': IceSkate,
     'Soccer': Futbol,
-    'MLB': Baseball,
+    'MLB': BaseballIcon,
     'Default': Trophy,
 };
