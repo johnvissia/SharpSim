@@ -40,17 +40,17 @@ const transformDailyGamesToGames = (dailyGames: DailyGame[] | null): Game[] => {
 
                 if (!h2hMarket) return null;
 
-                // Find outcomes
-                const homeMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name === dg.homeTeam);
-                const awayMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name === dg.awayTeam);
+                // Find outcomes by comparing trimmed names for robustness
+                const homeMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.homeTeam.trim());
+                const awayMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.awayTeam.trim());
                 if (!homeMoneylineOutcome || !awayMoneylineOutcome) return null;
 
                 const moneyline = { home: homeMoneylineOutcome.price, away: awayMoneylineOutcome.price };
 
                 let spread: Odds['spread'] = { points: 0, home: 0, away: 0 };
                 if (spreadsMarket) {
-                    const homeSpreadOutcome = spreadsMarket.outcomes.find((o: any) => o.name === dg.homeTeam);
-                    const awaySpreadOutcome = spreadsMarket.outcomes.find((o: any) => o.name === dg.awayTeam);
+                    const homeSpreadOutcome = spreadsMarket.outcomes.find((o: any) => o.name.trim() === dg.homeTeam.trim());
+                    const awaySpreadOutcome = spreadsMarket.outcomes.find((o: any) => o.name.trim() === dg.awayTeam.trim());
                     if (homeSpreadOutcome && awaySpreadOutcome) {
                         spread = { points: homeSpreadOutcome.point, home: homeSpreadOutcome.price, away: awaySpreadOutcome.price };
                     }
