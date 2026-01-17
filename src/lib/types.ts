@@ -1,0 +1,55 @@
+export type Player = {
+  id: string;
+  name: string;
+  position: string;
+  injuryStatus: 'Healthy' | 'Questionable' | 'Out';
+};
+
+export type Team = {
+  id:string;
+  name: string;
+  logo: string; // URL to logo
+  record: string; // e.g., "10-5"
+  players: Player[];
+};
+
+export type Odds = {
+  moneyline: { home: number; away: number };
+  spread: { points: number; home: number; away: number };
+  total: { points: number; over: number; under: number };
+};
+
+export type SportsbookOdds = {
+  sportsbook: 'FanDuel' | 'DraftKings' | 'BetMGM' | 'Caesars' | 'Fanatics';
+  odds: Odds;
+};
+
+export type Game = {
+  id: string;
+  sport: 'NFL' | 'NBA' | 'MLB' | 'NHL';
+  startTime: string; // ISO 8601 string
+  homeTeam: Team;
+  awayTeam: Team;
+  odds: Odds; // This will be the "best" line for display
+  allOdds: SportsbookOdds[];
+  liveScore?: { home: number; away: number };
+};
+
+export type Sport = {
+  id: string;
+  name: 'NFL' | 'NBA' | 'MLB' | 'NHL';
+};
+
+export type UserBet = {
+  id: string;
+  gameId: string;
+  userId: string;
+  sport: 'NFL' | 'NBA' | 'MLB' | 'NHL';
+  betType: 'moneyline' | 'spread' | 'total' | 'parlay';
+  pick: string; // e.g., "Golden State Warriors" or "Over 220.5"
+  stake: number;
+  odds: number;
+  potentialWinnings: number;
+  status: 'pending' | 'won' | 'lost' | 'push';
+  placedAt: string; // ISO 8601 string
+};
