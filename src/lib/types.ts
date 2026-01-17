@@ -24,9 +24,11 @@ export type SportsbookOdds = {
   odds: Odds;
 };
 
+export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'Soccer' | 'WNBA' | 'NCAAF' | 'NCAAM' | 'NCAAW';
+
 export type Game = {
   id: string;
-  sport: 'NFL' | 'NBA' | 'MLB' | 'NHL';
+  sport: SportName;
   startTime: string; // ISO 8601 string
   homeTeam: Team;
   awayTeam: Team;
@@ -37,14 +39,14 @@ export type Game = {
 
 export type Sport = {
   id: string;
-  name: 'NFL' | 'NBA' | 'MLB' | 'NHL';
+  name: SportName;
 };
 
 export type UserBet = {
   id: string;
   gameId: string;
   userId: string;
-  sport: 'NFL' | 'NBA' | 'MLB' | 'NHL';
+  sport: SportName;
   betType: 'moneyline' | 'spread' | 'total' | 'parlay';
   pick: string; // e.g., "Golden State Warriors" or "Over 220.5"
   stake: number;
