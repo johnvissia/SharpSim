@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { fetchAndSaveDailyData } from '@/lib/api';
 import { getSports } from '@/lib/mock-data';
 import type { Sport } from '@/lib/types';
@@ -27,6 +27,7 @@ export default function DashboardPage() {
   const [isFetching, setIsFetching] = useState(false);
   
   const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -35,15 +36,19 @@ export default function DashboardPage() {
       const sportsData = await getSports();
       setSports(sportsData);
 
-      // Initial data fetch for all sports on page load
-      if (firestore) {
-        handleFetchData('upcoming');
+      // Initial data fetch for all sports on page load, but only if user is logged in.
+      if (firestore && user) {
+        await handleFetchData('upcoming');
       }
-
       setLoading(false);
     };
-    fetchInitialData();
-  }, [firestore]); // Re-run if firestore instance becomes available
+
+    // Only run this logic once the initial user authentication check is complete.
+    if (!isUserLoading) {
+      fetchInitialData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firestore, user, isUserLoading]); // Re-run if firestore instance or user becomes available
 
   const handleFetchData = async (sportName: string) => {
       setIsFetching(true);
@@ -101,7 +106,7 @@ export default function DashboardPage() {
                     </SelectContent>
                 </Select>
             )}
-            <Button onClick={() => handleFetchData(selectedSport)} disabled={isFetching || !firestore}>
+            <Button onClick={() => handleFetchData(selectedSport)} disabled={isFetching || !firestore || !user}>
                 <Download className="mr-2 h-4 w-4" />
                 {isFetching ? 'Syncing...' : 'Sync Data'}
             </Button>
