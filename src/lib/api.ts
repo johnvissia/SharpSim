@@ -10,11 +10,20 @@ const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
 // Helper function to introduce a delay
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
+// List of sports to fetch for the daily 'upcoming' sync.
+const UPCOMING_SPORT_KEYS = [
+  'basketball_nba',
+  'basketball_ncaab',
+  'icehockey_nhl',
+  'soccer_epl',
+];
+
+
 /**
  * Fetches daily game odds and completed game scores from The Odds API
  * and saves them to Firestore. This function is designed to run on the client-side.
  * @param firestore The Firestore instance from `useFirestore()`.
- * @param sportKey The key for the sport to fetch (e.g., 'basketball_nba'). Defaults to 'upcoming' for all sports.
+ * @param sportKey The key for the sport to fetch (e.g., 'basketball_nba'). If 'upcoming', it fetches a predefined list of popular sports.
  */
 export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: string = 'upcoming') {
   if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') {
@@ -24,24 +33,30 @@ export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: stri
   }
 
   // --- 1. Fetch Upcoming Game Odds ---
-  // The 'odds' endpoint supports 'upcoming' to fetch all sports.
+  let allUpcomingGames: any[] = [];
+  const keysToFetch = sportKey === 'upcoming' ? UPCOMING_SPORT_KEYS : [sportKey];
+
   try {
-    const oddsApiUrl = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?regions=us&markets=h2h,spreads,totals&oddsFormat=american&apiKey=${API_KEY}`;
-    const oddsResponse = await fetch(oddsApiUrl);
+    const fetchPromises = keysToFetch.map(key => {
+        const oddsApiUrl = `https://api.the-odds-api.com/v4/sports/${key}/odds/?regions=us&markets=h2h,spreads,totals&oddsFormat=american&apiKey=${API_KEY}`;
+        return fetch(oddsApiUrl).then(async (res) => {
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error(`Failed to fetch odds for ${key}: ${res.status}`, errorText);
+                return []; // Return empty array on failure, so Promise.all doesn't reject
+            }
+            return res.json();
+        });
+    });
 
-    if (!oddsResponse.ok) {
-      const errorText = await oddsResponse.text();
-      console.error("The Odds API Response:", errorText);
-      throw new Error(`Failed to fetch odds: ${oddsResponse.status}`);
+    const results = await Promise.all(fetchPromises);
+    allUpcomingGames = results.flat(); // Combine arrays of games from all fetched sports
+
+    if (allUpcomingGames.length === 0) {
+        console.warn('No upcoming games found for the selected sports.');
     }
 
-    const upcomingGames: any[] = await oddsResponse.json();
-
-    if (upcomingGames.length === 0) {
-        console.warn('No upcoming games found for the selected sport.');
-    }
-
-    for (const game of upcomingGames) {
+    for (const game of allUpcomingGames) {
       const gameData: DailyGame = {
         id: game.id,
         sportKey: game.sport_key,
@@ -51,10 +66,10 @@ export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: stri
         bookmakerOdds: game.bookmakers?.map((b: any) => JSON.stringify(b)) || [],
       };
       const gameRef = doc(firestore, 'daily_games', gameData.id);
-      // Using non-blocking write as requested
+      // Using non-blocking write
       setDocumentNonBlocking(gameRef, gameData, { merge: true });
     }
-    console.log(`Successfully queued writes for ${upcomingGames.length} upcoming games.`);
+    console.log(`Successfully queued writes for ${allUpcomingGames.length} upcoming games.`);
   } catch (error) {
     console.error('Error fetching or saving daily odds:', error);
     throw error; // Re-throw to be caught by the calling component
@@ -112,7 +127,8 @@ export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: stri
       }
       
       // Introduce a delay to avoid hitting rate limits when fetching all sports.
-      if (sportKey === 'upcoming') {
+      // This is crucial when looping.
+      if (scoreSportKeysToFetch.length > 1) {
         await delay(1100); // Wait for ~1.1 second before the next request. Free plan allows roughly 1 req/sec.
       }
   }
