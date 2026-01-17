@@ -53,10 +53,12 @@ const FootballIcon = (props: LucideProps) => (
         strokeLinejoin: "round",
         ...props
     },
-      React.createElement('path', { d: "M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" }),
-      React.createElement('path', { d: "M8.5 7a5.1 5.1 0 0 1 7 0" }),
-      React.createElement('path', { d: "M12 22a7.8 7.8 0 0 1-4-1.5" }),
-      ReactcreateElement('path', { d: "M12 22a7.8 7.8 0 0 0 4-1.5" })
+      React.createElement('ellipse', { cx: "12", cy: "12", rx: "10", ry: "7" }),
+      React.createElement('path', { d: "M12 2a10 7 0 0 0-10 7c0 2.24 1.79 4.1 4 5.3" }),
+      React.createElement('path', { d: "M12 2a10 7 0 0 1 10 7c0 2.24-1.79 4.1-4 5.3" }),
+      React.createElement('path', { d: "M7 12h2" }),
+      React.createElement('path', { d: "M15 12h2" }),
+      React.createElement('path', { d: "M12 7v10" })
     )
 );
 
@@ -71,11 +73,12 @@ const FutbolIcon = (props: LucideProps) => (
         strokeLinejoin: "round",
         ...props
     },
-      React.createElement('path', { d: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" }),
-      React.createElement('path', { d: "M15.5 6.5L12 12l3.5 5.5" }),
-      React.createElement('path', { d: "M8.5 6.5L12 12l-3.5 5.5" }),
-      React.createElement('path', { d: "M6.5 15.5l5.5-3.5 5.5 3.5" }),
-      React.createElement('path', { d: "M6.5 8.5l5.5 3.5 5.5-3.5" })
+      React.createElement('circle', { cx: "12", cy: "12", r: "10" }),
+      React.createElement('polygon', { points: "12 2 12 22 2 12 22 12" }),
+      React.createElement('polygon', { points: "12 2 17 6.5 12 11 7 6.5" }),
+      React.createElement('polygon', { points: "12 22 17 17.5 12 13 7 17.5" }),
+      React.createElement('polygon', { points: "2 12 6.5 7 11 12 6.5 17" }),
+      React.createElement('polygon', { points: "22 12 17.5 7 13 12 17.5 17" })
     )
 );
 
@@ -146,25 +149,62 @@ const teamLogoSlugs: { [key: string]: string } = {
 };
 
 const sportLeagueMap: { [key in SportName]?: string } = {
-    'NFL': 'nfl', 'NBA': 'nba', 'NHL': 'nhl', 'MLB': 'mlb', 'WNBA': 'wnba', 'NCAAF': 'ncaaf', 'NCAAM': 'ncaab'
+    'NFL': 'nfl', 'NBA': 'nba', 'NHL': 'nhl', 'MLB': 'mlb', 'WNBA': 'wnba', 'NCAAF': 'ncaaf', 'NCAAM': 'ncaab', 'NCAAW': 'ncaaw'
 };
 
 export function getTeamLogoUrl(teamName: string, sport: SportName): string {
     const league = sportLeagueMap[sport];
-    const slug = teamLogoSlugs[teamName];
-
-    if (sport === 'NCAAF' || sport === 'NCAAM') {
-        if (teamName.includes('Alabama')) return `https://a.espncdn.com/i/teamlogos/ncaa/500/333.png`;
-        if (teamName.includes('Georgia')) return `https://a.espncdn.com/i/teamlogos/ncaa/500/61.png`;
-        // Add more NCAA mappings as needed
+    
+    // 1. Normalization
+    const normalizedApiName = teamName.toLowerCase();
+    
+    // Create a normalized map for easier lookup. This could be memoized for performance if needed.
+    const normalizedLogoSlugs: { [key: string]: string } = {};
+    for (const key in teamLogoSlugs) {
+        normalizedLogoSlugs[key.toLowerCase()] = teamLogoSlugs[key];
     }
 
-    if (league && slug) {
+    // --- Matching Logic ---
+
+    // a) Try for a direct, normalized match first
+    let slug = normalizedLogoSlugs[normalizedApiName];
+    if (slug && league) {
         return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
     }
 
+    // b) Mascot Handling: Try matching without the last word
+    const nameParts = normalizedApiName.split(' ');
+    if (nameParts.length > 1) {
+        const schoolName = nameParts.slice(0, -1).join(' ');
+        slug = normalizedLogoSlugs[schoolName];
+        if (slug && league) {
+            return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
+        }
+    }
+
+    // c) Partial Match: Check if any key is contained in the API name.
+    //    Sort keys by length to find the most specific match first.
+    const sortedKeys = Object.keys(normalizedLogoSlugs).sort((a, b) => b.length - a.length);
+    for (const mapKey of sortedKeys) {
+        if (normalizedApiName.includes(mapKey)) {
+            slug = normalizedLogoSlugs[mapKey];
+            if (slug && league) {
+                return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
+            }
+        }
+    }
+    
+    // Special hardcoded cases from previous version, as a final fallback.
+    if (sport === 'NCAAF' || sport === 'NCAAM' || sport === 'NCAAW') {
+        if (teamName.includes('Alabama')) return `https://a.espncdn.com/i/teamlogos/ncaa/500/333.png`;
+        if (teamName.includes('Georgia')) return `https://a.espncdn.com/i/teamlogos/ncaa/500/61.png`;
+    }
+
+    // d) Debug Mode: If still no logo, log the name.
+    console.log(`[Logo Mapper Debug] No logo found for team: "${teamName}" in sport: "${sport}"`);
     return ''; // Return empty string to signal fallback
 }
+
 
 export const sportIconMap: { [key: string]: React.ElementType<LucideProps> } = {
     'NBA': BasketballIcon,
