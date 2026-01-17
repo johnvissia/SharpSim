@@ -1,16 +1,15 @@
 /**
- * Core Philosophy: This ruleset supports a client-side data caching model for public sports data. Due to the architectural constraint of not using Cloud Functions (as per the Firebase Spark plan), clients are trusted to fetch data from an external API and write it directly to Firestore. The security model, therefore, allows any authenticated user to write data while making the data publicly readable by anyone.
+ * Core Philosophy: This ruleset supports a client-side data caching model for public sports data and user-specific betting.
  *
- * Data Structure: The database consists of these top-level collections:
- *   - /daily_games: Caches odds for upcoming games.
- *   - /completed_games: Caches final scores for completed games.
- *   - /system: Stores system-wide status information.
- * There is no user-specific data or nesting.
+ * Public Data (/daily_games, /completed_games, /system):
+ * - Public Read Access: All game and system data is public and readable by anyone.
+ * - Authenticated Writes: To prevent anonymous abuse, only signed-in users can write to these collections, which is necessary for the client-side data fetching model.
+ *
+ * User Data (/users):
+ * - Owner-Only Access: Users can only read and write their own data. A user can create their own profile and bets, and update them. This is critical for security. The `gradeUserBets` function runs on the client, so it can only update the bets of the currently logged-in user, which these rules enforce.
  *
  * Key Security Decisions:
- *   - Public Read Access: All data in all collections is considered public and can be read by any client, including unauthenticated visitors.
- *   - Authenticated Writes: To provide a minimal layer of protection against anonymous abuse, all write operations (create, update, delete) require the user to be signed in. This architecture trusts that authenticated clients will provide valid data from the external API.
- *   - No Data Validation: In line with the prototyping philosophy, these rules do not validate the shape or type of the data being written. Authorization is the sole focus.
+ *   - No Data Validation: In line with prototyping, these rules focus on authorization, not data validation.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -19,51 +18,52 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
     // Helper Functions
     // ------------------------------------------------------------------------
-
-    /**
-     * isSignedIn
-     * @description Checks if a user is authenticated. This is the primary check for all write operations.
-     * @returns {boolean} True if the user has a valid auth object, false otherwise.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // ------------------------------------------------------------------------
-    // Collection Rules
-    // ------------------------------------------------------------------------
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
 
-    /**
-     * @description Controls access to the public collection of daily game odds, which are cached from an external API.
-     * @path /daily_games/{gameId}
-     * @allow (get, list) by any user, including unauthenticated ones, to read public game data.
-     * @allow (create, update, delete) by any authenticated user to cache or refresh data from the client-side.
-     */
+    // ------------------------------------------------------------------------
+    // Public Collections
+    // ------------------------------------------------------------------------
     match /daily_games/{gameId} {
       allow get, list: if true;
       allow write: if isSignedIn();
     }
 
-    /**
-     * @description Controls access to the public collection of completed game scores, which are cached from an external API.
-     * @path /completed_games/{gameId}
-     * @allow (get, list) by any user, including unauthenticated ones, to read historical game scores.
-     * @allow (create, update, delete) by any authenticated user to cache or refresh data from the client-side.
-     */
     match /completed_games/{gameId} {
       allow get, list: if true;
       allow write: if isSignedIn();
     }
 
-    /**
-     * @description Controls access to the system status document, which tracks when the daily data was last updated.
-     * @path /system/{statusId}
-     * @allow (get, list) by any user to check the last update status.
-     * @allow (create, update, delete) by any authenticated user to update the status after a successful data fetch.
-     */
     match /system/{statusId} {
-        allow get, list: if true;
-        allow write: if isSignedIn();
+      allow get, list: if true;
+      allow write: if isSignedIn();
+    }
+    
+    // ------------------------------------------------------------------------
+    // User-Specific Collections
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to user profile documents. Users can create, read, and update their own profile, but cannot delete it or access others' profiles.
+     * @path /users/{userId}
+     */
+    match /users/{userId} {
+      allow get, update, create: if isOwner(userId);
+      // Deny reads/writes to the entire collection.
+      allow list, delete: if false;
+
+      /**
+       * @description Controls access to a user's subcollection of bets. Users can manage their own bets fully.
+       * @path /users/{userId}/bets/{betId}
+       */
+      match /bets/{betId} {
+        allow get, list, create, update, delete: if isOwner(userId);
+      }
     }
   }
 }

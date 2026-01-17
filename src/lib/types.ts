@@ -42,7 +42,15 @@ export type Sport = {
   name: SportName;
 };
 
-export type UserBet = {
+// Types from backend.json for Firestore
+export interface UserProfile {
+  uid: string;
+  isAnonymous: boolean;
+  balance: number;
+  createdAt: any; // Firestore ServerTimestamp
+}
+
+export interface UserBet {
   id: string;
   gameId: string;
   userId: string;
@@ -56,7 +64,6 @@ export type UserBet = {
   placedAt: string; // ISO 8601 string
 };
 
-// Types from backend.json for Firestore
 export interface DailyGame {
   id: string;
   sportKey: string;

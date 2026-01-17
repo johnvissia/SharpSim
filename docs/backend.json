@@ -1,5 +1,36 @@
 {
   "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Stores public profile information for a user, including their game balance.",
+      "properties": {
+        "uid": { "type": "string", "description": "The user's unique ID." },
+        "isAnonymous": { "type": "boolean", "description": "Whether the user is anonymous." },
+        "balance": { "type": "number", "description": "The user's current coin balance." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the profile was created."}
+      },
+      "required": ["uid", "isAnonymous", "balance", "createdAt"]
+    },
+    "UserBet": {
+      "title": "UserBet",
+      "type": "object",
+      "description": "Represents a single bet placed by a user.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the bet." },
+        "gameId": { "type": "string", "description": "The ID of the game the bet is on." },
+        "userId": { "type": "string", "description": "The ID of the user who placed the bet." },
+        "sport": { "type": "string", "description": "The sport of the game." },
+        "betType": { "type": "string", "enum": ["moneyline", "spread", "total", "parlay"]},
+        "pick": { "type": "string", "description": "The user's selection (e.g., 'Team A' or 'Over 220.5')." },
+        "stake": { "type": "number", "description": "The amount of coins staked." },
+        "odds": { "type": "number", "description": "The American odds for the bet." },
+        "potentialWinnings": { "type": "number", "description": "How much the user stands to win." },
+        "status": { "type": "string", "enum": ["pending", "won", "lost", "push"]},
+        "placedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "gameId", "userId", "sport", "betType", "pick", "stake", "odds", "potentialWinnings", "status", "placedAt"]
+    },
     "DailyGame": {
       "title": "DailyGame",
       "type": "object",
@@ -126,6 +157,14 @@
         "$ref": "#/entities/SystemStatus"
       },
       "description": "Stores system-wide status information. Only a single document with ID 'status' is expected."
+    },
+    "/users/{userId}": {
+        "schema": { "$ref": "#/entities/UserProfile" },
+        "description": "Stores user profile data, including their coin balance."
+    },
+    "/users/{userId}/bets/{betId}": {
+        "schema": { "$ref": "#/entities/UserBet" },
+        "description": "Subcollection for storing bets placed by a specific user."
     }
   }
 }

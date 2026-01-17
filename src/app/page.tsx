@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { fetchAndSaveDailyData } from '@/lib/api';
+import { gradeUserBets } from '@/lib/bet-grading';
 import { getSports } from '@/lib/mock-data';
 import type { Sport, SystemStatus } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,39 +67,44 @@ export default function DashboardPage() {
       return;
     }
 
-    // --- Trigger daily data fetch ---
+    // --- Trigger daily data fetch and bet grading ---
     const runDailySync = async () => {
       console.log(
-        'New day detected or first sync. Fetching and saving daily data...'
+        'New day detected or first sync. Running daily protocol...'
       );
       setIsAutoSyncing(true);
       toast({
         title: 'Performing Daily Sync...',
         description:
-          'Fetching latest odds and scores for the first time today.',
+          'Fetching latest odds, scores, and settling yesterdays bets.',
       });
 
       try {
+        // Step 1: Fetch new data
         await fetchAndSaveDailyData(firestore, 'upcoming');
-        // On success, update the status document with today's date
+        
+        // Step 2: Grade yesterday's bets
+        toast({ title: 'Syncing complete. Now grading bets...' });
+        await gradeUserBets(firestore, user);
+
+        // Step 3: On complete success, update the status document
         setDocumentNonBlocking(
           systemStatusRef,
           { last_updated_date: today },
           { merge: true }
         );
         toast({
-          title: 'Daily Sync Complete!',
-          description: 'Odds and scores are fresh for today.',
+          title: 'Daily Protocol Complete!',
+          description: 'Odds are fresh and bets are settled.',
         });
       } catch (error: any) {
-        console.error('Failed during automatic daily sync:', error);
-        // Do not update the date on failure, so it can try again later.
+        console.error('Failed during automatic daily protocol:', error);
         toast({
           variant: 'destructive',
           title: 'Auto-Sync Failed',
           description:
             error.message ||
-            'Could not fetch daily data. It will be retried on next page load.',
+            'Could not run daily protocol. It will be retried on next page load.',
         });
       } finally {
         setIsAutoSyncing(false);
@@ -109,6 +115,7 @@ export default function DashboardPage() {
   }, [systemStatus, isStatusLoading, firestore, user, systemStatusRef, toast]);
 
   const handleManualFetch = async (sportName: string) => {
+    if (!firestore || !user) return;
     setIsFetchingManually(true);
     toast({
       title: 'Syncing Data...',
@@ -144,7 +151,7 @@ export default function DashboardPage() {
     setIsFetchingManually(false);
   };
 
-  const showLoadingSpinner = isStatusLoading || isAutoSyncing;
+  const showLoadingSpinner = isStatusLoading || isAutoSyncing || isUserLoading;
 
   return (
     <div className="flex flex-col gap-8 p-4 md:p-8">
@@ -166,6 +173,7 @@ export default function DashboardPage() {
             <Select
               onValueChange={setSelectedSport}
               defaultValue={selectedSport}
+              disabled={showLoadingSpinner}
             >
               <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Select a sport" />
@@ -183,15 +191,15 @@ export default function DashboardPage() {
           <Button
             onClick={() => handleManualFetch(selectedSport)}
             disabled={
-              isFetchingManually || showLoadingSpinner || !firestore || !user
+              isFetchingManually || showLoadingSpinner
             }
           >
-            {isFetchingManually ? (
+            {isFetchingManually || isAutoSyncing ? (
               <Loader className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Download className="mr-2 h-4 w-4" />
             )}
-            {isFetchingManually ? 'Syncing...' : 'Sync Data'}
+            {isAutoSyncing ? 'Auto-Sync...' : isFetchingManually ? 'Syncing...' : 'Sync Data'}
           </Button>
         </div>
       </header>
@@ -200,11 +208,12 @@ export default function DashboardPage() {
         <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
           <Loader className="h-12 w-12 animate-spin text-primary" />
           <h2 className="text-xl font-semibold text-foreground">
-            Loading Daily Lines...
+            {isUserLoading ? 'Authenticating...' : 'Loading Daily Lines...'}
           </h2>
           <p className="text-muted-foreground">
-            This happens once per day on the first visit to ensure data is
-            fresh.
+            {isUserLoading 
+              ? 'Preparing your session...' 
+              : 'This happens once per day to ensure all data is fresh.'}
           </p>
         </div>
       ) : (
