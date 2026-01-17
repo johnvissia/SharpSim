@@ -146,44 +146,58 @@ const teamLogoSlugs: { [key: string]: string } = {
     'Philadelphia Phillies': 'phi', 'Pittsburgh Steelers': 'pit', 'San Diego Padres': 'sd', 'San Francisco Giants': 'sf',
     'Seattle Mariners': 'sea', 'St. Louis Cardinals': 'stl', 'Tampa Bay Rays': 'tb', 'Texas Rangers': 'tex',
     'Toronto Blue Jays': 'tor', 'Washington Nationals': 'wsh',
+    
+    // Soccer (EPL)
+    'Arsenal': '359', 'Manchester United': '360', 'Liverpool': '364', 'Manchester City': '382',
+    'Chelsea': '363', 'Tottenham Hotspur': '367', 'Nottingham Forest': '393'
 };
 
 const sportLeagueMap: { [key in SportName]?: string } = {
-    'NFL': 'nfl', 'NBA': 'nba', 'NHL': 'nhl', 'MLB': 'mlb', 'WNBA': 'wnba', 'NCAAF': 'ncaaf', 'NCAAM': 'ncaab', 'NCAAW': 'ncaaw'
+    'NFL': 'nfl', 'NBA': 'nba', 'NHL': 'nhl', 'MLB': 'mlb', 'WNBA': 'wnba', 'NCAAF': 'ncaaf', 'NCAAM': 'ncaab', 'NCAAW': 'ncaaw', 'Soccer': 'eng.1'
 };
 
 export function getTeamLogoUrl(teamName: string, sport: SportName): string {
     const league = sportLeagueMap[sport];
     
-    // 1. Normalization
-    const normalizedApiName = teamName.toLowerCase();
+    // 1. Normalization of API name
+    const normalizedApiName = teamName.toLowerCase().trim();
     
-    // Create a normalized map for easier lookup. This could be memoized for performance if needed.
+    // 2. Create a normalized map of our logo slugs for easier lookup.
     const normalizedLogoSlugs: { [key: string]: string } = {};
     for (const key in teamLogoSlugs) {
-        normalizedLogoSlugs[key.toLowerCase()] = teamLogoSlugs[key];
+        normalizedLogoSlugs[key.toLowerCase().trim()] = teamLogoSlugs[key];
     }
 
-    // --- Matching Logic ---
+    // --- Matching Strategies ---
 
-    // a) Try for a direct, normalized match first
+    // Strategy A: Direct Match
     let slug = normalizedLogoSlugs[normalizedApiName];
     if (slug && league) {
         return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
     }
 
-    // b) Mascot Handling: Try matching without the last word
+    // Strategy B: Soccer Suffix Handling
+    if (sport === 'Soccer') {
+        const suffixes = [' fc', ' united', ' hotspur'];
+        for (const suffix of suffixes) {
+            slug = normalizedLogoSlugs[normalizedApiName + suffix];
+            if (slug && league) {
+                return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
+            }
+        }
+    }
+    
+    // Strategy C: Mascot/Suffix Removal
     const nameParts = normalizedApiName.split(' ');
     if (nameParts.length > 1) {
-        const schoolName = nameParts.slice(0, -1).join(' ');
-        slug = normalizedLogoSlugs[schoolName];
+        const nameWithoutLastWord = nameParts.slice(0, -1).join(' ');
+        slug = normalizedLogoSlugs[nameWithoutLastWord];
         if (slug && league) {
             return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
         }
     }
 
-    // c) Partial Match: Check if any key is contained in the API name.
-    //    Sort keys by length to find the most specific match first.
+    // Strategy D: Partial Match (Containment check)
     const sortedKeys = Object.keys(normalizedLogoSlugs).sort((a, b) => b.length - a.length);
     for (const mapKey of sortedKeys) {
         if (normalizedApiName.includes(mapKey)) {
@@ -194,15 +208,17 @@ export function getTeamLogoUrl(teamName: string, sport: SportName): string {
         }
     }
     
-    // Special hardcoded cases from previous version, as a final fallback.
+    // --- Fallbacks ---
+
+    // Special hardcoded cases as a final fallback.
     if (sport === 'NCAAF' || sport === 'NCAAM' || sport === 'NCAAW') {
         if (teamName.includes('Alabama')) return `https://a.espncdn.com/i/teamlogos/ncaa/500/333.png`;
         if (teamName.includes('Georgia')) return `https://a.espncdn.com/i/teamlogos/ncaa/500/61.png`;
     }
 
-    // d) Debug Mode: If still no logo, log the name.
+    // If still no logo, log the name for debugging.
     console.log(`[Logo Mapper Debug] No logo found for team: "${teamName}" in sport: "${sport}"`);
-    return ''; // Return empty string to signal fallback
+    return ''; // Return empty string to signal fallback to the sport icon.
 }
 
 
