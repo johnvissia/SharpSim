@@ -20,7 +20,7 @@ export type Odds = {
 };
 
 export type SportsbookOdds = {
-  sportsbook: 'FanDuel' | 'DraftKings' | 'BetMGM' | 'Caesars' | 'Fanatics';
+  sportsbook: string;
   odds: Odds;
 };
 
