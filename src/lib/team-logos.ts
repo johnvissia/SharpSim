@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type { SportName } from './types';
 import type { LucideProps } from 'lucide-react';
-import { Football, Futbol, IceSkate, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 
 const BaseballIcon = (props: LucideProps) => (
     React.createElement('svg', {
@@ -41,6 +41,67 @@ const BasketballIcon = (props: LucideProps) => (
         React.createElement('path', { d: 'M12 2v20' })
     )
 );
+
+const FootballIcon = (props: LucideProps) => (
+    React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg",
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: "2",
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        ...props
+    },
+      React.createElement('path', { d: "M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" }),
+      React.createElement('path', { d: "M8.5 7a5.1 5.1 0 0 1 7 0" }),
+      React.createElement('path', { d: "M12 22a7.8 7.8 0 0 1-4-1.5" }),
+      ReactcreateElement('path', { d: "M12 22a7.8 7.8 0 0 0 4-1.5" })
+    )
+);
+
+const FutbolIcon = (props: LucideProps) => (
+    React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg",
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: "2",
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        ...props
+    },
+      React.createElement('path', { d: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" }),
+      React.createElement('path', { d: "M15.5 6.5L12 12l3.5 5.5" }),
+      React.createElement('path', { d: "M8.5 6.5L12 12l-3.5 5.5" }),
+      React.createElement('path', { d: "M6.5 15.5l5.5-3.5 5.5 3.5" }),
+      React.createElement('path', { d: "M6.5 8.5l5.5 3.5 5.5-3.5" })
+    )
+);
+
+const IceSkate = (props: LucideProps) => (
+    React.createElement('svg', {
+        xmlns: "http://www.w3.org/2000/svg",
+        width: "24",
+        height: "24",
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: "2",
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        ...props
+    },
+      React.createElement('path', { d: "M2 16h20" }),
+      React.createElement('path', { d: "M2 20h20" }),
+      React.createElement('path', { d: "M6 16l-2.5 4" }),
+      React.createElement('path', { d: "M18 16l2.5 4" }),
+      React.createElement('path', { d: "M12 16V9a2 2 0 0 0-2-2H8" }),
+      React.createElement('path', { d: "M18.5 6c-2 0-3.5-2-3.5-4" }),
+      React.createElement('path', { d: "M6 2h10a2 2 0 0 1 2 2v10H4V4a2 2 0 0 1 2-2z" })
+    )
+);
+
 
 const teamLogoSlugs: { [key: string]: string } = {
     // NFL
@@ -110,10 +171,10 @@ export const sportIconMap: { [key: string]: React.ElementType<LucideProps> } = {
     'WNBA': BasketballIcon,
     'NCAAM': BasketballIcon,
     'NCAAW': BasketballIcon,
-    'NFL': Football,
-    'NCAAF': Football,
+    'NFL': FootballIcon,
+    'NCAAF': FootballIcon,
     'NHL': IceSkate,
-    'Soccer': Futbol,
+    'Soccer': FutbolIcon,
     'MLB': BaseballIcon,
     'Default': Trophy,
 };
