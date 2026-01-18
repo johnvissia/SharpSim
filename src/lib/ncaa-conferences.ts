@@ -151,6 +151,19 @@ export const ncaaConferenceMap: Record<string, string> = {
   "Vanderbilt": "SEC"
 };
 
+const mascotRegex = new RegExp([
+    'University of', 'Eagles', 'Golden Bears', 'Tigers', 'Blue Devils', 'Seminoles', 'Yellow Jackets',
+    'Cardinals', 'Hurricanes', 'Wolfpack', 'Tar Heels', 'Fighting Irish', 'Panthers', 'Mustangs',
+    'Cardinal', 'Orange', 'Cavaliers', 'Hokies', 'Demon Deacons', 'Fighting Illini', 'Hoosiers',
+    'Hawkeyes', 'Terrapins', 'Wolverines', 'Spartans', 'Golden Gophers', 'Cornhuskers', 'Wildcats',
+    'Buckeyes', 'Ducks', 'Nittany Lions', 'Boilermakers', 'Scarlet Knights', 'Bruins', 'Trojans',
+    'Huskies', 'Badgers', 'Sun Devils', 'Bears', 'Cougars', 'Bearcats', 'Buffaloes', 'Cyclones',
+    'Jayhawks', 'Cowboys', 'Horned Frogs', 'Red Raiders', 'Knights', 'Utes', 'Mountaineers',
+    'Crimson Tide', 'Razorbacks', 'Gators', 'Bulldogs', 'Rebels', 'Gamecocks', 'Volunteers',
+    'Longhorns', 'Aggies', 'Commodores'
+].join('|'), 'gi');
+
+
 /**
  * Finds the conference for a given team name using a comprehensive map.
  * This function is designed to be resilient to variations in team names from the API.
@@ -158,7 +171,8 @@ export const ncaaConferenceMap: Record<string, string> = {
  * @returns The conference name as a string, or undefined if not found.
  */
 export function getConference(teamName: string): string | undefined {
-    const normalizedTeamName = teamName.toLowerCase().trim();
+    const normalizedTeamName = teamName.trim();
+    const cleanedName = normalizedTeamName.replace(mascotRegex, '').replace(/(\(FL\)|&)/g, '').trim().toLowerCase();
     const directionals = ["western", "eastern", "central", "northern", "southern"];
 
     // Create a normalized version of the map for consistent lookups
@@ -168,27 +182,30 @@ export function getConference(teamName: string): string | undefined {
     }
     
     // Strategy 1: Direct case-insensitive match
-    const directMatch = normalizedConferenceMap[normalizedTeamName];
+    const directMatch = normalizedConferenceMap[normalizedTeamName.toLowerCase()];
     if (directMatch) {
       return directMatch;
     }
   
-    // Strategy 2: Partial match (check if API name contains a known key)
-    // Sort keys by length descending to match longer, more specific names first 
-    // (e.g., "Michigan State" before "Michigan").
+    // Strategy 2: Partial match using cleaned name
     const sortedKeys = Object.keys(normalizedConferenceMap).sort((a, b) => b.length - a.length);
 
-    for (const key of sortedKeys) {
-        // If the team name from the API contains one of our known team names...
-        if (normalizedTeamName.includes(key)) {
-            // Directional Check to prevent false positives (e.g., "Western Michigan" vs "Michigan")
-            const apiIsDirectional = directionals.some(dir => normalizedTeamName.startsWith(dir));
+    for (const key of sortedKeys) { // key is power4Name e.g. "michigan wolverines"
+        if (key.includes(cleanedName)) {
+            const apiIsDirectional = directionals.some(dir => normalizedTeamName.toLowerCase().startsWith(dir));
             const keyIsDirectional = directionals.some(dir => key.startsWith(dir));
 
             if (apiIsDirectional && !keyIsDirectional) {
-                continue; // This is a false positive, so skip to the next key
+                continue;
             }
             
+            // "State Check"
+            const apiHasState = normalizedTeamName.toLowerCase().includes("state");
+            const keyHasState = key.includes("state");
+            if (apiHasState && !keyHasState) {
+                continue;
+            }
+
             return normalizedConferenceMap[key];
         }
     }

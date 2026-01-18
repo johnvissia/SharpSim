@@ -191,7 +191,7 @@ const ncaaTeamIdMap: Record<string, string> = {
 };
 
 const mascotRegex = new RegExp([
-    'University of', 'State', 'Eagles', 'Golden Bears', 'Tigers', 'Blue Devils', 'Seminoles', 'Yellow Jackets',
+    'University of', 'Eagles', 'Golden Bears', 'Tigers', 'Blue Devils', 'Seminoles', 'Yellow Jackets',
     'Cardinals', 'Hurricanes', 'Wolfpack', 'Tar Heels', 'Fighting Irish', 'Panthers', 'Mustangs',
     'Cardinal', 'Orange', 'Cavaliers', 'Hokies', 'Demon Deacons', 'Fighting Illini', 'Hoosiers',
     'Hawkeyes', 'Terrapins', 'Wolverines', 'Spartans', 'Golden Gophers', 'Cornhuskers', 'Wildcats',
@@ -216,12 +216,19 @@ export function getTeamLogoUrl(teamName: string, sport: SportName): string {
 
         // Strategy 1: Match cleaned name (e.g., "Minnesota Golden Gophers" -> "Minnesota")
         for (const key of sortedNcaaKeys) {
-            if (cleanedName.toLowerCase().includes(key.toLowerCase())) {
+            if (key.toLowerCase().includes(cleanedName.toLowerCase())) {
                 const keyIsDirectional = directionals.some(dir => key.toLowerCase().startsWith(dir));
-                // Prevent false positives like "Western Michigan" matching "Michigan"
                 if (apiIsDirectional && !keyIsDirectional) {
                     continue;
                 }
+
+                // "State Check": if API name has "State" but the map key doesn't, it's a mismatch.
+                const apiHasState = normalizedName.toLowerCase().includes("state");
+                const keyHasState = key.toLowerCase().includes("state");
+                if (apiHasState && !keyHasState) {
+                    continue;
+                }
+
                 const teamId = ncaaTeamIdMap[key];
                 return `https://a.espncdn.com/combiner/i?img=/i/teamlogos/ncaa/500/${teamId}.png`;
             }
@@ -229,12 +236,18 @@ export function getTeamLogoUrl(teamName: string, sport: SportName): string {
         
         // Strategy 2: Match original name (for cases where cleaning removes the whole name, e.g. "Duke")
         for (const key of sortedNcaaKeys) {
-            if (normalizedName.toLowerCase().includes(key.toLowerCase())) {
+            if (key.toLowerCase().includes(normalizedName.toLowerCase())) {
                 const keyIsDirectional = directionals.some(dir => key.toLowerCase().startsWith(dir));
-                // Prevent false positives
                 if (apiIsDirectional && !keyIsDirectional) {
                     continue;
                 }
+
+                const apiHasState = normalizedName.toLowerCase().includes("state");
+                const keyHasState = key.toLowerCase().includes("state");
+                if (apiHasState && !keyHasState) {
+                    continue;
+                }
+                
                 const teamId = ncaaTeamIdMap[key];
                 return `https://a.espncdn.com/combiner/i?img=/i/teamlogos/ncaa/500/${teamId}.png`;
             }
