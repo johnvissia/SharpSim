@@ -94,7 +94,7 @@ const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
       )}
       <div className="text-sm font-semibold h-10 flex items-center justify-center">
         {team.rank && (
-          <span className="font-bold mr-1.5 text-primary">#{team.rank}</span>
+          <span className="font-bold mr-1.5 text-primary">{team.rank}.</span>
         )}
         {team.name}
       </div>

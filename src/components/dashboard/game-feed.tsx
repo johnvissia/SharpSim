@@ -36,14 +36,16 @@ const transformDailyGamesToGames = (
                 const spreadsMarket = bookmaker.markets.find((m: any) => m.key === 'spreads');
                 const totalsMarket = bookmaker.markets.find((m: any) => m.key === 'totals');
 
-                if (!h2hMarket) return null;
+                // Odds are optional, so if h2h market isn't there, we can still show the game
+                const moneyline: Odds['moneyline'] | null = h2hMarket ? {
+                    home: h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.homeTeam.trim())?.price || 0,
+                    away: h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.awayTeam.trim())?.price || 0,
+                } : null;
 
-                const homeMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.homeTeam.trim());
-                const awayMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.awayTeam.trim());
-                
-                if (!homeMoneylineOutcome || !awayMoneylineOutcome) return null;
-
-                const moneyline: Odds['moneyline'] = { home: homeMoneylineOutcome.price, away: awayMoneylineOutcome.price };
+                if (!moneyline || !moneyline.home || !moneyline.away) {
+                    // If we can't get a valid moneyline, we can't really form odds.
+                    // We'll proceed without odds for this bookmaker.
+                }
 
                 let spread: Odds['spread'] = { points: 0, home: 0, away: 0 };
                 if (spreadsMarket) {
@@ -63,10 +65,13 @@ const transformDailyGamesToGames = (
                     };
                 }
                 
-                return {
-                    sportsbook: bookmaker.title,
-                    odds: { moneyline, spread, total },
-                };
+                if (moneyline) {
+                    return {
+                        sportsbook: bookmaker.title,
+                        odds: { moneyline, spread, total },
+                    };
+                }
+                return null;
 
             } catch (e) {
                 console.error("Failed to parse bookmaker odds:", e);
@@ -153,22 +158,29 @@ export function GameFeed({ selectedSport, selectedConference }: GameFeedProps) {
 
   const filteredAndSortedGames = useMemo(() => {
     return games.filter(game => {
-        // 1. Filter by selected sport
+        // 1. Sport Filter (always applied)
         const sportMatch = selectedSport === 'All' || game.sport === selectedSport;
         if (!sportMatch) return false;
 
-        // 2. Only apply conference filter for NCAA sports when a conference is actually selected
         const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
         const isNCAAGame = ncaaSports.includes(game.sport as any);
+        const isConferenceFilterActive = selectedConference !== 'All';
 
-        const isConferenceFilterEnabled = isNCAAGame && selectedConference !== 'All';
-
-        if (isConferenceFilterEnabled) {
+        // 2. Conference Filter (takes precedence for NCAA games)
+        if (isNCAAGame && isConferenceFilterActive) {
             const homeConference = game.homeTeam.conference;
             const awayConference = game.awayTeam.conference;
+            // A game is in the conference if at least one team is in it
             return homeConference === selectedConference || awayConference === selectedConference;
         }
+
+        // 3. Clutter-reduction Filter for "All Sports" view (only if conference filter is not active)
+        if (selectedSport === 'All' && isNCAAGame && !isConferenceFilterActive) {
+            // Only show ranked NCAA teams to reduce clutter in the main view
+            return !!game.homeTeam.rank || !!game.awayTeam.rank;
+        }
         
+        // 4. If none of the specific filters above apply, show the game
         return true;
     })
     .sort((a, b) => {
