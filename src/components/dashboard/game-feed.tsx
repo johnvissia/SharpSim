@@ -37,15 +37,16 @@ const transformDailyGamesToGames = (
                 const spreadsMarket = bookmaker.markets.find((m: any) => m.key === 'spreads');
                 const totalsMarket = bookmaker.markets.find((m: any) => m.key === 'totals');
 
-                // Odds are not mandatory for display, but h2h is required for this bookmaker entry to be valid
-                if (!h2hMarket) return null;
+                let moneyline: Odds['moneyline'] | undefined;
+                if (h2hMarket) {
+                    const homeMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.homeTeam.trim());
+                    const awayMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.awayTeam.trim());
+                    if (homeMoneylineOutcome && awayMoneylineOutcome) {
+                        moneyline = { home: homeMoneylineOutcome.price, away: awayMoneylineOutcome.price };
+                    }
+                }
 
-                // Find outcomes by comparing trimmed names for robustness
-                const homeMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.homeTeam.trim());
-                const awayMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.awayTeam.trim());
-                if (!homeMoneylineOutcome || !awayMoneylineOutcome) return null;
-
-                const moneyline = { home: homeMoneylineOutcome.price, away: awayMoneylineOutcome.price };
+                if(!moneyline) return null;
 
                 let spread: Odds['spread'] = { points: 0, home: 0, away: 0 };
                 if (spreadsMarket) {
@@ -119,10 +120,9 @@ const transformDailyGamesToGames = (
 type GameFeedProps = {
   selectedSport: string;
   selectedConference: string;
-  sortBy: string;
 };
 
-export function GameFeed({ selectedSport, selectedConference, sortBy }: GameFeedProps) {
+export function GameFeed({ selectedSport, selectedConference }: GameFeedProps) {
   const firestore = useFirestore();
   
   const dailyGamesQuery = useMemoFirebase(() => {
@@ -151,31 +151,20 @@ export function GameFeed({ selectedSport, selectedConference, sortBy }: GameFeed
   const games = useMemo(() => transformDailyGamesToGames(dailyGames, rankingsMap), [dailyGames, rankingsMap]);
 
   const filteredAndSortedGames = useMemo(() => {
-    const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
-
     const filtered = games.filter(game => {
         // 1. Filter by selected sport
         const sportMatch = selectedSport === 'All' || game.sport === selectedSport;
         if (!sportMatch) return false;
 
-        // 2. Apply special filters ONLY for NCAA games
+        // 2. Only apply conference filter for NCAA sports when a conference is actually selected
+        const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
         const isNCAAGame = ncaaSports.includes(game.sport as any);
-        if (isNCAAGame) {
-            // When view is "All Sports", only show ranked NCAA teams to reduce clutter
-            if (selectedSport === 'All' && !(game.homeTeam.rank || game.awayTeam.rank)) {
-                return false;
-            }
 
-            // If a conference is selected, filter by it. This applies whether we're in "All Sports" or a specific NCAA sport view.
-            if (selectedConference !== 'All') {
-                const conferenceMatch = game.homeTeam.conference === selectedConference || game.awayTeam.conference === selectedConference;
-                if (!conferenceMatch) {
-                    return false;
-                }
-            }
+        if (isNCAAGame && selectedConference !== 'All') {
+            const conferenceMatch = game.homeTeam.conference === selectedConference || game.awayTeam.conference === selectedConference;
+            if (!conferenceMatch) return false;
         }
         
-        // 3. If it's not an NCAA game, or it's an NCAA game that passed its filters, show it.
         return true;
     });
 
@@ -192,20 +181,10 @@ export function GameFeed({ selectedSport, selectedConference, sortBy }: GameFeed
         if (aIsFavTeam && !bIsFavTeam) return -1;
         if (!aIsFavTeam && bIsFavTeam) return 1;
 
-        // Then, apply the main sort logic
-        if (sortBy === 'rank') {
-            const getGameRank = (game: Game) => Math.min(game.homeTeam.rank ?? Infinity, game.awayTeam.rank ?? Infinity);
-            const rankA = getGameRank(a);
-            const rankB = getGameRank(b);
-            if (rankA !== rankB) {
-                return rankA - rankB;
-            }
-        }
-
         // Fallback to time sort
         return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
     });
-  }, [games, selectedSport, selectedConference, sortBy, favoriteSports, favoriteTeams]);
+  }, [games, selectedSport, selectedConference, favoriteSports, favoriteTeams]);
 
   const isLoading = isLoadingGames || isLoadingRankings;
 

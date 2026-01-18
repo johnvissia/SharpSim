@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { GameFeed } from '@/components/dashboard/game-feed';
 import {
   Select,
@@ -19,7 +19,6 @@ import { getSports } from '@/lib/mock-data';
 import type { Sport, SystemStatus } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Loader } from 'lucide-react';
-import { sportKeyMapping } from '@/lib/sports';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { BetSlip } from '@/components/dashboard/BetSlip';
 
@@ -27,7 +26,6 @@ export default function DashboardPage() {
   const [sports, setSports] = useState<Sport[]>([]);
   const [selectedSport, setSelectedSport] = useState('All');
   const [selectedConference, setSelectedConference] = useState('All');
-  const [sortBy, setSortBy] = useState('time');
   const [loadingSports, setLoadingSports] = useState(true);
   const [isFetchingManually, setIsFetchingManually] = useState(false);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
@@ -86,7 +84,7 @@ export default function DashboardPage() {
 
       try {
         // Step 1: Fetch new data
-        await fetchAndSaveDailyData(firestore, 'upcoming');
+        await fetchAndSaveDailyData(firestore);
         
         // Step 2: Grade yesterday's bets
         toast({ title: 'Syncing complete. Now grading bets...' });
@@ -119,28 +117,15 @@ export default function DashboardPage() {
     runDailySync();
   }, [systemStatus, isStatusLoading, firestore, user, systemStatusRef, toast]);
 
-  const handleManualFetch = async (sportName: string) => {
+  const handleManualFetch = async () => {
     if (!firestore || !user) return;
     setIsFetchingManually(true);
     toast({
       title: 'Syncing Data...',
-      description: 'Fetching latest odds and scores.',
+      description: 'Fetching latest odds and scores for all sports.',
     });
     try {
-      const sportKey =
-        sportName === 'All' || sportName === 'upcoming'
-          ? 'upcoming'
-          : sportKeyMapping[sportName];
-      if (!sportKey) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: `Sport '${sportName}' is not supported by the API.`,
-        });
-        setIsFetchingManually(false);
-        return;
-      }
-      await fetchAndSaveDailyData(firestore, sportKey);
+      await fetchAndSaveDailyData(firestore);
       toast({
         title: 'Sync Complete!',
         description: 'Odds and scores have been updated.',
@@ -159,7 +144,7 @@ export default function DashboardPage() {
   const showLoadingSpinner = isStatusLoading || isAutoSyncing || isUserLoading;
 
   const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
-  const isConferenceFilterEnabled = selectedSport === 'All' || ncaaSports.includes(selectedSport);
+  const isConferenceFilterEnabled = ncaaSports.includes(selectedSport);
 
   return (
     <>
@@ -177,7 +162,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <Button
-              onClick={() => handleManualFetch(selectedSport)}
+              onClick={handleManualFetch}
               disabled={
                 isFetchingManually || showLoadingSpinner
               }
@@ -190,7 +175,7 @@ export default function DashboardPage() {
               {isAutoSyncing ? 'Auto-Sync...' : isFetchingManually ? 'Syncing...' : 'Sync Data'}
             </Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {loadingSports ? (
                   <Skeleton className="h-10" />
               ) : (
@@ -226,20 +211,6 @@ export default function DashboardPage() {
                       ))}
                   </SelectContent>
               </Select>
-
-              <Select
-                  onValueChange={setSortBy}
-                  defaultValue={sortBy}
-                  disabled={showLoadingSpinner}
-              >
-                  <SelectTrigger>
-                      <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="time">Sort by Time</SelectItem>
-                      <SelectItem value="rank">Sort by Rank</SelectItem>
-                  </SelectContent>
-              </Select>
           </div>
         </header>
 
@@ -259,7 +230,6 @@ export default function DashboardPage() {
           <GameFeed
               selectedSport={selectedSport}
               selectedConference={selectedConference}
-              sortBy={sortBy}
           />
         )}
       </div>
