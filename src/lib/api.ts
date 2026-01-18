@@ -1,6 +1,6 @@
 'use client';
 
-import { doc, Firestore, writeBatch } from 'firebase/firestore';
+import { doc, Firestore, writeBatch, collection, getDocs } from 'firebase/firestore';
 import type { DailyGame, CompletedGame } from '@/lib/types';
 
 const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
@@ -63,28 +63,50 @@ export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: stri
         }
     });
 
-    console.log("Total games loaded:", allUpcomingGames.length);
+    console.log("Total games loaded from API:", allUpcomingGames.length);
 
-    // 4. Save & Log (Single Batch Update)
-    if (allUpcomingGames.length > 0) {
-        const batch = writeBatch(firestore);
-        allUpcomingGames.forEach(game => {
-            const gameData: DailyGame = {
-                id: game.id,
-                sportKey: game.sport_key,
-                commenceTime: game.commence_time,
-                homeTeam: game.home_team,
-                awayTeam: game.away_team,
-                bookmakerOdds: game.bookmakers?.map((b: any) => JSON.stringify(b)) || [],
-            };
-            const gameRef = doc(firestore, 'daily_games', gameData.id);
-            batch.set(gameRef, gameData, { merge: true });
+    // 4. Filter out expired games
+    const now = new Date();
+    const cutoffTime = new Date(now.getTime() - (2 * 60 * 60 * 1000)); // 2 hours ago
+    const activeGames = allUpcomingGames.filter(game => {
+      const gameTime = new Date(game.commence_time);
+      // Keep games that start in the future or started within the cutoff window
+      return gameTime > cutoffTime;
+    });
+
+    console.log(`Found ${activeGames.length} active games after filtering.`);
+
+    // 5. "Clobber" Save: Delete all old games and write the new active ones
+    const batch = writeBatch(firestore);
+    const dailyGamesCollectionRef = collection(firestore, 'daily_games');
+    
+    // Stage deletion of all existing documents
+    const existingGamesSnapshot = await getDocs(dailyGamesCollectionRef);
+    if (!existingGamesSnapshot.empty) {
+        existingGamesSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
         });
-        await batch.commit();
-        console.log(`Successfully committed a batch of ${allUpcomingGames.length} upcoming games.`);
-    } else {
-        console.log('No upcoming games data was fetched to save.');
+        console.log(`Staged deletion for ${existingGamesSnapshot.size} old games.`);
     }
+
+    // Stage setting of new active games
+    activeGames.forEach(game => {
+        const gameData: DailyGame = {
+            id: game.id,
+            sportKey: game.sport_key,
+            commenceTime: game.commence_time,
+            homeTeam: game.home_team,
+            awayTeam: game.away_team,
+            bookmakerOdds: game.bookmakers?.map((b: any) => JSON.stringify(b)) || [],
+        };
+        const gameRef = doc(firestore, 'daily_games', gameData.id);
+        batch.set(gameRef, gameData); // No merge needed, we are overwriting
+    });
+
+    // Commit all deletions and additions in one atomic operation
+    await batch.commit();
+    console.log(`Successfully synced daily_games collection. Removed ${existingGamesSnapshot.size}, added ${activeGames.length}.`);
+
   } catch (error) {
     console.error('An unexpected error occurred during the odds fetching process:', error);
   }
