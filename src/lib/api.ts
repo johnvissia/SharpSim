@@ -10,22 +10,11 @@ const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
 // Helper function to introduce a delay
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-// List of sports to fetch for the daily 'upcoming' sync.
-const UPCOMING_SPORT_KEYS = [
-  "americanfootball_nfl",
-  "baseball_mlb",
-  "basketball_ncaab",
-  "basketball_nba",
-  "icehockey_nhl",
-  "soccer_epl"
-];
-
-
 /**
  * Fetches daily game odds and completed game scores from The Odds API
  * and saves them to Firestore. This function is designed to run on the client-side.
  * @param firestore The Firestore instance from `useFirestore()`.
- * @param sportKey The key for the sport to fetch (e.g., 'basketball_nba'). If 'upcoming', it fetches a predefined list of popular sports.
+ * @param sportKey The key for the sport to fetch (e.g., 'basketball_nba'). If 'upcoming', it fetches all configured sports.
  */
 export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: string = 'upcoming') {
   if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') {
@@ -33,34 +22,55 @@ export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: stri
     console.error(message);
     throw new Error(message);
   }
+  
+  // 1. The Master Sports Map
+  const sportsRequests = [
+    { key: 'basketball_nba', category: 'NBA' },
+    { key: 'americanfootball_nfl', category: 'NFL' },
+    { key: 'baseball_mlb', category: 'MLB' },
+    { key: 'icehockey_nhl', category: 'NHL' },
+    { key: 'soccer_epl', category: 'Soccer' },
+    { key: 'basketball_wnba', category: 'WNBA' },
+    { key: 'americanfootball_ncaaf', category: 'NCAAF' },
+    { key: 'basketball_ncaab', category: 'NCAAM' },
+    { key: 'basketball_ncaaw', category: 'NCAAW' }
+  ];
+
+  // Determine which sports to fetch based on the input
+  const sportsToFetch = sportKey === 'upcoming' 
+    ? sportsRequests 
+    : sportsRequests.filter(s => s.key === sportKey);
 
   // --- 1. Fetch Upcoming Game Odds ---
-  const keysToFetch = sportKey === 'upcoming' ? UPCOMING_SPORT_KEYS : [sportKey];
-
   try {
-    const fetchPromises = keysToFetch.map(key => {
-        const oddsApiUrl = `https://api.the-odds-api.com/v4/sports/${key}/odds/?regions=us&markets=h2h,spreads,totals&oddsFormat=american&apiKey=${API_KEY}`;
+    // 2. The Safe Fetch Loop
+    const fetchPromises = sportsToFetch.map(sport => {
+        const oddsApiUrl = `https://api.the-odds-api.com/v4/sports/${sport.key}/odds/?regions=us&markets=h2h,spreads,totals&oddsFormat=american&apiKey=${API_KEY}`;
         return fetch(oddsApiUrl)
             .then(async (res) => {
                 if (!res.ok) {
                     const errorText = await res.text();
-                    console.error(`Failed to fetch odds for ${key}: ${res.status}`, errorText);
+                    console.warn(`Failed to fetch odds for ${sport.category} (${sport.key}): ${res.status}`, errorText);
                     return []; // Return empty array on failure so Promise.all doesn't reject
                 }
                 return res.json();
             })
             .catch(error => {
-                console.error(`Network error fetching odds for ${key}:`, error);
+                console.warn(`Network error fetching odds for ${sport.category} (${sport.key}):`, error);
                 return []; // Gracefully handle fetch error by returning an empty array
             });
     });
 
     const results = await Promise.all(fetchPromises);
+    
+    // 3. Data Processing
     const allUpcomingGames: any[] = results.flat();
 
     if (allUpcomingGames.length > 0) {
         const batch = writeBatch(firestore);
         for (const game of allUpcomingGames) {
+          // The API response `sport_key` is used to tag the data.
+          // The transformation to a display name happens later in the UI components.
           const gameData: DailyGame = {
             id: game.id,
             sportKey: game.sport_key,
@@ -83,8 +93,9 @@ export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: stri
   }
 
   // --- 2. Fetch Completed Game Scores (from the last 3 days to be safe) ---
-  // The 'scores' endpoint requires a specific sport_key. If 'upcoming' is passed, we loop through all supported sports.
-  const scoreSportKeysToFetch = sportKey === 'upcoming' ? Object.values(sportKeyMapping) : [sportKey];
+  const scoreSportKeysToFetch = sportKey === 'upcoming' 
+    ? sportsRequests.map(s => s.key) 
+    : sportsToFetch.map(s => s.key);
   
   let totalScoresFetched = 0;
 
