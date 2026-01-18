@@ -75,12 +75,6 @@ const transformDailyGamesToGames = (
             }
         }).filter((o): o is SportsbookOdds => o !== null);
 
-        if (allOdds.length === 0) {
-            return null; // Don't render games without any valid odds
-        }
-
-        const bestOdds = allOdds[0].odds; // Use first bookmaker's odds as the "best" for now
-
         const homeRankingInfo = rankingsMap.get(dg.homeTeam);
         const homeTeam: Team = {
             id: dg.homeTeam,
@@ -103,15 +97,21 @@ const transformDailyGamesToGames = (
             conference: awayRankingInfo?.conference,
         };
 
-        return {
+        const game: Game = {
             id: dg.id,
             sport: sportName,
             startTime: dg.commenceTime,
             homeTeam,
             awayTeam,
-            allOdds,
-            odds: bestOdds,
         };
+
+        if (allOdds.length > 0) {
+            game.allOdds = allOdds;
+            game.odds = allOdds[0].odds; // Use first bookmaker's odds as the "best" for now
+        }
+
+        return game;
+
     }).filter((g): g is Game => g !== null);
 };
 

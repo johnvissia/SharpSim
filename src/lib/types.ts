@@ -34,8 +34,8 @@ export type Game = {
   startTime: string; // ISO 8601 string
   homeTeam: Team;
   awayTeam: Team;
-  odds: Odds; // This will be the "best" line for display
-  allOdds: SportsbookOdds[];
+  odds?: Odds; // This will be the "best" line for display
+  allOdds?: SportsbookOdds[];
   liveScore?: { home: number; away: number };
 };
 

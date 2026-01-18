@@ -109,29 +109,31 @@ export function GameCard({ game }: { game: Game }) {
           <TeamDisplay team={game.homeTeam} sport={game.sport} />
         </div>
         
-        <div className="space-y-2">
-            <p className="text-center text-xs text-muted-foreground mb-2">Quick Bets</p>
-            <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" size="sm" className="flex-col h-auto py-2">
-                    <span>{game.awayTeam.name.split(' ').pop()} {game.odds.moneyline.away > 0 ? `+${game.odds.moneyline.away}`: game.odds.moneyline.away}</span>
-                    <span className="text-xs text-muted-foreground">Moneyline</span>
-                </Button>
-                <Button variant="outline" size="sm" className="flex-col h-auto py-2">
-                    <span>{game.homeTeam.name.split(' ').pop()} {game.odds.moneyline.home > 0 ? `+${game.odds.moneyline.home}`: game.odds.moneyline.home}</span>
-                    <span className="text-xs text-muted-foreground">Moneyline</span>
-                </Button>
-            </div>
-             <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" size="sm" className="flex-col h-auto py-2">
-                    <span>Over {game.odds.total.points}</span>
-                    <span className="text-xs text-muted-foreground">({game.odds.total.over > 0 ? `+${game.odds.total.over}`: game.odds.total.over})</span>
-                </Button>
-                <Button variant="outline" size="sm" className="flex-col h-auto py-2">
-                    <span>Under {game.odds.total.points}</span>
-                    <span className="text-xs text-muted-foreground">({game.odds.total.under > 0 ? `+${game.odds.total.under}`: game.odds.total.under})</span>
-                </Button>
-            </div>
-        </div>
+        {game.odds && (
+          <div className="space-y-2">
+              <p className="text-center text-xs text-muted-foreground mb-2">Quick Bets</p>
+              <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" size="sm" className="flex-col h-auto py-2">
+                      <span>{game.awayTeam.name.split(' ').pop()} {game.odds.moneyline.away > 0 ? `+${game.odds.moneyline.away}`: game.odds.moneyline.away}</span>
+                      <span className="text-xs text-muted-foreground">Moneyline</span>
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-col h-auto py-2">
+                      <span>{game.homeTeam.name.split(' ').pop()} {game.odds.moneyline.home > 0 ? `+${game.odds.moneyline.home}`: game.odds.moneyline.home}</span>
+                      <span className="text-xs text-muted-foreground">Moneyline</span>
+                  </Button>
+              </div>
+               <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" size="sm" className="flex-col h-auto py-2">
+                      <span>Over {game.odds.total.points}</span>
+                      <span className="text-xs text-muted-foreground">({game.odds.total.over > 0 ? `+${game.odds.total.over}`: game.odds.total.over})</span>
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-col h-auto py-2">
+                      <span>Under {game.odds.total.points}</span>
+                      <span className="text-xs text-muted-foreground">({game.odds.total.under > 0 ? `+${game.odds.total.under}`: game.odds.total.under})</span>
+                  </Button>
+              </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
