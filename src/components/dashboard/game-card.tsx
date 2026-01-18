@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import type { Game, SportName, Team } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,22 +10,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Star, Coins, Calculator } from 'lucide-react';
+import { Star } from 'lucide-react';
 import Image from 'next/image';
 import { sportIconMap } from '@/lib/team-logos';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useBetSlip } from '@/context/BetSlipContext';
+
 
 const InjuryIndicator = ({ team }: { team: Team }) => {
   const outPlayers = team.players.filter((p) => p.injuryStatus === 'Out');
@@ -116,19 +104,8 @@ const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
   );
 };
 
-type SelectedBet = {
-  pick: string;
-  odds: number;
-  betType: string;
-  game: Game;
-};
-
 export function GameCard({ game }: { game: Game }) {
-  const [open, setOpen] = useState(false);
-  const [selectedBet, setSelectedBet] = useState<SelectedBet | null>(null);
-  const [stake, setStake] = useState('');
-  const [potentialWinnings, setPotentialWinnings] = useState(0);
-  const { toast } = useToast();
+  const { addPick } = useBetSlip();
 
   const gameDate = new Date(game.startTime);
   const now = new Date();
@@ -149,51 +126,12 @@ export function GameCard({ game }: { game: Game }) {
   const handleBetSelection = (
     pick: string,
     odds: number,
-    betType: string
+    betType: 'moneyline' | 'spread' | 'total'
   ) => {
-    setSelectedBet({ pick, odds, betType, game });
-  };
-
-  useEffect(() => {
-    if (!open) {
-      // Reset state when dialog is closed for a clean slate next time
-      setSelectedBet(null);
-      setStake('');
-      setPotentialWinnings(0);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    const stakeNum = parseFloat(stake);
-    if (!stakeNum || !selectedBet || stakeNum <= 0) {
-      setPotentialWinnings(0);
-      return;
-    }
-
-    const odds = selectedBet.odds;
-    let profit = 0;
-    if (odds > 0) {
-      // For positive odds, profit = stake * (odds / 100)
-      profit = stakeNum * (odds / 100);
-    } else {
-      // For negative odds, profit = stake / (abs(odds) / 100)
-      profit = stakeNum / (Math.abs(odds) / 100);
-    }
-    setPotentialWinnings(stakeNum + profit);
-  }, [stake, selectedBet]);
-
-  const handlePlaceBet = () => {
-    // In a real app, this would write to Firestore.
-    // For now, we'll just show a confirmation toast.
-    toast({
-      title: 'Bet Placed (Simulated)',
-      description: `You wagered ${stake} coins on ${selectedBet?.pick}. Good luck!`,
-    });
-    setOpen(false);
+    addPick({ pick, odds, betType, game });
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
       <Card className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200">
         <CardHeader className="flex-row items-center justify-between bg-card-foreground/5 p-3">
           <div className="text-sm font-medium">{game.sport}</div>
@@ -217,8 +155,10 @@ export function GameCard({ game }: { game: Game }) {
                 Quick Bets
               </p>
               <div className="grid grid-cols-2 gap-2">
-                <DialogTrigger
-                  asChild
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-col h-auto py-2"
                   onClick={() =>
                     handleBetSelection(
                       game.awayTeam.name,
@@ -227,24 +167,20 @@ export function GameCard({ game }: { game: Game }) {
                     )
                   }
                 >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-col h-auto py-2"
-                  >
-                    <span>
-                      {game.awayTeam.name.split(' ').pop()}{' '}
-                      {game.odds.moneyline.away > 0
-                        ? `+${game.odds.moneyline.away}`
-                        : game.odds.moneyline.away}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Moneyline
-                    </span>
-                  </Button>
-                </DialogTrigger>
-                <DialogTrigger
-                  asChild
+                  <span>
+                    {game.awayTeam.name.split(' ').pop()}{' '}
+                    {game.odds.moneyline.away > 0
+                      ? `+${game.odds.moneyline.away}`
+                      : game.odds.moneyline.away}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Moneyline
+                  </span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-col h-auto py-2"
                   onClick={() =>
                     handleBetSelection(
                       game.homeTeam.name,
@@ -253,26 +189,22 @@ export function GameCard({ game }: { game: Game }) {
                     )
                   }
                 >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-col h-auto py-2"
-                  >
-                    <span>
-                      {game.homeTeam.name.split(' ').pop()}{' '}
-                      {game.odds.moneyline.home > 0
-                        ? `+${game.odds.moneyline.home}`
-                        : game.odds.moneyline.home}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Moneyline
-                    </span>
-                  </Button>
-                </DialogTrigger>
+                  <span>
+                    {game.homeTeam.name.split(' ').pop()}{' '}
+                    {game.odds.moneyline.home > 0
+                      ? `+${game.odds.moneyline.home}`
+                      : game.odds.moneyline.home}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Moneyline
+                  </span>
+                </Button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <DialogTrigger
-                  asChild
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-col h-auto py-2"
                   onClick={() =>
                     handleBetSelection(
                       `Over ${game.odds!.total.points}`,
@@ -281,23 +213,19 @@ export function GameCard({ game }: { game: Game }) {
                     )
                   }
                 >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-col h-auto py-2"
-                  >
-                    <span>Over {game.odds.total.points}</span>
-                    <span className="text-xs text-muted-foreground">
-                      (
-                      {game.odds.total.over > 0
-                        ? `+${game.odds.total.over}`
-                        : game.odds.total.over}
-                      )
-                    </span>
-                  </Button>
-                </DialogTrigger>
-                <DialogTrigger
-                  asChild
+                  <span>Over {game.odds.total.points}</span>
+                  <span className="text-xs text-muted-foreground">
+                    (
+                    {game.odds.total.over > 0
+                      ? `+${game.odds.total.over}`
+                      : game.odds.total.over}
+                    )
+                  </span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-col h-auto py-2"
                   onClick={() =>
                     handleBetSelection(
                       `Under ${game.odds!.total.points}`,
@@ -306,105 +234,19 @@ export function GameCard({ game }: { game: Game }) {
                     )
                   }
                 >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-col h-auto py-2"
-                  >
-                    <span>Under {game.odds.total.points}</span>
-                    <span className="text-xs text-muted-foreground">
-                      (
-                      {game.odds.total.under > 0
-                        ? `+${game.odds.total.under}`
-                        : game.odds.total.under}
-                      )
-                    </span>
-                  </Button>
-                </DialogTrigger>
+                  <span>Under {game.odds.total.points}</span>
+                  <span className="text-xs text-muted-foreground">
+                    (
+                    {game.odds.total.under > 0
+                      ? `+${game.odds.total.under}`
+                      : game.odds.total.under}
+                    )
+                  </span>
+                </Button>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
-      <DialogContent className="sm:max-w-[425px]">
-        <Tabs defaultValue="single" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="single">Single Bet</TabsTrigger>
-            <TabsTrigger value="parlay">Parlay</TabsTrigger>
-          </TabsList>
-          <TabsContent value="single">
-            {selectedBet ? (
-              <>
-                <DialogHeader>
-                  <DialogTitle>{selectedBet.pick}</DialogTitle>
-                  <DialogDescription>
-                    {selectedBet.game.awayTeam.name} @{' '}
-                    {selectedBet.game.homeTeam.name}
-                    <br />
-                    <span className="capitalize">{selectedBet.betType}</span> @{' '}
-                    <span className="font-bold">
-                      {selectedBet.odds > 0
-                        ? `+${selectedBet.odds}`
-                        : selectedBet.odds}
-                    </span>
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="stake" className="text-right">
-                      <Coins className="inline-block mr-1 h-4 w-4 text-muted-foreground" />
-                      Stake
-                    </Label>
-                    <Input
-                      id="stake"
-                      type="number"
-                      value={stake}
-                      onChange={(e) => setStake(e.target.value)}
-                      className="col-span-3"
-                      placeholder="0.00 coins"
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="winnings" className="text-right">
-                      <Calculator className="inline-block mr-1 h-4 w-4 text-muted-foreground" />
-                      Return
-                    </Label>
-                    <p
-                      id="winnings"
-                      className="col-span-3 text-sm font-semibold text-foreground"
-                    >
-                      {potentialWinnings.toFixed(2)} coins
-                    </p>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    onClick={handlePlaceBet}
-                    disabled={!stake || parseFloat(stake) <= 0}
-                  >
-                    Place Bet
-                  </Button>
-                </DialogFooter>
-              </>
-            ) : (
-              <div className="py-4 text-center text-muted-foreground">
-                <p>Select a bet from a game card to get started.</p>
-              </div>
-            )}
-          </TabsContent>
-          <TabsContent value="parlay">
-            <DialogHeader>
-              <DialogTitle>Build Your Parlay</DialogTitle>
-              <DialogDescription>
-                Add multiple picks from different games to create a parlay.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 text-center text-muted-foreground">
-              <p>Parlay builder coming soon!</p>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
   );
 }

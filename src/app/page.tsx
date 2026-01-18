@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Loader } from 'lucide-react';
 import { sportKeyMapping } from '@/lib/sports';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { BetSlip } from '@/components/dashboard/BetSlip';
 
 export default function DashboardPage() {
   const [sports, setSports] = useState<Sport[]>([]);
@@ -161,105 +162,108 @@ export default function DashboardPage() {
   const isConferenceFilterEnabled = selectedSport === 'All' || ncaaSports.includes(selectedSport);
 
   return (
-    <div className="flex flex-col gap-8 p-4 md:p-8">
-      <header className="flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Today's Games
-            </h1>
+    <>
+      <div className="flex flex-col gap-8 p-4 md:p-8">
+        <header className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                Today's Games
+              </h1>
+              <p className="text-muted-foreground">
+                {selectedSport === 'All'
+                  ? 'All upcoming games'
+                  : `Upcoming ${selectedSport} games`}
+              </p>
+            </div>
+            <Button
+              onClick={() => handleManualFetch(selectedSport)}
+              disabled={
+                isFetchingManually || showLoadingSpinner
+              }
+            >
+              {isFetchingManually || isAutoSyncing ? (
+                <Loader className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              {isAutoSyncing ? 'Auto-Sync...' : isFetchingManually ? 'Syncing...' : 'Sync Data'}
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              {loadingSports ? (
+                  <Skeleton className="h-10" />
+              ) : (
+                  <Select
+                  onValueChange={setSelectedSport}
+                  defaultValue={selectedSport}
+                  disabled={showLoadingSpinner}
+                  >
+                  <SelectTrigger>
+                      <SelectValue placeholder="Select a sport" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="All">All Sports</SelectItem>
+                      {sports.map((sport) => (
+                      <SelectItem key={sport.id} value={sport.name}>
+                          {sport.name}
+                      </SelectItem>
+                      ))}
+                  </SelectContent>
+                  </Select>
+              )}
+              <Select
+                  onValueChange={setSelectedConference}
+                  defaultValue={selectedConference}
+                  disabled={showLoadingSpinner || !isConferenceFilterEnabled}
+              >
+                  <SelectTrigger>
+                      <SelectValue placeholder="Filter by Conference" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {conferenceOptions.map((conf) => (
+                          <SelectItem key={conf} value={conf}>{conf}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+
+              <Select
+                  onValueChange={setSortBy}
+                  defaultValue={sortBy}
+                  disabled={showLoadingSpinner}
+              >
+                  <SelectTrigger>
+                      <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="time">Sort by Time</SelectItem>
+                      <SelectItem value="rank">Sort by Rank</SelectItem>
+                  </SelectContent>
+              </Select>
+          </div>
+        </header>
+
+        {showLoadingSpinner ? (
+          <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
+            <Loader className="h-12 w-12 animate-spin text-primary" />
+            <h2 className="text-xl font-semibold text-foreground">
+              {isUserLoading ? 'Authenticating...' : 'Loading Daily Lines...'}
+            </h2>
             <p className="text-muted-foreground">
-              {selectedSport === 'All'
-                ? 'All upcoming games'
-                : `Upcoming ${selectedSport} games`}
+              {isUserLoading 
+                ? 'Preparing your session...' 
+                : 'This happens once per day to ensure all data is fresh.'}
             </p>
           </div>
-          <Button
-            onClick={() => handleManualFetch(selectedSport)}
-            disabled={
-              isFetchingManually || showLoadingSpinner
-            }
-          >
-            {isFetchingManually || isAutoSyncing ? (
-              <Loader className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            {isAutoSyncing ? 'Auto-Sync...' : isFetchingManually ? 'Syncing...' : 'Sync Data'}
-          </Button>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {loadingSports ? (
-                <Skeleton className="h-10" />
-            ) : (
-                <Select
-                onValueChange={setSelectedSport}
-                defaultValue={selectedSport}
-                disabled={showLoadingSpinner}
-                >
-                <SelectTrigger>
-                    <SelectValue placeholder="Select a sport" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="All">All Sports</SelectItem>
-                    {sports.map((sport) => (
-                    <SelectItem key={sport.id} value={sport.name}>
-                        {sport.name}
-                    </SelectItem>
-                    ))}
-                </SelectContent>
-                </Select>
-            )}
-            <Select
-                onValueChange={setSelectedConference}
-                defaultValue={selectedConference}
-                disabled={showLoadingSpinner || !isConferenceFilterEnabled}
-            >
-                <SelectTrigger>
-                    <SelectValue placeholder="Filter by Conference" />
-                </SelectTrigger>
-                <SelectContent>
-                    {conferenceOptions.map((conf) => (
-                        <SelectItem key={conf} value={conf}>{conf}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-
-            <Select
-                onValueChange={setSortBy}
-                defaultValue={sortBy}
-                disabled={showLoadingSpinner}
-            >
-                <SelectTrigger>
-                    <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="time">Sort by Time</SelectItem>
-                    <SelectItem value="rank">Sort by Rank</SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-      </header>
-
-      {showLoadingSpinner ? (
-        <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
-          <Loader className="h-12 w-12 animate-spin text-primary" />
-          <h2 className="text-xl font-semibold text-foreground">
-            {isUserLoading ? 'Authenticating...' : 'Loading Daily Lines...'}
-          </h2>
-          <p className="text-muted-foreground">
-            {isUserLoading 
-              ? 'Preparing your session...' 
-              : 'This happens once per day to ensure all data is fresh.'}
-          </p>
-        </div>
-      ) : (
-        <GameFeed
-            selectedSport={selectedSport}
-            selectedConference={selectedConference}
-            sortBy={sortBy}
-        />
-      )}
-    </div>
+        ) : (
+          <GameFeed
+              selectedSport={selectedSport}
+              selectedConference={selectedConference}
+              sortBy={sortBy}
+          />
+        )}
+      </div>
+      <BetSlip />
+    </>
   );
 }
