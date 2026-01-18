@@ -154,11 +154,36 @@ export const ncaaConferenceMap: Record<string, string> = {
 
 /**
  * Finds the conference for a given team name using a comprehensive map.
- * It performs a case-insensitive lookup.
+ * This function is designed to be resilient to variations in team names from the API.
  * @param teamName The name of the team from the API.
  * @returns The conference name as a string, or undefined if not found.
  */
 export function getConference(teamName: string): string | undefined {
-    // This simple lookup is fast. A more complex fuzzy match could be added later if needed.
-    return ncaaConferenceMap[teamName];
+    const normalizedTeamName = teamName.toLowerCase().trim();
+
+    // Create a normalized version of the map for consistent lookups
+    const normalizedConferenceMap: Record<string, string> = {};
+    for (const key in ncaaConferenceMap) {
+        normalizedConferenceMap[key.toLowerCase().trim()] = ncaaConferenceMap[key];
+    }
+    
+    // Strategy 1: Direct case-insensitive match
+    const directMatch = normalizedConferenceMap[normalizedTeamName];
+    if (directMatch) {
+      return directMatch;
+    }
+  
+    // Strategy 2: Partial match (check if API name contains a known key)
+    // Sort keys by length descending to match longer, more specific names first 
+    // (e.g., "Michigan State" before "Michigan").
+    const sortedKeys = Object.keys(normalizedConferenceMap).sort((a, b) => b.length - a.length);
+
+    for (const key of sortedKeys) {
+        // If the team name from the API contains one of our known team names...
+        if (normalizedTeamName.includes(key)) {
+            return normalizedConferenceMap[key];
+        }
+    }
+    
+    return undefined;
 }
