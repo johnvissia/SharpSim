@@ -98,7 +98,6 @@ const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
         )}
         {team.name}
       </div>
-      <div className="text-xs text-muted-foreground">({team.record})</div>
       <InjuryIndicator team={team} />
     </div>
   );
