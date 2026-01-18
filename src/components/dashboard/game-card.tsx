@@ -26,6 +26,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const InjuryIndicator = ({ team }: { team: Team }) => {
   const outPlayers = team.players.filter((p) => p.injuryStatus === 'Out');
@@ -326,60 +327,83 @@ export function GameCard({ game }: { game: Game }) {
         </CardContent>
       </Card>
       <DialogContent className="sm:max-w-[425px]">
-        {selectedBet && (
-          <>
+        <Tabs defaultValue="single" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="single">Single Bet</TabsTrigger>
+            <TabsTrigger value="parlay">Parlay</TabsTrigger>
+          </TabsList>
+          <TabsContent value="single">
+            {selectedBet ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{selectedBet.pick}</DialogTitle>
+                  <DialogDescription>
+                    {selectedBet.game.awayTeam.name} @{' '}
+                    {selectedBet.game.homeTeam.name}
+                    <br />
+                    <span className="capitalize">{selectedBet.betType}</span> @{' '}
+                    <span className="font-bold">
+                      {selectedBet.odds > 0
+                        ? `+${selectedBet.odds}`
+                        : selectedBet.odds}
+                    </span>
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="stake" className="text-right">
+                      <Coins className="inline-block mr-1 h-4 w-4 text-muted-foreground" />
+                      Stake
+                    </Label>
+                    <Input
+                      id="stake"
+                      type="number"
+                      value={stake}
+                      onChange={(e) => setStake(e.target.value)}
+                      className="col-span-3"
+                      placeholder="0.00 coins"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="winnings" className="text-right">
+                      <Calculator className="inline-block mr-1 h-4 w-4 text-muted-foreground" />
+                      Return
+                    </Label>
+                    <p
+                      id="winnings"
+                      className="col-span-3 text-sm font-semibold text-foreground"
+                    >
+                      {potentialWinnings.toFixed(2)} coins
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={handlePlaceBet}
+                    disabled={!stake || parseFloat(stake) <= 0}
+                  >
+                    Place Bet
+                  </Button>
+                </DialogFooter>
+              </>
+            ) : (
+              <div className="py-4 text-center text-muted-foreground">
+                <p>Select a bet from a game card to get started.</p>
+              </div>
+            )}
+          </TabsContent>
+          <TabsContent value="parlay">
             <DialogHeader>
-              <DialogTitle>{selectedBet.pick}</DialogTitle>
+              <DialogTitle>Build Your Parlay</DialogTitle>
               <DialogDescription>
-                {selectedBet.game.awayTeam.name} @{' '}
-                {selectedBet.game.homeTeam.name}
-                <br />
-                <span className="capitalize">{selectedBet.betType}</span> @{' '}
-                <span className="font-bold">
-                  {selectedBet.odds > 0
-                    ? `+${selectedBet.odds}`
-                    : selectedBet.odds}
-                </span>
+                Add multiple picks from different games to create a parlay.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="stake" className="text-right">
-                  <Coins className="inline-block mr-1 h-4 w-4 text-muted-foreground" />
-                  Stake
-                </Label>
-                <Input
-                  id="stake"
-                  type="number"
-                  value={stake}
-                  onChange={(e) => setStake(e.target.value)}
-                  className="col-span-3"
-                  placeholder="0.00 coins"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="winnings" className="text-right">
-                  <Calculator className="inline-block mr-1 h-4 w-4 text-muted-foreground" />
-                  Return
-                </Label>
-                <p
-                  id="winnings"
-                  className="col-span-3 text-sm font-semibold text-foreground"
-                >
-                  {potentialWinnings.toFixed(2)} coins
-                </p>
-              </div>
+            <div className="py-4 text-center text-muted-foreground">
+              <p>Parlay builder coming soon!</p>
             </div>
-            <DialogFooter>
-              <Button
-                onClick={handlePlaceBet}
-                disabled={!stake || parseFloat(stake) <= 0}
-              >
-                Place Bet
-              </Button>
-            </DialogFooter>
-          </>
-        )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
