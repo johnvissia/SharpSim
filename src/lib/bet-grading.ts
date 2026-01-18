@@ -80,7 +80,7 @@ export async function gradeUserBets(firestore: Firestore, user: User) {
 
   // 3. Use a write batch to perform all database updates atomically
   const batch = writeBatch(firestore);
-  let totalWinnings = 0;
+  let totalPayout = 0;
   let gradedCount = 0;
 
   pendingBetsSnapshot.forEach(betDoc => {
@@ -115,24 +115,24 @@ export async function gradeUserBets(firestore: Firestore, user: User) {
 
     // If the user won, add the winnings to a running total
     if (newStatus === 'won') {
-      // The stake is already "spent", so we add the stake back plus the profit
-      totalWinnings += bet.stake + bet.potentialWinnings;
+      // potentialWinnings is the total payout (stake + profit), so we just add that.
+      totalPayout += bet.potentialWinnings;
     } else if (newStatus === 'push') {
         // If it's a push, just return the original stake
-        totalWinnings += bet.stake;
+        totalPayout += bet.stake;
     }
   });
 
   // 4. If there were any payouts, stage the update for the user's balance
-  if (totalWinnings > 0) {
+  if (totalPayout > 0) {
     const userRef = doc(firestore, 'users', user.uid);
-    batch.update(userRef, { balance: increment(totalWinnings) });
+    batch.update(userRef, { balance: increment(totalPayout) });
   }
 
   // 5. Commit all the updates to Firestore
   if (gradedCount > 0) {
     await batch.commit();
-    console.log(`Graded ${gradedCount} bets. Total payout applied: ${totalWinnings.toFixed(2)} coins.`);
+    console.log(`Graded ${gradedCount} bets. Total payout applied: ${totalPayout.toFixed(2)} coins.`);
   } else {
     console.log("Found pending bets, but no matching completed games to grade them against yet.")
   }

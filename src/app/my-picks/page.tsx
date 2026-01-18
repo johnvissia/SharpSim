@@ -149,7 +149,7 @@ export default function MyPicksPage() {
                 <div className="flex flex-col items-end gap-2 text-right">
                   {getBetStatusBadge(bet.status, isWinning)}
                   <p className="text-sm">Stake: {bet.stake} coins</p>
-                  <p className="text-sm">To Win: {bet.potentialWinnings.toFixed(2)} coins</p>
+                  <p className="text-sm">Return: {bet.potentialWinnings.toFixed(2)} coins</p>
                 </div>
               </CardContent>
             </Card>

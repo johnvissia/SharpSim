@@ -170,15 +170,15 @@ export function GameCard({ game }: { game: Game }) {
     }
 
     const odds = selectedBet.odds;
-    let winnings = 0;
+    let profit = 0;
     if (odds > 0) {
-      // For positive odds, winnings = stake * (odds / 100)
-      winnings = stakeNum * (odds / 100);
+      // For positive odds, profit = stake * (odds / 100)
+      profit = stakeNum * (odds / 100);
     } else {
-      // For negative odds, winnings = stake / (abs(odds) / 100)
-      winnings = stakeNum / (Math.abs(odds) / 100);
+      // For negative odds, profit = stake / (abs(odds) / 100)
+      profit = stakeNum / (Math.abs(odds) / 100);
     }
-    setPotentialWinnings(winnings);
+    setPotentialWinnings(stakeNum + profit);
   }, [stake, selectedBet]);
 
   const handlePlaceBet = () => {
@@ -360,7 +360,7 @@ export function GameCard({ game }: { game: Game }) {
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="winnings" className="text-right">
                   <Calculator className="inline-block mr-1 h-4 w-4 text-muted-foreground" />
-                  To Win
+                  Return
                 </Label>
                 <p
                   id="winnings"
