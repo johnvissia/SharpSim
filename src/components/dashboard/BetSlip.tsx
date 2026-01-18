@@ -10,11 +10,16 @@ import { Separator } from '@/components/ui/separator';
 import { X, Ticket } from 'lucide-react';
 import { calculateParlay } from '@/lib/parlay';
 import { useToast } from '@/hooks/use-toast';
+import { useFirestore, useUser } from '@/firebase';
+import { collection, doc, writeBatch, increment } from 'firebase/firestore';
+import type { UserBet } from '@/lib/types';
 
 export function BetSlip() {
   const { picks, removePick, clearPicks } = useBetSlip();
   const [stake, setStake] = useState('');
   const { toast } = useToast();
+  const firestore = useFirestore();
+  const { user } = useUser();
 
   const { potentialPayout, combinedOdds } = useMemo(() => {
     if (picks.length === 0 || !stake) {
@@ -41,14 +46,82 @@ export function BetSlip() {
     return { potentialPayout, combinedOdds: americanOdds };
   }, [picks, stake]);
 
-  const handlePlaceBet = () => {
-    // This is where we would eventually write to Firestore
-    toast({
-      title: 'Bet Placed (Simulated)',
-      description: `You wagered ${stake} coins. Good luck!`,
-    });
-    setStake('');
-    clearPicks();
+  const handlePlaceBet = async () => {
+    if (!user || !firestore || !stake) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'You must be logged in and enter a stake to place a bet.',
+      });
+      return;
+    }
+    
+    const stakeNum = parseFloat(stake);
+    if (stakeNum <= 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Stake',
+        description: 'Please enter a wager amount greater than zero.',
+      });
+      return;
+    }
+    
+    const userDocRef = doc(firestore, 'users', user.uid);
+    const betsCollectionRef = collection(firestore, 'users', user.uid, 'bets');
+    const batch = writeBatch(firestore);
+
+    try {
+      let newBet: Omit<UserBet, 'id'>;
+
+      if (picks.length === 1) {
+        const pick = picks[0];
+        newBet = {
+          gameId: pick.game.id,
+          userId: user.uid,
+          sport: pick.game.sport,
+          betType: pick.betType,
+          pick: pick.pick,
+          stake: stakeNum,
+          odds: pick.odds,
+          potentialWinnings: potentialPayout,
+          status: 'pending',
+          placedAt: new Date().toISOString(),
+        };
+      } else {
+        newBet = {
+          gameId: picks.map(p => p.game.id).join(','),
+          userId: user.uid,
+          sport: picks[0].game.sport, // Use first pick's sport for parlay
+          betType: 'parlay',
+          pick: picks.map(p => `${p.pick} (${p.odds > 0 ? '+' : ''}${p.odds})`).join(' | '),
+          stake: stakeNum,
+          odds: combinedOdds,
+          potentialWinnings: potentialPayout,
+          status: 'pending',
+          placedAt: new Date().toISOString(),
+        };
+      }
+
+      const newBetRef = doc(betsCollectionRef);
+      batch.set(newBetRef, newBet);
+      batch.update(userDocRef, { balance: increment(-stakeNum) });
+
+      await batch.commit();
+
+      toast({
+        title: 'Bet Placed!',
+        description: `You wagered ${stakeNum.toFixed(2)} coins. Good luck!`,
+      });
+      setStake('');
+      clearPicks();
+    } catch (error: any) {
+        console.error('Failed to place bet:', error);
+        toast({
+            title: 'Bet Failed',
+            description: error.message || 'Could not place bet. You may not have enough coins.',
+            variant: 'destructive',
+        });
+    }
   };
 
   if (picks.length === 0) {
@@ -89,7 +162,7 @@ export function BetSlip() {
         <div className="space-y-4">
             {picks.length > 1 && (
                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">{picks.length}-Team Parlay</span>
+                    <span className="text-muted-foreground">{picks.length}-Leg Parlay</span>
                     <span className="font-bold">{combinedOdds > 0 ? `+${combinedOdds}` : combinedOdds}</span>
                 </div>
             )}
@@ -104,12 +177,16 @@ export function BetSlip() {
                 />
             </div>
             <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Potential Payout</span>
-                <span className="font-bold text-green-600">{potentialPayout.toFixed(2)} coins</span>
+                <span className="text-muted-foreground">To Win</span>
+                <span className="font-bold text-green-600">{(potentialPayout - parseFloat(stake || '0')).toFixed(2)} coins</span>
+            </div>
+             <div className="flex justify-between items-center text-sm font-semibold">
+                <span className="text-muted-foreground">Total Payout</span>
+                <span className="text-green-500">{potentialPayout.toFixed(2)} coins</span>
             </div>
             <Button 
               className="w-full"
-              disabled={!stake || parseFloat(stake) <= 0}
+              disabled={!stake || parseFloat(stake) <= 0 || !user}
               onClick={handlePlaceBet}
             >
                 Place Bet
