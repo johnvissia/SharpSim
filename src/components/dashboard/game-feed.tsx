@@ -37,6 +37,7 @@ const transformDailyGamesToGames = (
                 const spreadsMarket = bookmaker.markets.find((m: any) => m.key === 'spreads');
                 const totalsMarket = bookmaker.markets.find((m: any) => m.key === 'totals');
 
+                // Odds are not mandatory. If h2h market is missing, we still want to show the game.
                 if (!h2hMarket) return null;
 
                 // Find outcomes by comparing trimmed names for robustness
@@ -159,15 +160,17 @@ export function GameFeed({ selectedSport, selectedConference, sortBy }: GameFeed
 
         const isNCAAGame = ncaaSports.includes(game.sport as any);
 
-        // Apply special filters ONLY for NCAA games
+        // Special filtering for NCAA games
         if (isNCAAGame) {
-            // Rank Filter: Only show games with at least one ranked team
-            const hasRankedTeam = game.homeTeam.rank || game.awayTeam.rank;
-            if (!hasRankedTeam) {
-                return false;
+            // IF "All Sports" is selected, ONLY show ranked NCAA teams to reduce clutter.
+            if (selectedSport === 'All') {
+                const hasRankedTeam = game.homeTeam.rank || game.awayTeam.rank;
+                if (!hasRankedTeam) {
+                    return false;
+                }
             }
 
-            // Conference Filter: Apply only if a specific conference is selected
+            // Apply conference filter if a specific conference is selected.
             if (selectedConference !== 'All') {
                 const conferenceMatch = game.homeTeam.conference === selectedConference || game.awayTeam.conference === selectedConference;
                 if (!conferenceMatch) {
@@ -176,7 +179,7 @@ export function GameFeed({ selectedSport, selectedConference, sortBy }: GameFeed
             }
         }
         
-        // If it's not an NCAA game, or it's an NCAA game that passed the filters, show it.
+        // If it passes all filters, include it.
         return true;
     });
 
