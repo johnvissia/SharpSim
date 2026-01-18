@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Star, Swords } from 'lucide-react';
+import { Star } from 'lucide-react';
 import Image from 'next/image';
 import { sportIconMap } from '@/lib/team-logos';
 
@@ -104,7 +104,7 @@ export function GameCard({ game }: { game: Game }) {
         <div className="flex items-start justify-around text-center mb-4">
           <TeamDisplay team={game.awayTeam} sport={game.sport}/>
           <div className="flex flex-col items-center self-center px-2">
-            <Swords className="h-6 w-6 text-muted-foreground" />
+            <span className="text-lg font-bold text-muted-foreground">@</span>
           </div>
           <TeamDisplay team={game.homeTeam} sport={game.sport} />
         </div>
