@@ -1,6 +1,6 @@
 'use client';
 
-import { doc, Firestore } from 'firebase/firestore';
+import { doc, Firestore, writeBatch } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { DailyGame, CompletedGame } from '@/lib/types';
 import { sportKeyMapping } from './sports';
@@ -33,7 +33,6 @@ export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: stri
   }
 
   // --- 1. Fetch Upcoming Game Odds ---
-  let allUpcomingGames: any[] = [];
   const keysToFetch = sportKey === 'upcoming' ? UPCOMING_SPORT_KEYS : [sportKey];
 
   try {
@@ -50,26 +49,27 @@ export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: stri
     });
 
     const results = await Promise.all(fetchPromises);
-    allUpcomingGames = results.flat(); // Combine arrays of games from all fetched sports
+    const allUpcomingGames: any[] = results.flat();
 
-    if (allUpcomingGames.length === 0) {
+    if (allUpcomingGames.length > 0) {
+        const batch = writeBatch(firestore);
+        for (const game of allUpcomingGames) {
+          const gameData: DailyGame = {
+            id: game.id,
+            sportKey: game.sport_key,
+            commenceTime: game.commence_time,
+            homeTeam: game.home_team,
+            awayTeam: game.away_team,
+            bookmakerOdds: game.bookmakers?.map((b: any) => JSON.stringify(b)) || [],
+          };
+          const gameRef = doc(firestore, 'daily_games', gameData.id);
+          batch.set(gameRef, gameData, { merge: true });
+        }
+        await batch.commit();
+        console.log(`Successfully committed a batch of ${allUpcomingGames.length} upcoming games.`);
+    } else {
         console.warn('No upcoming games found for the selected sports.');
     }
-
-    for (const game of allUpcomingGames) {
-      const gameData: DailyGame = {
-        id: game.id,
-        sportKey: game.sport_key,
-        commenceTime: game.commence_time,
-        homeTeam: game.home_team,
-        awayTeam: game.away_team,
-        bookmakerOdds: game.bookmakers?.map((b: any) => JSON.stringify(b)) || [],
-      };
-      const gameRef = doc(firestore, 'daily_games', gameData.id);
-      // Using non-blocking write
-      setDocumentNonBlocking(gameRef, gameData, { merge: true });
-    }
-    console.log(`Successfully queued writes for ${allUpcomingGames.length} upcoming games.`);
   } catch (error) {
     console.error('Error fetching or saving daily odds:', error);
     throw error; // Re-throw to be caught by the calling component
