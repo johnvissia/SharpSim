@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Game, SportName, Team } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,17 +11,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Star } from 'lucide-react';
+import { Star, Coins, Calculator } from 'lucide-react';
 import Image from 'next/image';
 import { sportIconMap } from '@/lib/team-logos';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 const InjuryIndicator = ({ team }: { team: Team }) => {
   const outPlayers = team.players.filter((p) => p.injuryStatus === 'Out');
@@ -111,8 +115,20 @@ const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
   );
 };
 
+type SelectedBet = {
+  pick: string;
+  odds: number;
+  betType: string;
+  game: Game;
+};
+
 export function GameCard({ game }: { game: Game }) {
   const [open, setOpen] = useState(false);
+  const [selectedBet, setSelectedBet] = useState<SelectedBet | null>(null);
+  const [stake, setStake] = useState('');
+  const [potentialWinnings, setPotentialWinnings] = useState(0);
+  const { toast } = useToast();
+
   const gameDate = new Date(game.startTime);
   const now = new Date();
   const isToday =
@@ -128,6 +144,52 @@ export function GameCard({ game }: { game: Game }) {
         hour: 'numeric',
         minute: '2-digit',
       });
+
+  const handleBetSelection = (
+    pick: string,
+    odds: number,
+    betType: string
+  ) => {
+    setSelectedBet({ pick, odds, betType, game });
+  };
+
+  useEffect(() => {
+    if (!open) {
+      // Reset state when dialog is closed for a clean slate next time
+      setSelectedBet(null);
+      setStake('');
+      setPotentialWinnings(0);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const stakeNum = parseFloat(stake);
+    if (!stakeNum || !selectedBet || stakeNum <= 0) {
+      setPotentialWinnings(0);
+      return;
+    }
+
+    const odds = selectedBet.odds;
+    let winnings = 0;
+    if (odds > 0) {
+      // For positive odds, winnings = stake * (odds / 100)
+      winnings = stakeNum * (odds / 100);
+    } else {
+      // For negative odds, winnings = stake / (abs(odds) / 100)
+      winnings = stakeNum / (Math.abs(odds) / 100);
+    }
+    setPotentialWinnings(winnings);
+  }, [stake, selectedBet]);
+
+  const handlePlaceBet = () => {
+    // In a real app, this would write to Firestore.
+    // For now, we'll just show a confirmation toast.
+    toast({
+      title: 'Bet Placed (Simulated)',
+      description: `You wagered ${stake} coins on ${selectedBet?.pick}. Good luck!`,
+    });
+    setOpen(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -154,7 +216,16 @@ export function GameCard({ game }: { game: Game }) {
                 Quick Bets
               </p>
               <div className="grid grid-cols-2 gap-2">
-                <DialogTrigger asChild>
+                <DialogTrigger
+                  asChild
+                  onClick={() =>
+                    handleBetSelection(
+                      game.awayTeam.name,
+                      game.odds!.moneyline.away,
+                      'moneyline'
+                    )
+                  }
+                >
                   <Button
                     variant="outline"
                     size="sm"
@@ -171,7 +242,16 @@ export function GameCard({ game }: { game: Game }) {
                     </span>
                   </Button>
                 </DialogTrigger>
-                <DialogTrigger asChild>
+                <DialogTrigger
+                  asChild
+                  onClick={() =>
+                    handleBetSelection(
+                      game.homeTeam.name,
+                      game.odds!.moneyline.home,
+                      'moneyline'
+                    )
+                  }
+                >
                   <Button
                     variant="outline"
                     size="sm"
@@ -190,7 +270,16 @@ export function GameCard({ game }: { game: Game }) {
                 </DialogTrigger>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <DialogTrigger asChild>
+                <DialogTrigger
+                  asChild
+                  onClick={() =>
+                    handleBetSelection(
+                      `Over ${game.odds!.total.points}`,
+                      game.odds!.total.over,
+                      'total'
+                    )
+                  }
+                >
                   <Button
                     variant="outline"
                     size="sm"
@@ -206,7 +295,16 @@ export function GameCard({ game }: { game: Game }) {
                     </span>
                   </Button>
                 </DialogTrigger>
-                <DialogTrigger asChild>
+                <DialogTrigger
+                  asChild
+                  onClick={() =>
+                    handleBetSelection(
+                      `Under ${game.odds!.total.points}`,
+                      game.odds!.total.under,
+                      'total'
+                    )
+                  }
+                >
                   <Button
                     variant="outline"
                     size="sm"
@@ -227,13 +325,61 @@ export function GameCard({ game }: { game: Game }) {
           )}
         </CardContent>
       </Card>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Place Your Bet</DialogTitle>
-          <DialogDescription>
-            Confirm your pick and enter your stake.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[425px]">
+        {selectedBet && (
+          <>
+            <DialogHeader>
+              <DialogTitle>{selectedBet.pick}</DialogTitle>
+              <DialogDescription>
+                {selectedBet.game.awayTeam.name} @{' '}
+                {selectedBet.game.homeTeam.name}
+                <br />
+                <span className="capitalize">{selectedBet.betType}</span> @{' '}
+                <span className="font-bold">
+                  {selectedBet.odds > 0
+                    ? `+${selectedBet.odds}`
+                    : selectedBet.odds}
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="stake" className="text-right">
+                  <Coins className="inline-block mr-1 h-4 w-4 text-muted-foreground" />
+                  Stake
+                </Label>
+                <Input
+                  id="stake"
+                  type="number"
+                  value={stake}
+                  onChange={(e) => setStake(e.target.value)}
+                  className="col-span-3"
+                  placeholder="0.00 coins"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="winnings" className="text-right">
+                  <Calculator className="inline-block mr-1 h-4 w-4 text-muted-foreground" />
+                  To Win
+                </Label>
+                <p
+                  id="winnings"
+                  className="col-span-3 text-sm font-semibold text-foreground"
+                >
+                  {potentialWinnings.toFixed(2)} coins
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={handlePlaceBet}
+                disabled={!stake || parseFloat(stake) <= 0}
+              >
+                Place Bet
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
