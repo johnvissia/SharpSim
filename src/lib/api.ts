@@ -12,10 +12,12 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 // List of sports to fetch for the daily 'upcoming' sync.
 const UPCOMING_SPORT_KEYS = [
-  'basketball_nba',
-  'basketball_ncaab',
-  'icehockey_nhl',
-  'soccer_epl',
+  "americanfootball_nfl",
+  "baseball_mlb",
+  "basketball_ncaab",
+  "basketball_nba",
+  "icehockey_nhl",
+  "soccer_epl"
 ];
 
 
@@ -38,14 +40,19 @@ export async function fetchAndSaveDailyData(firestore: Firestore, sportKey: stri
   try {
     const fetchPromises = keysToFetch.map(key => {
         const oddsApiUrl = `https://api.the-odds-api.com/v4/sports/${key}/odds/?regions=us&markets=h2h,spreads,totals&oddsFormat=american&apiKey=${API_KEY}`;
-        return fetch(oddsApiUrl).then(async (res) => {
-            if (!res.ok) {
-                const errorText = await res.text();
-                console.error(`Failed to fetch odds for ${key}: ${res.status}`, errorText);
-                return []; // Return empty array on failure, so Promise.all doesn't reject
-            }
-            return res.json();
-        });
+        return fetch(oddsApiUrl)
+            .then(async (res) => {
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error(`Failed to fetch odds for ${key}: ${res.status}`, errorText);
+                    return []; // Return empty array on failure so Promise.all doesn't reject
+                }
+                return res.json();
+            })
+            .catch(error => {
+                console.error(`Network error fetching odds for ${key}:`, error);
+                return []; // Gracefully handle fetch error by returning an empty array
+            });
     });
 
     const results = await Promise.all(fetchPromises);
