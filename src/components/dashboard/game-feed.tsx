@@ -8,11 +8,12 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { sportNameMapping } from '@/lib/sports';
 import { getTeamLogoUrl } from '@/lib/team-logos';
+import { getConference } from '@/lib/ncaa-conferences';
 
 /**
  * Transforms raw DailyGame data from Firestore into the Game format required by UI components.
  * @param dailyGames - An array of DailyGame objects from Firestore.
- * @param rankingsMap - A map of team names to their rank and conference.
+ * @param rankingsMap - A map of team names to their rank.
  * @returns An array of Game objects ready for display.
  */
 const transformDailyGamesToGames = (
@@ -31,22 +32,18 @@ const transformDailyGamesToGames = (
         const allOdds: SportsbookOdds[] = (dg.bookmakerOdds || []).map((jsonString: string): SportsbookOdds | null => {
             try {
                 const bookmaker = JSON.parse(jsonString);
-
-                // Find markets
                 const h2hMarket = bookmaker.markets.find((m: any) => m.key === 'h2h');
                 const spreadsMarket = bookmaker.markets.find((m: any) => m.key === 'spreads');
                 const totalsMarket = bookmaker.markets.find((m: any) => m.key === 'totals');
 
-                let moneyline: Odds['moneyline'] | undefined;
-                if (h2hMarket) {
-                    const homeMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.homeTeam.trim());
-                    const awayMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.awayTeam.trim());
-                    if (homeMoneylineOutcome && awayMoneylineOutcome) {
-                        moneyline = { home: homeMoneylineOutcome.price, away: awayMoneylineOutcome.price };
-                    }
-                }
+                if (!h2hMarket) return null;
 
-                if(!moneyline) return null;
+                const homeMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.homeTeam.trim());
+                const awayMoneylineOutcome = h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.awayTeam.trim());
+                
+                if (!homeMoneylineOutcome || !awayMoneylineOutcome) return null;
+
+                const moneyline: Odds['moneyline'] = { home: homeMoneylineOutcome.price, away: awayMoneylineOutcome.price };
 
                 let spread: Odds['spread'] = { points: 0, home: 0, away: 0 };
                 if (spreadsMarket) {
@@ -78,6 +75,8 @@ const transformDailyGamesToGames = (
         }).filter((o): o is SportsbookOdds => o !== null);
 
         const homeRankingInfo = rankingsMap.get(dg.homeTeam);
+        const homeConference = homeRankingInfo?.conference || getConference(dg.homeTeam);
+        
         const homeTeam: Team = {
             id: dg.homeTeam,
             name: dg.homeTeam,
@@ -85,10 +84,12 @@ const transformDailyGamesToGames = (
             record: '', // Data not available in daily_games collection
             players: [], // Data not available in daily_games collection
             rank: homeRankingInfo?.rank,
-            conference: homeRankingInfo?.conference,
+            conference: homeConference,
         };
         
         const awayRankingInfo = rankingsMap.get(dg.awayTeam);
+        const awayConference = awayRankingInfo?.conference || getConference(dg.awayTeam);
+
         const awayTeam: Team = {
             id: dg.awayTeam,
             name: dg.awayTeam,
@@ -96,7 +97,7 @@ const transformDailyGamesToGames = (
             record: '', // Data not available in daily_games collection
             players: [], // Data not available in daily_games collection
             rank: awayRankingInfo?.rank,
-            conference: awayRankingInfo?.conference,
+            conference: awayConference,
         };
 
         const game: Game = {
@@ -151,7 +152,7 @@ export function GameFeed({ selectedSport, selectedConference }: GameFeedProps) {
   const games = useMemo(() => transformDailyGamesToGames(dailyGames, rankingsMap), [dailyGames, rankingsMap]);
 
   const filteredAndSortedGames = useMemo(() => {
-    const filtered = games.filter(game => {
+    return games.filter(game => {
         // 1. Filter by selected sport
         const sportMatch = selectedSport === 'All' || game.sport === selectedSport;
         if (!sportMatch) return false;
@@ -160,16 +161,17 @@ export function GameFeed({ selectedSport, selectedConference }: GameFeedProps) {
         const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
         const isNCAAGame = ncaaSports.includes(game.sport as any);
 
-        if (isNCAAGame && selectedConference !== 'All') {
-            const conferenceMatch = game.homeTeam.conference === selectedConference || game.awayTeam.conference === selectedConference;
-            if (!conferenceMatch) return false;
+        const isConferenceFilterEnabled = isNCAAGame && selectedConference !== 'All';
+
+        if (isConferenceFilterEnabled) {
+            const homeConference = game.homeTeam.conference;
+            const awayConference = game.awayTeam.conference;
+            return homeConference === selectedConference || awayConference === selectedConference;
         }
         
         return true;
-    });
-
-    // Now, sort the `filtered` array
-    return [...filtered].sort((a, b) => {
+    })
+    .sort((a, b) => {
         // Favorite sorting comes first
         const aIsFavSport = favoriteSports.includes(a.sport);
         const bIsFavSport = favoriteSports.includes(b.sport);
