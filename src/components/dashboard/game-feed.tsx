@@ -37,7 +37,7 @@ const transformDailyGamesToGames = (
                 const spreadsMarket = bookmaker.markets.find((m: any) => m.key === 'spreads');
                 const totalsMarket = bookmaker.markets.find((m: any) => m.key === 'totals');
 
-                // Odds are not mandatory. If h2h market is missing, we still want to show the game.
+                // Odds are not mandatory for display, but h2h is required for this bookmaker entry to be valid
                 if (!h2hMarket) return null;
 
                 // Find outcomes by comparing trimmed names for robustness
@@ -108,7 +108,7 @@ const transformDailyGamesToGames = (
 
         if (allOdds.length > 0) {
             game.allOdds = allOdds;
-            game.odds = allOdds[0].odds; // Use first bookmaker's odds as the "best" for now
+            game.odds = allOdds[0].odds;
         }
 
         return game;
@@ -154,23 +154,19 @@ export function GameFeed({ selectedSport, selectedConference, sortBy }: GameFeed
     const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
 
     const filtered = games.filter(game => {
-        // Filter by selected sport first
+        // 1. Filter by selected sport
         const sportMatch = selectedSport === 'All' || game.sport === selectedSport;
         if (!sportMatch) return false;
 
+        // 2. Apply special filters ONLY for NCAA games
         const isNCAAGame = ncaaSports.includes(game.sport as any);
-
-        // Special filtering for NCAA games
         if (isNCAAGame) {
-            // IF "All Sports" is selected, ONLY show ranked NCAA teams to reduce clutter.
-            if (selectedSport === 'All') {
-                const hasRankedTeam = game.homeTeam.rank || game.awayTeam.rank;
-                if (!hasRankedTeam) {
-                    return false;
-                }
+            // When view is "All Sports", only show ranked NCAA teams to reduce clutter
+            if (selectedSport === 'All' && !(game.homeTeam.rank || game.awayTeam.rank)) {
+                return false;
             }
 
-            // Apply conference filter if a specific conference is selected.
+            // If a conference is selected, filter by it. This applies whether we're in "All Sports" or a specific NCAA sport view.
             if (selectedConference !== 'All') {
                 const conferenceMatch = game.homeTeam.conference === selectedConference || game.awayTeam.conference === selectedConference;
                 if (!conferenceMatch) {
@@ -179,7 +175,7 @@ export function GameFeed({ selectedSport, selectedConference, sortBy }: GameFeed
             }
         }
         
-        // If it passes all filters, include it.
+        // 3. If it's not an NCAA game, or it's an NCAA game that passed its filters, show it.
         return true;
     });
 
