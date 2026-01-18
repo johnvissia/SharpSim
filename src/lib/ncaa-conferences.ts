@@ -159,6 +159,7 @@ export const ncaaConferenceMap: Record<string, string> = {
  */
 export function getConference(teamName: string): string | undefined {
     const normalizedTeamName = teamName.toLowerCase().trim();
+    const directionals = ["western", "eastern", "central", "northern", "southern"];
 
     // Create a normalized version of the map for consistent lookups
     const normalizedConferenceMap: Record<string, string> = {};
@@ -180,6 +181,14 @@ export function getConference(teamName: string): string | undefined {
     for (const key of sortedKeys) {
         // If the team name from the API contains one of our known team names...
         if (normalizedTeamName.includes(key)) {
+            // Directional Check to prevent false positives (e.g., "Western Michigan" vs "Michigan")
+            const apiIsDirectional = directionals.some(dir => normalizedTeamName.startsWith(dir));
+            const keyIsDirectional = directionals.some(dir => key.startsWith(dir));
+
+            if (apiIsDirectional && !keyIsDirectional) {
+                continue; // This is a false positive, so skip to the next key
+            }
+            
             return normalizedConferenceMap[key];
         }
     }

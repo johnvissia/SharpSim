@@ -205,17 +205,23 @@ const mascotRegex = new RegExp([
 
 export function getTeamLogoUrl(teamName: string, sport: SportName): string {
     const isNcaa = ['NCAAF', 'NCAAM', 'NCAAW'].includes(sport);
+    const directionals = ["western", "eastern", "central", "northern", "southern"];
     
     if (isNcaa) {
         const normalizedName = teamName.trim();
-        // Clean the name by removing mascots and other noise
         const cleanedName = normalizedName.replace(mascotRegex, '').replace(/(\(FL\)|&)/g, '').trim();
 
         const sortedNcaaKeys = Object.keys(ncaaTeamIdMap).sort((a, b) => b.length - a.length);
+        const apiIsDirectional = directionals.some(dir => normalizedName.toLowerCase().startsWith(dir));
 
         // Strategy 1: Match cleaned name (e.g., "Minnesota Golden Gophers" -> "Minnesota")
         for (const key of sortedNcaaKeys) {
             if (cleanedName.toLowerCase().includes(key.toLowerCase())) {
+                const keyIsDirectional = directionals.some(dir => key.toLowerCase().startsWith(dir));
+                // Prevent false positives like "Western Michigan" matching "Michigan"
+                if (apiIsDirectional && !keyIsDirectional) {
+                    continue;
+                }
                 const teamId = ncaaTeamIdMap[key];
                 return `https://a.espncdn.com/combiner/i?img=/i/teamlogos/ncaa/500/${teamId}.png`;
             }
@@ -224,6 +230,11 @@ export function getTeamLogoUrl(teamName: string, sport: SportName): string {
         // Strategy 2: Match original name (for cases where cleaning removes the whole name, e.g. "Duke")
         for (const key of sortedNcaaKeys) {
             if (normalizedName.toLowerCase().includes(key.toLowerCase())) {
+                const keyIsDirectional = directionals.some(dir => key.toLowerCase().startsWith(dir));
+                // Prevent false positives
+                if (apiIsDirectional && !keyIsDirectional) {
+                    continue;
+                }
                 const teamId = ncaaTeamIdMap[key];
                 return `https://a.espncdn.com/combiner/i?img=/i/teamlogos/ncaa/500/${teamId}.png`;
             }
