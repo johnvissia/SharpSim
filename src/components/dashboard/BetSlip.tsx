@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useBetSlip } from '@/context/BetSlipContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser } from '@/firebase';
 import { collection, doc, writeBatch, increment } from 'firebase/firestore';
 import type { UserBet } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 export function BetSlip() {
   const { picks, removePick, clearPicks } = useBetSlip();
@@ -20,6 +21,99 @@ export function BetSlip() {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user } = useUser();
+  
+  const slipRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  // On mount, position the slip at the bottom-right corner.
+  useEffect(() => {
+    if (slipRef.current) {
+        const { innerWidth, innerHeight } = window;
+        const { offsetWidth, offsetHeight } = slipRef.current;
+        setPosition({
+            x: innerWidth - offsetWidth - 20,
+            y: innerHeight - offsetHeight - 20,
+        });
+    }
+  }, []);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only allow dragging from the header, not on buttons inside it
+    if ((e.target as HTMLElement).closest('button')) {
+        return;
+    }
+    
+    if (slipRef.current) {
+        setIsDragging(true);
+        setDragStart({
+            x: e.clientX - position.x,
+            y: e.clientY - position.y,
+        });
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    }
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (isDragging && slipRef.current) {
+        let newX = e.clientX - dragStart.x;
+        let newY = e.clientY - dragStart.y;
+        
+        const { innerWidth, innerHeight } = window;
+        const { offsetWidth, offsetHeight } = slipRef.current;
+        
+        newX = Math.max(0, Math.min(newX, innerWidth - offsetWidth));
+        newY = Math.max(0, Math.min(newY, innerHeight - offsetHeight));
+
+        setPosition({ x: newX, y: newY });
+    }
+  }, [isDragging, dragStart]);
+
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    document.body.style.userSelect = '';
+    if (slipRef.current) {
+        const { innerWidth, innerHeight } = window;
+        const { offsetWidth, offsetHeight } = slipRef.current;
+        const margin = 20;
+
+        const corners = [
+            { x: margin, y: margin }, // Top-left
+            { x: innerWidth - offsetWidth - margin, y: margin }, // Top-right
+            { x: margin, y: innerHeight - offsetHeight - margin }, // Bottom-left
+            { x: innerWidth - offsetWidth - margin, y: innerHeight - offsetHeight - margin } // Bottom-right
+        ];
+
+        let closestCorner = corners[0];
+        let minDistance = Infinity;
+
+        corners.forEach(corner => {
+            const distance = Math.sqrt(Math.pow(position.x - corner.x, 2) + Math.pow(position.y - corner.y, 2));
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestCorner = corner;
+            }
+        });
+        
+        setPosition(closestCorner);
+    }
+  }, [position.x, position.y]);
+
+  useEffect(() => {
+    if (isDragging) {
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp, { once: true });
+    }
+    return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.userSelect = '';
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
 
   const { potentialPayout, combinedOdds } = useMemo(() => {
     if (picks.length === 0 || !stake) {
@@ -129,8 +223,22 @@ export function BetSlip() {
   }
 
   return (
-    <Card className="fixed bottom-4 right-4 w-80 shadow-2xl z-50">
-      <CardHeader className="flex flex-row items-center justify-between p-4">
+    <Card
+      ref={slipRef}
+      className={cn(
+        "fixed w-80 z-50",
+        isDragging ? 'shadow-2xl cursor-grabbing' : 'shadow-lg'
+      )}
+      style={{
+        top: `${position.y}px`,
+        left: `${position.x}px`,
+        transition: isDragging ? 'none' : 'top 0.3s ease-out, left 0.3s ease-out',
+      }}
+    >
+      <CardHeader 
+        className="flex flex-row items-center justify-between p-4 cursor-grab"
+        onMouseDown={handleMouseDown}
+      >
         <CardTitle className="text-lg flex items-center gap-2">
             <Ticket className="h-5 w-5" />
             Bet Slip
