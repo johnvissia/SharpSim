@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import type { SportName } from './types';
 import type { LucideProps } from 'lucide-react';
@@ -147,76 +149,125 @@ const teamLogoSlugs: { [key: string]: string } = {
     'Seattle Mariners': 'sea', 'St. Louis Cardinals': 'stl', 'Tampa Bay Rays': 'tb', 'Texas Rangers': 'tex',
     'Toronto Blue Jays': 'tor', 'Washington Nationals': 'wsh',
     
-    // Soccer (EPL)
+    // Soccer (EPL) - These are Team IDs, not slugs
     'Arsenal': '359', 'Manchester United': '360', 'Liverpool': '364', 'Manchester City': '382',
     'Chelsea': '363', 'Tottenham Hotspur': '367', 'Nottingham Forest': '393'
 };
 
 const sportLeagueMap: { [key in SportName]?: string } = {
-    'NFL': 'nfl', 'NBA': 'nba', 'NHL': 'nhl', 'MLB': 'mlb', 'WNBA': 'wnba', 'NCAAF': 'ncaaf', 'NCAAM': 'ncaab', 'NCAAW': 'ncaaw', 'Soccer': 'eng.1'
+    'NFL': 'nfl', 'NBA': 'nba', 'NHL': 'nhl', 'MLB': 'mlb', 'WNBA': 'wnba', 'NCAAF': 'ncaaf', 'NCAAM': 'ncaab', 'NCAAW': 'ncaaw', 'Soccer': 'soccer'
 };
 
+const ncaaTeamIdMap: Record<string, string> = {
+    // SEC
+    "Alabama": "333", "Arkansas": "8", "Auburn": "2", "Florida": "57",
+    "Georgia": "61", "Kentucky": "96", "LSU": "99", "Ole Miss": "145",
+    "Mississippi State": "344", "Missouri": "142", "Oklahoma": "201",
+    "South Carolina": "2579", "Tennessee": "2633", "Texas": "251",
+    "Texas A&M": "245", "Vanderbilt": "238",
+
+    // Big Ten
+    "Illinois": "356", "Indiana": "84", "Iowa": "2294", "Maryland": "120",
+    "Michigan": "130", "Michigan State": "127", "Minnesota": "135",
+    "Nebraska": "158", "Northwestern": "77", "Ohio State": "194",
+    "Oregon": "2483", "Penn State": "213", "Purdue": "2509",
+    "Rutgers": "164", "UCLA": "26", "USC": "30", "Washington": "264",
+    "Wisconsin": "275",
+
+    // ACC
+    "Boston College": "103", "California": "25", "Clemson": "228",
+    "Duke": "150", "Florida State": "52", "Georgia Tech": "59",
+    "Louisville": "97", "Miami": "2390", "NC State": "152",
+    "North Carolina": "153", "Notre Dame": "87", "Pittsburgh": "221",
+    "SMU": "231", "Stanford": "24", "Syracuse": "155",
+    "Virginia": "258", "Virginia Tech": "259", "Wake Forest": "154",
+
+    // Big 12
+    "Arizona": "12", "Arizona State": "9", "Baylor": "239", "BYU": "252",
+    "Cincinnati": "2132", "Colorado": "38", "Houston": "248",
+    "Iowa State": "66", "Kansas": "2305", "Kansas State": "2306",
+    "Oklahoma State": "197", "TCU": "2628", "Texas Tech": "2641",
+    "UCF": "2116", "Utah": "254", "West Virginia": "277",
+};
+
+const mascotRegex = new RegExp([
+    'University of', 'State', 'Eagles', 'Golden Bears', 'Tigers', 'Blue Devils', 'Seminoles', 'Yellow Jackets',
+    'Cardinals', 'Hurricanes', 'Wolfpack', 'Tar Heels', 'Fighting Irish', 'Panthers', 'Mustangs',
+    'Cardinal', 'Orange', 'Cavaliers', 'Hokies', 'Demon Deacons', 'Fighting Illini', 'Hoosiers',
+    'Hawkeyes', 'Terrapins', 'Wolverines', 'Spartans', 'Golden Gophers', 'Cornhuskers', 'Wildcats',
+    'Buckeyes', 'Ducks', 'Nittany Lions', 'Boilermakers', 'Scarlet Knights', 'Bruins', 'Trojans',
+    'Huskies', 'Badgers', 'Sun Devils', 'Bears', 'Cougars', 'Bearcats', 'Buffaloes', 'Cyclones',
+    'Jayhawks', 'Cowboys', 'Horned Frogs', 'Red Raiders', 'Knights', 'Utes', 'Mountaineers',
+    'Crimson Tide', 'Razorbacks', 'Gators', 'Bulldogs', 'Rebels', 'Gamecocks', 'Volunteers',
+    'Longhorns', 'Aggies', 'Commodores'
+].join('|'), 'gi');
+
+
 export function getTeamLogoUrl(teamName: string, sport: SportName): string {
-    const league = sportLeagueMap[sport];
+    const isNcaa = ['NCAAF', 'NCAAM', 'NCAAW'].includes(sport);
     
-    // 1. Normalization of API name
+    if (isNcaa) {
+        const normalizedName = teamName.trim();
+        // Clean the name by removing mascots and other noise
+        const cleanedName = normalizedName.replace(mascotRegex, '').replace(/(\(FL\)|&)/g, '').trim();
+
+        const sortedNcaaKeys = Object.keys(ncaaTeamIdMap).sort((a, b) => b.length - a.length);
+
+        // Strategy 1: Match cleaned name (e.g., "Minnesota Golden Gophers" -> "Minnesota")
+        for (const key of sortedNcaaKeys) {
+            if (cleanedName.toLowerCase().includes(key.toLowerCase())) {
+                const teamId = ncaaTeamIdMap[key];
+                return `https://a.espncdn.com/combiner/i?img=/i/teamlogos/ncaa/500/${teamId}.png`;
+            }
+        }
+        
+        // Strategy 2: Match original name (for cases where cleaning removes the whole name, e.g. "Duke")
+        for (const key of sortedNcaaKeys) {
+            if (normalizedName.toLowerCase().includes(key.toLowerCase())) {
+                const teamId = ncaaTeamIdMap[key];
+                return `https://a.espncdn.com/combiner/i?img=/i/teamlogos/ncaa/500/${teamId}.png`;
+            }
+        }
+    }
+
+    // --- Fallback to Professional Leagues & old logic ---
+    const league = sportLeagueMap[sport];
+    if (!league) {
+        console.log(`[Logo Mapper Debug] No league mapping for sport: "${sport}"`);
+        return '';
+    }
+
     const normalizedApiName = teamName.toLowerCase().trim();
     
-    // 2. Create a normalized map of our logo slugs for easier lookup.
     const normalizedLogoSlugs: { [key: string]: string } = {};
     for (const key in teamLogoSlugs) {
         normalizedLogoSlugs[key.toLowerCase().trim()] = teamLogoSlugs[key];
     }
 
-    // --- Matching Strategies ---
-
-    // Strategy A: Direct Match
     let slug = normalizedLogoSlugs[normalizedApiName];
-    if (slug && league) {
+    if (slug) {
         return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
     }
 
-    // Strategy B: Soccer Suffix Handling
-    if (sport === 'Soccer') {
-        const suffixes = [' fc', ' united', ' hotspur'];
-        for (const suffix of suffixes) {
-            slug = normalizedLogoSlugs[normalizedApiName + suffix];
-            if (slug && league) {
-                return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
-            }
-        }
-    }
-    
-    // Strategy C: Mascot/Suffix Removal
     const nameParts = normalizedApiName.split(' ');
     if (nameParts.length > 1) {
         const nameWithoutLastWord = nameParts.slice(0, -1).join(' ');
         slug = normalizedLogoSlugs[nameWithoutLastWord];
-        if (slug && league) {
+        if (slug) {
             return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
         }
     }
 
-    // Strategy D: Partial Match (Containment check)
     const sortedKeys = Object.keys(normalizedLogoSlugs).sort((a, b) => b.length - a.length);
     for (const mapKey of sortedKeys) {
         if (normalizedApiName.includes(mapKey)) {
             slug = normalizedLogoSlugs[mapKey];
-            if (slug && league) {
+            if (slug) {
                 return `https://a.espncdn.com/i/teamlogos/${league}/500/${slug}.png`;
             }
         }
     }
     
-    // --- Fallbacks ---
-
-    // Special hardcoded cases as a final fallback.
-    if (sport === 'NCAAF' || sport === 'NCAAM' || sport === 'NCAAW') {
-        if (teamName.includes('Alabama')) return `https://a.espncdn.com/i/teamlogos/ncaa/500/333.png`;
-        if (teamName.includes('Georgia')) return `https://a.espncdn.com/i/teamlogos/ncaa/500/61.png`;
-    }
-
-    // If still no logo, log the name for debugging.
     console.log(`[Logo Mapper Debug] No logo found for team: "${teamName}" in sport: "${sport}"`);
     return ''; // Return empty string to signal fallback to the sport icon.
 }
