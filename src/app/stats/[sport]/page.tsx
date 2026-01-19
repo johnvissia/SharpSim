@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useParams } from 'next/navigation';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import Link from 'next/link';
@@ -23,8 +24,9 @@ function getTeamFromPick(pick: string, betType: UserBet['betType']): string | nu
     return null;
 }
 
-export default function SportStatsPage({ params }: { params: { sport: string } }) {
-    const sportName = decodeURIComponent(params.sport) as SportName;
+export default function SportStatsPage() {
+    const params = useParams();
+    const sportName = decodeURIComponent(params.sport as string) as SportName;
     const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
 
