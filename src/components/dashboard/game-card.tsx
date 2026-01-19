@@ -110,9 +110,15 @@ export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game
   const isLive = game.statusDetail && !game.statusDetail.toLowerCase().includes('final') && !game.statusDetail.toLowerCase().includes('tba') && !game.statusDetail.toLowerCase().includes(':');
   const isFinal = game.statusDetail && game.statusDetail.toLowerCase().includes('final');
 
+  const gameDate = new Date(game.startTime);
+  const now = new Date();
+  const isToday = now.getFullYear() === gameDate.getFullYear() && now.getMonth() === gameDate.getMonth() && now.getDate() === gameDate.getDate();
+
   const gameTimeOrStatus = isLive || isFinal 
     ? game.statusDetail
-    : new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    : isToday
+      ? gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      : gameDate.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const handleBetSelection = (
     e: React.MouseEvent,

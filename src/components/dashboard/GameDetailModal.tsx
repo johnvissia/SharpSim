@@ -50,21 +50,25 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
 
   const gameDate = new Date(game.startTime);
   const now = new Date();
-  const isLive = now > gameDate;
+  
+  const isLive = game.statusDetail && !game.statusDetail.toLowerCase().includes('final') && !game.statusDetail.toLowerCase().includes('tba') && !game.statusDetail.toLowerCase().includes(':');
+  const isFinal = game.statusDetail && game.statusDetail.toLowerCase().includes('final');
 
   const isToday =
     now.getFullYear() === gameDate.getFullYear() &&
     now.getMonth() === gameDate.getMonth() &&
     now.getDate() === gameDate.getDate();
 
-  const gameTime = isToday
-    ? gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-    : gameDate.toLocaleString([], {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      });
+  const gameTimeOrStatus = isLive || isFinal
+    ? game.statusDetail
+    : isToday
+      ? gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      : gameDate.toLocaleString([], {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        });
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -86,7 +90,7 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                     <TeamHeader team={game.awayTeam} sport={game.sport} />
                     <div className="flex flex-col items-center self-center text-center">
                         <span className="text-4xl font-bold text-muted-foreground">VS</span>
-                         <div className="text-sm text-muted-foreground mt-2">{gameTime}</div>
+                         <div className="text-sm text-muted-foreground mt-2">{gameTimeOrStatus}</div>
                         {isLive && (
                             <Badge className="bg-red-600 hover:bg-red-600 text-white animate-pulse text-xs mt-2">
                                 LIVE
