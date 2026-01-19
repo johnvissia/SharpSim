@@ -22,11 +22,12 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
   const sportsMap = [
     { key: 'americanfootball_nfl', label: 'NFL' },
     { key: 'americanfootball_ncaaf', label: 'NCAAF' },
-    { key: 'baseball_mlb', label: 'MLB' },
     { key: 'basketball_nba', label: 'NBA' },
     { key: 'basketball_ncaab', label: 'NCAAM' },
     { key: 'icehockey_nhl', label: 'NHL' },
-    { key: 'soccer_epl', label: 'Soccer' }
+    // Temporarily removed to reduce API calls and avoid rate limiting.
+    // { key: 'baseball_mlb', label: 'MLB' },
+    // { key: 'soccer_epl', label: 'Soccer' }
   ];
 
   // 1. Fetch Upcoming Game Odds

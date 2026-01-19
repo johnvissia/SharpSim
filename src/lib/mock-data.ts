@@ -201,32 +201,6 @@ const mockGames: Game[] = [
     get odds() { return getBestOdds(this.allOdds) }
   },
   {
-    id: 'g3',
-    sport: 'Soccer',
-    startTime: new Date('2026-01-16T15:00:00-05:00').toISOString(),
-    awayTeam: liverpool,
-    homeTeam: manUtd,
-    allOdds: generateOdds({
-      moneyline: { away: 150, home: 180 },
-      spread: { points: 0.5, home: -110, away: -110 },
-      total: { points: 2.5, over: -120, under: 100 },
-    }),
-    get odds() { return getBestOdds(this.allOdds) }
-  },
-  {
-    id: 'g4',
-    sport: 'WNBA',
-    startTime: new Date('2026-01-16T21:00:00-05:00').toISOString(),
-    awayTeam: liberty,
-    homeTeam: aces,
-    allOdds: generateOdds({
-      moneyline: { away: 130, home: -150 },
-      spread: { points: -3.0, home: -110, away: -110 },
-      total: { points: 170.5, over: -110, under: -110 },
-    }),
-    get odds() { return getBestOdds(this.allOdds) }
-  },
-    {
     id: 'g5',
     sport: 'NCAAF',
     startTime: new Date('2026-01-16T13:00:00-05:00').toISOString(),
@@ -245,10 +219,7 @@ const mockGames: Game[] = [
 const mockSports: Sport[] = [
     { id: 's1', name: 'NBA' },
     { id: 's2', name: 'NFL' },
-    { id: 's3', name: 'MLB' },
     { id: 's4', name: 'NHL' },
-    { id: 's5', name: 'Soccer' },
-    { id: 's6', name: 'WNBA' },
     { id: 's7', name: 'NCAAF' },
     { id: 's8', name: 'NCAAM' },
 ]
