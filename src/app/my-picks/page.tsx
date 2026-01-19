@@ -7,10 +7,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { UserBet } from '@/lib/types';
-import { Ticket, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Ticket, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, isSameDay, addDays, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 const getBetStatusBadge = (status: UserBet['status']) => {
   if (status === 'pending') return <Badge variant="secondary">Pending</Badge>;
@@ -103,31 +104,70 @@ export default function MyPicksPage() {
                         { 'bg-green-100 dark:bg-green-500/10': bet.status === 'won' }
                     )}>
                         <CardContent className="!p-0">
-                            <div className="flex justify-between items-start p-4">
-                                <div className="flex-grow">
-                                    {isParlay ? (
-                                        <div className="space-y-1">
-                                            <p className="font-semibold text-lg">{bet.pick.split(' | ').length}-Leg Parlay <span className="font-mono text-muted-foreground font-normal">({bet.odds > 0 ? `+${bet.odds}`: bet.odds})</span></p>
-                                            <ul className="text-sm text-muted-foreground list-disc pl-5">
-                                                {bet.pick.split(' | ').map((leg, index) => (
-                                                    <li key={index}>{leg}</li>
-                                                ))}
-                                            </ul>
+                            {isParlay && bet.legs ? (
+                                // --- NEW FLIFF-STYLE PARLAY TICKET ---
+                                <>
+                                    <div className="p-4 space-y-4">
+                                        {bet.legs.map((leg, index) => {
+                                            const Icon = leg.status === 'won' ? CheckCircle2 : leg.status === 'lost' ? XCircle : Clock;
+                                            const iconColor = leg.status === 'won' ? 'text-green-500' : leg.status === 'lost' ? 'text-red-500' : 'text-muted-foreground';
+                                            const gameDate = new Date(leg.commenceTime);
+                                            const gameTime = gameDate.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+                                            return (
+                                                <div key={index}>
+                                                    {/* Leg Row 1 */}
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <p className="font-bold truncate pr-2">{leg.matchup}</p>
+                                                        <p className="font-mono font-semibold">{leg.odds > 0 ? `+${leg.odds}` : leg.odds}</p>
+                                                    </div>
+                                                    {/* Leg Row 2 */}
+                                                    <p className="text-xs text-muted-foreground">{gameTime}</p>
+                                                    {/* Leg Row 3 */}
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <Icon className={cn("h-5 w-5 flex-shrink-0", iconColor)} />
+                                                        <div>
+                                                            <p className="font-semibold">{leg.pick}</p>
+                                                            <p className="text-xs text-muted-foreground uppercase tracking-wider">{leg.betType}</p>
+                                                        </div>
+                                                    </div>
+                                                    {index < bet.legs.length - 1 && <Separator className="my-3" />}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="border-t-2 border-dashed border-border/50 mx-4" />
+                                    <div className="p-4 space-y-2">
+                                        <div className="flex justify-between items-center font-bold text-base">
+                                            <p>{bet.pick}</p>
+                                            <div className="flex items-center gap-4">
+                                                <p className="font-mono">{bet.odds > 0 ? `+${bet.odds}`: bet.odds}</p>
+                                                {getBetStatusBadge(bet.status)}
+                                            </div>
                                         </div>
-                                    ) : (
-                                        <>
+                                        <div className="flex justify-between items-center text-sm text-muted-foreground font-mono">
+                                            <p>Risk: <span className="font-semibold text-foreground">{bet.stake.toFixed(2)} coins</span></p>
+                                            <p>Payout: <span className="font-semibold text-green-600">{bet.potentialWinnings.toFixed(2)} coins</span></p>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                // --- EXISTING SINGLE TICKET ---
+                                <>
+                                    <div className="flex justify-between items-start p-4">
+                                        <div className="flex-grow">
                                             <p className="font-semibold text-lg">{bet.pick} <span className="font-mono text-muted-foreground font-normal">({bet.odds > 0 ? `+${bet.odds}`: bet.odds})</span></p>
                                             <p className="text-sm text-muted-foreground">{bet.matchup || 'Game details not available'}</p>
-                                        </>
-                                    )}
-                                </div>
-                                {getBetStatusBadge(bet.status)}
-                            </div>
-                            <div className="border-t-2 border-dashed border-border/50 mx-4" />
-                            <div className="flex justify-between items-center p-4 text-sm text-muted-foreground">
-                                <p className="font-mono">Stake: <span className="font-semibold text-foreground">{bet.stake.toFixed(2)} coins</span></p>
-                                <p className="font-mono">To Win: <span className="font-semibold text-green-600">{(bet.potentialWinnings - bet.stake).toFixed(2)} coins</span></p>
-                            </div>
+                                        </div>
+                                        {getBetStatusBadge(bet.status)}
+                                    </div>
+                                    <div className="border-t-2 border-dashed border-border/50 mx-4" />
+                                    <div className="flex justify-between items-center p-4 text-sm text-muted-foreground">
+                                        <p className="font-mono">Stake: <span className="font-semibold text-foreground">{bet.stake.toFixed(2)} coins</span></p>
+                                        <p className="font-mono">To Win: <span className="font-semibold text-green-600">{(bet.potentialWinnings - bet.stake).toFixed(2)} coins</span></p>
+                                    </div>
+                                </>
+                            )}
                         </CardContent>
                     </Card>
                 );

@@ -12,7 +12,7 @@ import { calculateParlay } from '@/lib/parlay';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser } from '@/firebase';
 import { collection, doc, writeBatch, increment } from 'firebase/firestore';
-import type { UserBet } from '@/lib/types';
+import type { UserBet, ParlayLeg } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 export function BetSlip() {
@@ -184,17 +184,28 @@ export function BetSlip() {
           placedAt: new Date().toISOString(),
         };
       } else {
+        const parlayLegs: ParlayLeg[] = picks.map(p => ({
+            gameId: p.game.id,
+            matchup: `${p.game.awayTeam.name} @ ${p.game.homeTeam.name}`,
+            commenceTime: p.game.startTime,
+            pick: p.pick,
+            betType: p.betType,
+            odds: p.odds,
+            status: 'pending',
+        }));
+
         newBet = {
           gameId: picks.map(p => p.game.id).join(','),
           userId: user.uid,
           sport: picks[0].game.sport, // Use first pick's sport for parlay
           betType: 'parlay',
-          pick: picks.map(p => `${p.pick} (${p.odds > 0 ? '+' : ''}${p.odds})`).join(' | '),
+          pick: `${picks.length}-Leg Parlay`,
           stake: stakeNum,
           odds: combinedOdds,
           potentialWinnings: potentialPayout,
           status: 'pending',
           placedAt: new Date().toISOString(),
+          legs: parlayLegs,
         };
       }
 

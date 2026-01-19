@@ -44,6 +44,17 @@ export type Sport = {
 };
 
 // Types from backend.json for Firestore
+
+export interface ParlayLeg {
+  gameId: string;
+  matchup: string;
+  commenceTime: string;
+  pick: string; // The specific selection, e.g., "Los Angeles Lakers"
+  betType: 'moneyline' | 'spread' | 'total';
+  odds: number;
+  status: 'pending' | 'won' | 'lost' | 'push'; // Individual leg status
+}
+
 export interface UserProfile {
   uid: string;
   isAnonymous: boolean;
@@ -58,7 +69,7 @@ export interface UserBet {
   userId: string;
   sport: SportName;
   betType: 'moneyline' | 'spread' | 'total' | 'parlay';
-  pick: string; // e.g., "Golden State Warriors" or "Over 220.5"
+  pick: string; // e.g., "Golden State Warriors", "Over 220.5", or "4-Leg Parlay"
   matchup?: string; // e.g. "Team A @ Team B"
   stake: number;
   odds: number;
@@ -66,6 +77,7 @@ export interface UserBet {
   status: 'pending' | 'won' | 'lost' | 'push';
   placedAt: string; // ISO 8601 string
   commenceTime?: string; // ISO 8601 string
+  legs?: ParlayLeg[];
 };
 
 export interface DailyGame {

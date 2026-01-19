@@ -23,14 +23,31 @@
         "userId": { "type": "string", "description": "The ID of the user who placed the bet." },
         "sport": { "type": "string", "description": "The sport of the game." },
         "betType": { "type": "string", "enum": ["moneyline", "spread", "total", "parlay"]},
-        "pick": { "type": "string", "description": "The user's selection. For parlays, this is a ' | ' separated string of individual picks." },
+        "pick": { "type": "string", "description": "The user's selection. For parlays, this is a summary like '4-Leg Parlay'." },
         "matchup": { "type": "string", "description": "The matchup string for single bets, e.g., 'Team A @ Team B'." },
         "stake": { "type": "number", "description": "The amount of coins staked." },
         "odds": { "type": "number", "description": "The American odds for the bet." },
         "potentialWinnings": { "type": "number", "description": "How much the user stands to win." },
         "status": { "type": "string", "enum": ["pending", "won", "lost", "push"]},
         "placedAt": { "type": "string", "format": "date-time" },
-        "commenceTime": { "type": "string", "format": "date-time", "description": "The start time of the game, snapshotted at time of bet placement."}
+        "commenceTime": { "type": "string", "format": "date-time", "description": "The start time of the game, snapshotted at time of bet placement."},
+        "legs": {
+            "type": "array",
+            "description": "An array of individual bet legs for a parlay.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "gameId": { "type": "string" },
+                    "matchup": { "type": "string" },
+                    "commenceTime": { "type": "string", "format": "date-time" },
+                    "pick": { "type": "string" },
+                    "betType": { "type": "string" },
+                    "odds": { "type": "number" },
+                    "status": { "type": "string", "enum": ["pending", "won", "lost", "push"] }
+                },
+                "required": ["gameId", "matchup", "commenceTime", "pick", "betType", "odds", "status"]
+            }
+        }
       },
       "required": ["id", "gameId", "userId", "sport", "betType", "pick", "stake", "odds", "potentialWinnings", "status", "placedAt"]
     },

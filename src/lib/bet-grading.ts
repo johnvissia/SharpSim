@@ -3,20 +3,17 @@
 import { collection, doc, getDocs, query, where, writeBatch, Firestore, User, increment } from 'firebase/firestore';
 import type { CompletedGame, UserBet } from './types';
 
-const gradeMoneyline = (bet: UserBet, game: CompletedGame): 'won' | 'lost' => {
+const gradeMoneyline = (bet: Pick<UserBet, 'pick'>, game: CompletedGame): 'won' | 'lost' => {
   const isHomePick = bet.pick === game.homeTeam;
   const isAwayPick = bet.pick === game.awayTeam;
   
   if (isHomePick && game.homeScore > game.awayScore) return 'won';
   if (isAwayPick && game.awayScore > game.homeScore) return 'won';
   
-  // Also check for ties in sports where that is possible (e.g., soccer)
-  // This simple example assumes no ties for moneyline.
-  
   return 'lost';
 };
 
-const gradeTotal = (bet: UserBet, game: CompletedGame): 'won' | 'lost' | 'push' => {
+const gradeTotal = (bet: Pick<UserBet, 'pick'>, game: CompletedGame): 'won' | 'lost' | 'push' => {
     const totalPoints = game.homeScore + game.awayScore;
     const [pickType, pointsStr] = bet.pick.split(' ');
     const points = parseFloat(pointsStr);
@@ -28,7 +25,7 @@ const gradeTotal = (bet: UserBet, game: CompletedGame): 'won' | 'lost' | 'push' 
     return 'lost';
 };
 
-const gradeSpread = (bet: UserBet, game: CompletedGame): 'won' | 'lost' | 'push' => {
+const gradeSpread = (bet: Pick<UserBet, 'pick'>, game: CompletedGame): 'won' | 'lost' | 'push' => {
   const lastSpaceIndex = bet.pick.lastIndexOf(' ');
   const teamName = bet.pick.substring(0, lastSpaceIndex).trim();
   const points = parseFloat(bet.pick.substring(lastSpaceIndex + 1));
@@ -55,7 +52,7 @@ const gradeSpread = (bet: UserBet, game: CompletedGame): 'won' | 'lost' | 'push'
  * @param user The authenticated user object.
  */
 export async function gradeUserBets(firestore: Firestore, user: User) {
-  // 1. Get all completed games from the last 3 days from our database
+  // 1. Get all completed games from our database
   const completedGamesSnapshot = await getDocs(collection(firestore, 'completed_games'));
   const completedGames = new Map<string, CompletedGame>();
   completedGamesSnapshot.forEach(doc => {
@@ -78,16 +75,78 @@ export async function gradeUserBets(firestore: Firestore, user: User) {
     return;
   }
 
-  // 3. Use a write batch to perform all database updates atomically
   const batch = writeBatch(firestore);
   let totalPayout = 0;
   let gradedCount = 0;
 
   pendingBetsSnapshot.forEach(betDoc => {
     const bet = betDoc.data() as UserBet;
+    
+    // --- PARLAY GRADING LOGIC ---
+    if (bet.betType === 'parlay' && bet.legs) {
+        let overallParlayStatus: UserBet['status'] = 'won'; // Assume won until a loss is found
+        let activePushLegs = 0;
+
+        const updatedLegs = bet.legs.map(leg => {
+            const game = completedGames.get(leg.gameId);
+            if (!game) {
+                overallParlayStatus = 'pending';
+                return leg;
+            }
+
+            let legStatus: UserBet['status'] = 'lost';
+            const legAsBetForGrading = { pick: leg.pick };
+
+            switch(leg.betType) {
+                case 'moneyline':
+                    legStatus = gradeMoneyline(legAsBetForGrading, game);
+                    break;
+                case 'total':
+                    legStatus = gradeTotal(legAsBetForGrading, game);
+                    break;
+                case 'spread':
+                    legStatus = gradeSpread(legAsBetForGrading, game);
+                    break;
+            }
+
+            if (legStatus === 'lost') {
+                overallParlayStatus = 'lost';
+            }
+            if (legStatus === 'push') {
+                activePushLegs++;
+            }
+
+            return { ...leg, status: legStatus };
+        });
+
+        if (updatedLegs.some(leg => leg.status === 'pending')) {
+            overallParlayStatus = 'pending';
+        }
+
+        if (overallParlayStatus === 'pending') {
+            return;
+        }
+
+        if (activePushLegs === bet.legs.length) {
+            overallParlayStatus = 'push';
+        }
+
+        batch.update(betDoc.ref, { status: overallParlayStatus, legs: updatedLegs });
+        gradedCount++;
+        
+        if (overallParlayStatus === 'won') {
+            // TODO: In a real app, recalculate odds if there were pushes. For now, pay out full amount.
+            totalPayout += bet.potentialWinnings;
+        } else if (overallParlayStatus === 'push') {
+            totalPayout += bet.stake;
+        }
+        
+        return; // Done with this parlay, move to the next bet
+    }
+
+    // --- SINGLE BET GRADING LOGIC (existing) ---
     const game = completedGames.get(bet.gameId);
 
-    // Only grade if the corresponding game has finished and its score is in our DB
     if (!game) {
       return; 
     }
@@ -109,27 +168,21 @@ export async function gradeUserBets(firestore: Firestore, user: User) {
              return; // Skip this bet
     }
     
-    // Stage the update for the bet document
     batch.update(betDoc.ref, { status: newStatus });
     gradedCount++;
 
-    // If the user won, add the winnings to a running total
     if (newStatus === 'won') {
-      // potentialWinnings is the total payout (stake + profit), so we just add that.
       totalPayout += bet.potentialWinnings;
     } else if (newStatus === 'push') {
-        // If it's a push, just return the original stake
         totalPayout += bet.stake;
     }
   });
 
-  // 4. If there were any payouts, stage the update for the user's balance
   if (totalPayout > 0) {
     const userRef = doc(firestore, 'users', user.uid);
     batch.update(userRef, { balance: increment(totalPayout) });
   }
 
-  // 5. Commit all the updates to Firestore
   if (gradedCount > 0) {
     await batch.commit();
     console.log(`Graded ${gradedCount} bets. Total payout applied: ${totalPayout.toFixed(2)} coins.`);
