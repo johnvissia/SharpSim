@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { sportIconMap } from '@/lib/team-logos';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '../ui/button';
+import { MainLinesView } from './MainLinesView';
 
 interface GameDetailModalProps {
   game: Game | null;
@@ -102,9 +103,7 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                         <TabsTrigger value="player-props">Player Props</TabsTrigger>
                     </TabsList>
                     <TabsContent value="main-lines" className="mt-4">
-                        <p className="text-center text-muted-foreground py-8">
-                            Main lines content will go here.
-                        </p>
+                        <MainLinesView game={game} />
                     </TabsContent>
                     <TabsContent value="player-props" className="mt-4">
                         <p className="text-center text-muted-foreground py-8">
