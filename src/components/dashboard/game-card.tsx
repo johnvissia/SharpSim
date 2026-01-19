@@ -1,6 +1,6 @@
 'use client';
 
-import type { Game, SportName, Team } from '@/lib/types';
+import type { Game, Team } from '@/lib/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -74,7 +74,7 @@ const InjuryIndicator = ({ team }: { team: Team }) => {
   );
 };
 
-const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
+const TeamDisplay = ({ team, score, sport }: { team: Team; score?: number, sport: Game['sport'] }) => {
   const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
 
   return (
@@ -98,6 +98,7 @@ const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
         )}
         {team.name}
       </div>
+      {score !== undefined && <div className="text-2xl font-bold">{score}</div>}
       <InjuryIndicator team={team} />
     </div>
   );
@@ -106,26 +107,12 @@ const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
 export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game: Game) => void }) {
   const { addPick } = useBetSlip();
 
-  const gameDate = new Date(game.startTime);
-  const now = new Date();
+  const isLive = game.statusDetail && !game.statusDetail.toLowerCase().includes('final') && !game.statusDetail.toLowerCase().includes('tba') && !game.statusDetail.toLowerCase().includes(':');
+  const isFinal = game.statusDetail && game.statusDetail.toLowerCase().includes('final');
 
-  // A game is live if it started in the past.
-  // The feed already filters out games that completed more than ~2 hours ago.
-  const isLive = now > gameDate;
-
-  const isToday =
-    now.getFullYear() === gameDate.getFullYear() &&
-    now.getMonth() === gameDate.getMonth() &&
-    now.getDate() === gameDate.getDate();
-
-  const gameTime = isToday
-    ? gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-    : gameDate.toLocaleString([], {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      });
+  const gameTimeOrStatus = isLive || isFinal 
+    ? game.statusDetail
+    : new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
   const handleBetSelection = (
     e: React.MouseEvent,
@@ -150,7 +137,7 @@ export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game
         <CardHeader className="flex-row items-center justify-between bg-card-foreground/5 p-3">
           <div className="text-sm font-medium">{game.sport}</div>
             <div className="flex items-center gap-2">
-                <div className="text-sm text-muted-foreground">{gameTime}</div>
+                <div className="text-sm text-muted-foreground">{gameTimeOrStatus}</div>
                 {isLive && (
                     <Badge className="bg-red-600 hover:bg-red-600 text-white animate-pulse text-xs">
                         LIVE
@@ -166,14 +153,14 @@ export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game
         </CardHeader>
         <CardContent className="flex-grow p-4 flex flex-col justify-between">
           <div className="flex items-start justify-around text-center mb-4">
-            <TeamDisplay team={game.awayTeam} sport={game.sport} />
+            <TeamDisplay team={game.awayTeam} score={game.liveScore?.away} sport={game.sport} />
             <div className="flex flex-col items-center self-center px-2">
-              <span className="text-lg font-bold text-muted-foreground">@</span>
+              <span className="text-lg font-bold text-muted-foreground">{isFinal ? 'F' : '@'}</span>
             </div>
-            <TeamDisplay team={game.homeTeam} sport={game.sport} />
+            <TeamDisplay team={game.homeTeam} score={game.liveScore?.home} sport={game.sport} />
           </div>
 
-          {game.odds && (
+          {game.odds && !isFinal && ( // Hide odds if game is final
             <div className="space-y-2">
               <p className="text-center text-xs text-muted-foreground mb-2">
                 Quick Bets

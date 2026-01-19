@@ -36,6 +36,7 @@ export type Game = {
   odds?: Odds; // This will be the "best" line for display
   allOdds?: SportsbookOdds[];
   liveScore?: { home: number; away: number };
+  statusDetail?: string; // e.g., "Final", "Q3 10:00" from ESPN
 };
 
 export type Sport = {

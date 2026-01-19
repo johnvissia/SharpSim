@@ -2,158 +2,20 @@
 
 import { useMemo, useState } from 'react';
 import { GameCard } from './game-card';
-import type { Game, DailyGame, Team, SportsbookOdds, Odds, SportName, TeamRanking } from '@/lib/types';
+import type { Game } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
-import { sportNameMapping } from '@/lib/sports';
-import { getTeamLogoUrl } from '@/lib/team-logos';
-import { getConference } from '@/lib/ncaa-conferences';
-
-/**
- * Transforms raw DailyGame data from Firestore into the Game format required by UI components.
- * @param dailyGames - An array of DailyGame objects from Firestore.
- * @param rankingsMap - A map of team names to their rank.
- * @returns An array of Game objects ready for display.
- */
-const transformDailyGamesToGames = (
-    dailyGames: DailyGame[] | null,
-    rankingsMap: Map<string, { rank: number; conference: string }>
-): Game[] => {
-    if (!dailyGames) return [];
-    
-    return dailyGames.map((dg): Game | null => {
-        const sportName = sportNameMapping[dg.sportKey];
-        if (!sportName) {
-            console.warn(`No sport name mapping for key: ${dg.sportKey}`);
-            return null; // Skip games with unmapped sports
-        }
-
-        const allOdds: SportsbookOdds[] = (dg.bookmakerOdds || []).map((jsonString: string): SportsbookOdds | null => {
-            try {
-                const bookmaker = JSON.parse(jsonString);
-                const h2hMarket = bookmaker.markets.find((m: any) => m.key === 'h2h');
-                const spreadsMarket = bookmaker.markets.find((m: any) => m.key === 'spreads');
-                const totalsMarket = bookmaker.markets.find((m: any) => m.key === 'totals');
-
-                // Odds are optional, so if h2h market isn't there, we can still show the game
-                const moneyline: Odds['moneyline'] | null = h2hMarket ? {
-                    home: h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.homeTeam.trim())?.price || 0,
-                    away: h2hMarket.outcomes.find((o: any) => o.name.trim() === dg.awayTeam.trim())?.price || 0,
-                } : null;
-
-                if (!moneyline || !moneyline.home || !moneyline.away) {
-                    // If we can't get a valid moneyline, we can't really form odds.
-                    // We'll proceed without odds for this bookmaker.
-                }
-
-                let spread: Odds['spread'] = { points: 0, home: 0, away: 0 };
-                if (spreadsMarket) {
-                    const homeSpreadOutcome = spreadsMarket.outcomes.find((o: any) => o.name.trim() === dg.homeTeam.trim());
-                    const awaySpreadOutcome = spreadsMarket.outcomes.find((o: any) => o.name.trim() === dg.awayTeam.trim());
-                    if (homeSpreadOutcome && awaySpreadOutcome) {
-                        spread = { points: homeSpreadOutcome.point, home: homeSpreadOutcome.price, away: awaySpreadOutcome.price };
-                    }
-                }
-
-                let total: Odds['total'] = { points: 0, over: 0, under: 0 };
-                if (totalsMarket && totalsMarket.outcomes.length >= 2) {
-                    total = {
-                        points: totalsMarket.outcomes[0].point,
-                        over: totalsMarket.outcomes.find((o: any) => o.name === 'Over')?.price || 0,
-                        under: totalsMarket.outcomes.find((o: any) => o.name === 'Under')?.price || 0,
-                    };
-                }
-                
-                if (moneyline) {
-                    return {
-                        sportsbook: bookmaker.title,
-                        odds: { moneyline, spread, total },
-                    };
-                }
-                return null;
-
-            } catch (e) {
-                console.error("Failed to parse bookmaker odds:", e);
-                return null;
-            }
-        }).filter((o): o is SportsbookOdds => o !== null);
-
-        const homeRankingInfo = rankingsMap.get(dg.homeTeam);
-        const homeConference = homeRankingInfo?.conference || getConference(dg.homeTeam);
-        
-        const homeTeam: Team = {
-            id: dg.homeTeam,
-            name: dg.homeTeam,
-            logo: getTeamLogoUrl(dg.homeTeam, sportName),
-            players: [], // Data not available in daily_games collection
-            rank: homeRankingInfo?.rank,
-            conference: homeConference,
-        };
-        
-        const awayRankingInfo = rankingsMap.get(dg.awayTeam);
-        const awayConference = awayRankingInfo?.conference || getConference(dg.awayTeam);
-
-        const awayTeam: Team = {
-            id: dg.awayTeam,
-            name: dg.awayTeam,
-            logo: getTeamLogoUrl(dg.awayTeam, sportName),
-            players: [], // Data not available in daily_games collection
-            rank: awayRankingInfo?.rank,
-            conference: awayConference,
-        };
-
-        const game: Game = {
-            id: dg.id,
-            sport: sportName,
-            startTime: dg.commenceTime,
-            homeTeam,
-            awayTeam,
-        };
-
-        if (allOdds.length > 0) {
-            game.allOdds = allOdds;
-            game.odds = allOdds[0].odds;
-        }
-
-        return game;
-
-    }).filter((g): g is Game => g !== null);
-};
 
 type GameFeedProps = {
+  games: Game[];
+  isLoading: boolean;
   selectedSport: string;
   selectedConference: string;
   onGameClick: (game: Game) => void;
 };
 
-export function GameFeed({ selectedSport, selectedConference, onGameClick }: GameFeedProps) {
-  const firestore = useFirestore();
-  
-  const dailyGamesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'daily_games'), orderBy('commenceTime'));
-  }, [firestore]);
-  
-  const { data: dailyGames, isLoading: isLoadingGames } = useCollection<DailyGame>(dailyGamesQuery);
-
-  const rankingsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'rankings');
-  }, [firestore]);
-
-  const { data: rankings, isLoading: isLoadingRankings } = useCollection<TeamRanking>(rankingsQuery);
-
-  const rankingsMap = useMemo(() => {
-    if (!rankings) return new Map<string, { rank: number; conference: string }>();
-    return new Map(rankings.map(r => [r.teamName, { rank: r.rank, conference: r.conference }]));
-  }, [rankings]);
-
-
+export function GameFeed({ games, isLoading, selectedSport, selectedConference, onGameClick }: GameFeedProps) {
   const [favoriteSports, setFavoriteSports] = useState<string[]>(['NFL', 'NBA']);
   const [favoriteTeams, setFavoriteTeams] = useState<string[]>(['Golden State Warriors', 'Kansas City Chiefs']);
-
-  const games = useMemo(() => transformDailyGamesToGames(dailyGames, rankingsMap), [dailyGames, rankingsMap]);
 
   const filteredAndSortedGames = useMemo(() => {
     return games.filter(game => {
@@ -199,9 +61,7 @@ export function GameFeed({ selectedSport, selectedConference, onGameClick }: Gam
     });
   }, [games, selectedSport, selectedConference, favoriteSports, favoriteTeams]);
 
-  const isLoading = isLoadingGames || isLoadingRankings;
-
-  if (isLoading && !dailyGames) {
+  if (isLoading && games.length === 0) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 8 }).map((_, i) => (
