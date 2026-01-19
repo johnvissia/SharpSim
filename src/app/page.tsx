@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -130,7 +129,6 @@ export default function DashboardPage() {
   const [selectedConference, setSelectedConference] = useState('All');
   const [loadingSports, setLoadingSports] = useState(true);
   const [isFetchingManually, setIsFetchingManually] = useState(false);
-  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [espnGames, setEspnGames] = useState<Game[]>([]); // State for new ESPN data
   const [isLoadingEspn, setIsLoadingEspn] = useState(true);
@@ -178,57 +176,29 @@ export default function DashboardPage() {
     };
     getEspnData();
   }, []);
-
-  // Daily sync effect remains largely the same
-  useEffect(() => {
-    if (isStatusLoading || !firestore || !user || !systemStatusRef) return;
-    const today = new Date().toISOString().split('T')[0];
-    const lastUpdated = systemStatus?.last_updated_date;
-    if (lastUpdated === today) {
-        console.log('Daily data is already up to date for', today);
-        return;
-    }
-    const runDailySync = async () => {
-      console.log('New day detected or first sync. Running daily protocol...');
-      setIsAutoSyncing(true);
-      toast({
-        title: 'Performing Daily Sync...',
-        description: 'Fetching latest odds, scores, and settling yesterdays bets.',
-      });
-      try {
-        await fetchAndSaveDailyData(firestore);
-        toast({ title: 'Syncing complete. Now grading bets...' });
-        await gradeUserBets(firestore, user);
-        setDocumentNonBlocking(systemStatusRef, { last_updated_date: today }, { merge: true });
-        toast({
-          title: 'Daily Protocol Complete!',
-          description: 'Odds are fresh and bets are settled.',
-        });
-      } catch (error: any) {
-        console.error('Failed during automatic daily protocol:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Auto-Sync Failed',
-          description: error.message || 'Could not run daily protocol. It will be retried on next page load.',
-          duration: 20000,
-        });
-      } finally {
-        setIsAutoSyncing(false);
-      }
-    };
-    runDailySync();
-  }, [systemStatus, isStatusLoading, firestore, user, systemStatusRef, toast]);
   
   const handleManualFetch = async () => {
-    if (!firestore || !user) return;
+    if (!firestore || !user || !systemStatusRef) return;
     setIsFetchingManually(true);
-    toast({ title: 'Syncing Data...', description: 'Fetching latest odds and scores for all sports.' });
+    toast({ title: 'Syncing Data...', description: 'Fetching latest odds, scores, and settling bets.' });
     try {
       await fetchAndSaveDailyData(firestore);
-      toast({ title: 'Sync Complete!', description: 'Odds and scores have been updated.' });
+      toast({ title: 'Odds Sync Complete!', description: 'Now grading any settled bets.' });
+      await gradeUserBets(firestore, user);
+      const today = new Date().toISOString().split('T')[0];
+      setDocumentNonBlocking(systemStatusRef, { last_updated_date: today }, { merge: true });
+      toast({
+        title: 'Sync Protocol Complete!',
+        description: 'Odds are fresh and bets are settled.',
+      });
     } catch (error: any) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Sync Failed', description: error.message || 'Could not fetch data from The Odds API.', duration: 20000 });
+      console.error('Failed during manual sync protocol:', error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Sync Failed', 
+        description: error.message || 'Could not run sync protocol.', 
+        duration: 20000 
+      });
     }
     setIsFetchingManually(false);
   };
@@ -269,7 +239,7 @@ export default function DashboardPage() {
     });
   }, [dailyGames, rankings, espnGames, isLoadingEspn]);
 
-  const showLoadingSpinner = isUserLoading || isAutoSyncing || (isLoadingGames && !dailyGames);
+  const showLoadingSpinner = isUserLoading || (isLoadingGames && !dailyGames);
 
   const ncaaSports = ['NCAAF', 'NCAAM'];
   const isConferenceFilterEnabled = ncaaSports.includes(selectedSport);
@@ -293,12 +263,12 @@ export default function DashboardPage() {
               onClick={handleManualFetch}
               disabled={isFetchingManually || showLoadingSpinner}
             >
-              {isFetchingManually || isAutoSyncing ? (
+              {isFetchingManually ? (
                 <Loader className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Download className="mr-2 h-4 w-4" />
               )}
-              {isAutoSyncing ? 'Auto-Sync...' : isFetchingManually ? 'Syncing...' : 'Sync Odds'}
+              {isFetchingManually ? 'Syncing...' : 'Sync Odds'}
             </Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -329,7 +299,7 @@ export default function DashboardPage() {
               {isUserLoading ? 'Authenticating...' : 'Loading Daily Lines...'}
             </h2>
             <p className="text-muted-foreground">
-              {isUserLoading ? 'Preparing your session...' : 'This happens once per day to ensure all data is fresh.'}
+              {isUserLoading ? 'Preparing your session...' : 'Getting the latest game information.'}
             </p>
           </div>
         ) : (
