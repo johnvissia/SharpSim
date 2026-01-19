@@ -25,6 +25,7 @@ import { BetSlip } from '@/components/dashboard/BetSlip';
 import { GameDetailModal } from '@/components/dashboard/GameDetailModal';
 import { sportNameMapping } from '@/lib/sports';
 import { getConference } from '@/lib/ncaa-conferences';
+import { isSameDay } from 'date-fns';
 
 // This function is now being moved from game-feed.tsx to page.tsx
 const transformDailyGamesToGames = (
@@ -255,7 +256,19 @@ export default function DashboardPage() {
         return oddsGames;
     }
     
-    return Array.from(finalGames.values());
+    const allGames = Array.from(finalGames.values());
+    const today = new Date();
+
+    return allGames.filter(game => {
+      const isFinal = game.statusDetail?.toLowerCase().includes('final');
+      if (!isFinal) {
+        return true; // Always show games that are not final
+      }
+
+      // If the game is final, only show it if it started today
+      const gameDate = new Date(game.startTime);
+      return isSameDay(gameDate, today);
+    });
 
   }, [dailyGames, rankings, espnGames, isLoadingEspn]);
 
