@@ -116,6 +116,8 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
     const endpoints = [
         { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', sport: 'NBA' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard', sport: 'NFL' as SportName },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard', sport: 'NHL' as SportName },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard', sport: 'NCAAF' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard', sport: 'NCAAM' as SportName },
     ];
 
