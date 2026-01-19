@@ -204,6 +204,11 @@ export default function DashboardPage() {
   };
   
   const mergedGames = useMemo(() => {
+    const teamNameNormalizationMap: Record<string, string> = {
+      'LA Clippers': 'Los Angeles Clippers',
+    };
+    const normalizeTeamName = (name: string) => teamNameNormalizationMap[name] || name;
+
     const rankingsMap = new Map(rankings?.map(r => [r.teamName, { rank: r.rank, conference: r.conference }]) || []);
     const oddsGames = transformDailyGamesToGames(dailyGames, rankingsMap);
 
@@ -211,7 +216,9 @@ export default function DashboardPage() {
 
     // Step 1: Add all games from the live ESPN feed. This is our primary source of truth for what's on today.
     espnGames.forEach(espnGame => {
-        const key = `${espnGame.sport}-${espnGame.homeTeam.name}-${espnGame.awayTeam.name}`;
+        const homeName = normalizeTeamName(espnGame.homeTeam.name);
+        const awayName = normalizeTeamName(espnGame.awayTeam.name);
+        const key = `${espnGame.sport}-${homeName}-${awayName}`;
         
         // Enrich ESPN game with ranking/conference data right away.
         const homeRankingInfo = rankingsMap.get(espnGame.homeTeam.name);
@@ -234,7 +241,9 @@ export default function DashboardPage() {
 
     // Step 2: Enrich with odds data from The Odds API / Firestore.
     oddsGames.forEach(oddsGame => {
-        const key = `${oddsGame.sport}-${oddsGame.homeTeam.name}-${oddsGame.awayTeam.name}`;
+        const homeName = normalizeTeamName(oddsGame.homeTeam.name);
+        const awayName = normalizeTeamName(oddsGame.awayTeam.name);
+        const key = `${oddsGame.sport}-${homeName}-${awayName}`;
         const existingGame = finalGames.get(key);
 
         if (existingGame) {

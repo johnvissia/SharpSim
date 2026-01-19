@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { GameCard } from './game-card';
 import type { Game } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,8 +15,6 @@ type GameFeedProps = {
 };
 
 export function GameFeed({ games, isLoading, selectedSport, selectedConference, onGameClick }: GameFeedProps) {
-  const [favoriteSports, setFavoriteSports] = useState<string[]>(['NFL', 'NBA']);
-  const [favoriteTeams, setFavoriteTeams] = useState<string[]>(['Golden State Warriors', 'Kansas City Chiefs']);
 
   const filteredAndSortedGames = useMemo(() => {
     return games.filter(game => {
@@ -47,21 +45,32 @@ export function GameFeed({ games, isLoading, selectedSport, selectedConference, 
         return true;
     })
     .sort((a, b) => {
-        // Favorite sorting comes first
-        const aIsFavSport = favoriteSports.includes(a.sport);
-        const bIsFavSport = favoriteSports.includes(b.sport);
-        if (aIsFavSport && !bIsFavSport) return -1;
-        if (!aIsFavSport && bIsFavSport) return 1;
-        
-        const aIsFavTeam = favoriteTeams.includes(a.homeTeam.name) || favoriteTeams.includes(a.awayTeam.name);
-        const bIsFavTeam = favoriteTeams.includes(b.homeTeam.name) || favoriteTeams.includes(b.awayTeam.name);
-        if (aIsFavTeam && !bIsFavTeam) return -1;
-        if (!aIsFavTeam && bIsFavTeam) return 1;
+        const statusOrder = {
+            'in': 1,   // Live
+            'post': 2, // Finished
+            'pre': 3,  // Upcoming
+        };
 
-        // Fallback to time sort
+        const aStatus = a.statusState ?? 'pre';
+        const bStatus = b.statusState ?? 'pre';
+
+        const aOrder = statusOrder[aStatus as keyof typeof statusOrder] || 4;
+        const bOrder = bStatus[bStatus as keyof typeof statusOrder] || 4;
+        
+        if (aOrder !== bOrder) {
+            return aOrder - bOrder;
+        }
+
+        // For games in the same state, sort by time.
+        // For finished games, sort descending to show most recent first.
+        if (aStatus === 'post') {
+            return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
+        }
+        
+        // For live and upcoming, sort ascending to show soonest first.
         return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
     });
-  }, [games, selectedSport, selectedConference, favoriteSports, favoriteTeams]);
+  }, [games, selectedSport, selectedConference]);
 
   if (isLoading && games.length === 0) {
     return (
@@ -77,7 +86,7 @@ export function GameFeed({ games, isLoading, selectedSport, selectedConference, 
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {filteredAndSortedGames.length > 0 ? (
         filteredAndSortedGames.map((game) => (
-            <GameCard key={game.id} game={game} onGameClick={onGameClick} />
+            <GameCard key={`${game.id}-${game.homeTeam.name}`} game={game} onGameClick={onGameClick} />
         ))
       ) : (
         <p className="text-muted-foreground md:col-span-2 lg:col-span-3 xl:col-span-4">
