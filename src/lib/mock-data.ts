@@ -251,7 +251,6 @@ const mockSports: Sport[] = [
     { id: 's6', name: 'WNBA' },
     { id: 's7', name: 'NCAAF' },
     { id: 's8', name: 'NCAAM' },
-    { id: 's9', name: 'NCAAW' },
 ]
 
 // Simulate API calls

@@ -26,7 +26,6 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
     { key: 'basketball_nba', label: 'NBA' },
     { key: 'basketball_wnba', label: 'WNBA' },
     { key: 'basketball_ncaab', label: 'NCAAM' },
-    { key: 'basketball_ncaaw', label: 'NCAAW' },
     { key: 'icehockey_nhl', label: 'NHL' },
     { key: 'soccer_epl', label: 'Soccer' }
   ];

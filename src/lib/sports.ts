@@ -10,7 +10,6 @@ export const sportKeyMapping: { [key: string]: string } = {
     'WNBA': 'basketball_wnba',
     'NCAAF': 'americanfootball_ncaaf',
     'NCAAM': 'basketball_ncaab',
-    'NCAAW': 'basketball_ncaaw',
 };
 
 // Create a reverse mapping to get SportName from sport_key

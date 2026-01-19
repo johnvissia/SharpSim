@@ -86,7 +86,6 @@ const transformDailyGamesToGames = (
             id: dg.homeTeam,
             name: dg.homeTeam,
             logo: getTeamLogoUrl(dg.homeTeam, sportName),
-            record: '', // Data not available in daily_games collection
             players: [], // Data not available in daily_games collection
             rank: homeRankingInfo?.rank,
             conference: homeConference,
@@ -99,7 +98,6 @@ const transformDailyGamesToGames = (
             id: dg.awayTeam,
             name: dg.awayTeam,
             logo: getTeamLogoUrl(dg.awayTeam, sportName),
-            record: '', // Data not available in daily_games collection
             players: [], // Data not available in daily_games collection
             rank: awayRankingInfo?.rank,
             conference: awayConference,
@@ -162,7 +160,7 @@ export function GameFeed({ selectedSport, selectedConference }: GameFeedProps) {
         const sportMatch = selectedSport === 'All' || game.sport === selectedSport;
         if (!sportMatch) return false;
 
-        const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
+        const ncaaSports = ['NCAAF', 'NCAAM'];
         const isNCAAGame = ncaaSports.includes(game.sport as any);
         const isConferenceFilterActive = selectedConference !== 'All';
 

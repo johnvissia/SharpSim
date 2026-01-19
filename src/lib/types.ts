@@ -25,7 +25,7 @@ export type SportsbookOdds = {
   odds: Odds;
 };
 
-export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'Soccer' | 'WNBA' | 'NCAAF' | 'NCAAM' | 'NCAAW';
+export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'Soccer' | 'WNBA' | 'NCAAF' | 'NCAAM';
 
 export type Game = {
   id: string;

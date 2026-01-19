@@ -145,7 +145,7 @@ export default function DashboardPage() {
 
   const showLoadingSpinner = isStatusLoading || isAutoSyncing || isUserLoading;
 
-  const ncaaSports = ['NCAAF', 'NCAAM', 'NCAAW'];
+  const ncaaSports = ['NCAAF', 'NCAAM'];
   const isConferenceFilterEnabled = ncaaSports.includes(selectedSport);
 
   return (

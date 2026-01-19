@@ -155,7 +155,7 @@ const teamLogoSlugs: { [key: string]: string } = {
 };
 
 const sportLeagueMap: { [key in SportName]?: string } = {
-    'NFL': 'nfl', 'NBA': 'nba', 'NHL': 'nhl', 'MLB': 'mlb', 'WNBA': 'wnba', 'NCAAF': 'ncaaf', 'NCAAM': 'ncaab', 'NCAAW': 'ncaaw', 'Soccer': 'soccer'
+    'NFL': 'nfl', 'NBA': 'nba', 'NHL': 'nhl', 'MLB': 'mlb', 'WNBA': 'wnba', 'NCAAF': 'ncaaf', 'NCAAM': 'ncaab', 'Soccer': 'soccer'
 };
 
 const ncaaTeamIdMap: Record<string, string> = {
@@ -204,7 +204,7 @@ const mascotRegex = new RegExp([
 
 
 export function getTeamLogoUrl(teamName: string, sport: SportName): string {
-    const isNcaa = ['NCAAF', 'NCAAM', 'NCAAW'].includes(sport);
+    const isNcaa = ['NCAAF', 'NCAAM'].includes(sport);
     const directionals = ["western", "eastern", "central", "northern", "southern"];
     
     if (isNcaa) {
@@ -301,7 +301,6 @@ export const sportIconMap: { [key: string]: React.ElementType<LucideProps> } = {
     'NBA': BasketballIcon,
     'WNBA': BasketballIcon,
     'NCAAM': BasketballIcon,
-    'NCAAW': BasketballIcon,
     'NFL': FootballIcon,
     'NCAAF': FootballIcon,
     'NHL': IceSkate,
