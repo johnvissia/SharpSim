@@ -30,7 +30,8 @@ const OddsButton = ({
 
 export function MainLinesView({ game }: { game: Game }) {
   const { addPick } = useBetSlip();
-  const { odds, homeTeam, awayTeam, sport } = game;
+  const { odds, homeTeam, awayTeam, sport, statusState } = game;
+  const canBet = statusState === 'pre';
 
   if (!odds) {
       return (
@@ -78,7 +79,7 @@ export function MainLinesView({ game }: { game: Game }) {
         </div>
         <div className="text-center">
           {odds.spread ? (
-            <OddsButton onClick={() => handlePick(`${awayTeam.name} ${awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}`, odds.spread.away, 'spread')}>
+            <OddsButton onClick={() => handlePick(`${awayTeam.name} ${awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}`, odds.spread.away, 'spread')} disabled={!canBet}>
               <span className="font-semibold text-primary">{awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}</span>
               <span className="text-xs text-muted-foreground">{odds.spread.away > 0 ? `+${odds.spread.away}` : odds.spread.away}</span>
             </OddsButton>
@@ -88,7 +89,7 @@ export function MainLinesView({ game }: { game: Game }) {
         </div>
         <div className="text-center">
           {odds.total ? (
-            <OddsButton onClick={() => handlePick(`Over ${odds.total.points}`, odds.total.over, 'total')}>
+            <OddsButton onClick={() => handlePick(`Over ${odds.total.points}`, odds.total.over, 'total')} disabled={!canBet}>
               <span className="font-semibold text-primary">O {odds.total.points}</span>
               <span className="text-xs text-muted-foreground">{odds.total.over > 0 ? `+${odds.total.over}` : odds.total.over}</span>
             </OddsButton>
@@ -98,7 +99,7 @@ export function MainLinesView({ game }: { game: Game }) {
         </div>
         <div className="text-center">
           {odds.moneyline ? (
-            <OddsButton onClick={() => handlePick(awayTeam.name, odds.moneyline.away, 'moneyline')}>
+            <OddsButton onClick={() => handlePick(awayTeam.name, odds.moneyline.away, 'moneyline')} disabled={!canBet}>
               <span className="font-semibold text-primary">{odds.moneyline.away > 0 ? `+${odds.moneyline.away}` : odds.moneyline.away}</span>
             </OddsButton>
           ) : (
@@ -121,7 +122,7 @@ export function MainLinesView({ game }: { game: Game }) {
         </div>
         <div className="text-center">
           {odds.spread ? (
-             <OddsButton onClick={() => handlePick(`${homeTeam.name} ${homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}`, odds.spread.home, 'spread')}>
+             <OddsButton onClick={() => handlePick(`${homeTeam.name} ${homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}`, odds.spread.home, 'spread')} disabled={!canBet}>
               <span className="font-semibold text-primary">{homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}</span>
               <span className="text-xs text-muted-foreground">{odds.spread.home > 0 ? `+${odds.spread.home}` : odds.spread.home}</span>
             </OddsButton>
@@ -131,7 +132,7 @@ export function MainLinesView({ game }: { game: Game }) {
         </div>
         <div className="text-center">
           {odds.total ? (
-             <OddsButton onClick={() => handlePick(`Under ${odds.total.points}`, odds.total.under, 'total')}>
+             <OddsButton onClick={() => handlePick(`Under ${odds.total.points}`, odds.total.under, 'total')} disabled={!canBet}>
               <span className="font-semibold text-primary">U {odds.total.points}</span>
               <span className="text-xs text-muted-foreground">{odds.total.under > 0 ? `+${odds.total.under}` : odds.total.under}</span>
             </OddsButton>
@@ -141,7 +142,7 @@ export function MainLinesView({ game }: { game: Game }) {
         </div>
         <div className="text-center">
           {odds.moneyline ? (
-            <OddsButton onClick={() => handlePick(homeTeam.name, odds.moneyline.home, 'moneyline')}>
+            <OddsButton onClick={() => handlePick(homeTeam.name, odds.moneyline.home, 'moneyline')} disabled={!canBet}>
               <span className="font-semibold text-primary">{odds.moneyline.home > 0 ? `+${odds.moneyline.home}` : odds.moneyline.home}</span>
             </OddsButton>
           ) : (

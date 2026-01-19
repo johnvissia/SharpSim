@@ -109,6 +109,7 @@ export function PlayerPropsView({ game }: { game: Game }) {
     const [markets, setMarkets] = useState<PlayerPropMarket[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const canBet = game.statusState === 'pre';
 
     useEffect(() => {
         const fetchPlayerProps = async () => {
@@ -230,11 +231,11 @@ export function PlayerPropsView({ game }: { game: Game }) {
                             {market.props.map(prop => (
                                 <div key={prop.playerName + prop.point} className="grid grid-cols-3 items-center gap-2 p-2 rounded-lg hover:bg-muted/50">
                                     <div className="font-semibold text-sm truncate">{prop.playerName}</div>
-                                    <OddsButton onClick={() => handlePick(prop.playerName, market.name, prop.point, 'Over', prop.overOdds)}>
+                                    <OddsButton onClick={() => handlePick(prop.playerName, market.name, prop.point, 'Over', prop.overOdds)} disabled={!canBet}>
                                         <span className="font-semibold text-primary">O {prop.point}</span>
                                         <span className="text-xs text-muted-foreground">{prop.overOdds > 0 ? `+${prop.overOdds}` : prop.overOdds}</span>
                                     </OddsButton>
-                                    <OddsButton onClick={() => handlePick(prop.playerName, market.name, prop.point, 'Under', prop.underOdds)}>
+                                    <OddsButton onClick={() => handlePick(prop.playerName, market.name, prop.point, 'Under', prop.underOdds)} disabled={!canBet}>
                                         <span className="font-semibold text-primary">U {prop.point}</span>
                                         <span className="text-xs text-muted-foreground">{prop.underOdds > 0 ? `+${prop.underOdds}` : prop.underOdds}</span>
                                     </OddsButton>

@@ -118,7 +118,23 @@ export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game
   const isLive = game.statusState === 'in';
   const isFinal = game.statusState === 'post';
 
-  const gameTimeOrStatus = game.statusDetail;
+  const gameDate = new Date(game.startTime);
+  const now = new Date();
+  const isToday =
+    now.getFullYear() === gameDate.getFullYear() &&
+    now.getMonth() === gameDate.getMonth() &&
+    now.getDate() === gameDate.getDate();
+
+  const gameTimeOrStatus = isLive || isFinal
+    ? game.statusDetail
+    : isToday
+      ? gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      : gameDate.toLocaleString([], {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        });
 
   const handleBetSelection = (
     e: React.MouseEvent,
@@ -166,7 +182,7 @@ export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game
             <TeamDisplay team={game.homeTeam} score={(isLive || isFinal) ? game.liveScore?.home : undefined} sport={game.sport} isLive={isLive} />
           </div>
 
-          {game.odds && !isFinal && ( // Hide odds if game is final
+          {game.odds && game.statusState === 'pre' && (
             <div className="space-y-2">
               <p className="text-center text-xs text-muted-foreground mb-2">
                 Quick Bets
