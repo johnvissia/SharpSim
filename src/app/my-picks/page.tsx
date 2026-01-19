@@ -10,6 +10,7 @@ import type { UserBet } from '@/lib/types';
 import { Ticket, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, isSameDay, addDays, subDays } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const getBetStatusBadge = (status: UserBet['status']) => {
   if (status === 'pending') return <Badge variant="secondary">Pending</Badge>;
@@ -97,7 +98,10 @@ export default function MyPicksPage() {
                 const isParlay = bet.betType === 'parlay';
 
                 return (
-                    <Card key={bet.id} className="ticket">
+                    <Card key={bet.id} className={cn(
+                        "ticket transition-colors",
+                        { 'bg-green-100 dark:bg-green-500/10': bet.status === 'won' }
+                    )}>
                         <CardContent className="!p-0">
                             <div className="flex justify-between items-start p-4">
                                 <div className="flex-grow">
