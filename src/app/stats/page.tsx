@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 
 const StatCard = ({ title, value, icon, description, loading }: { title: string, value: string, icon?: React.ReactNode, description?: string, loading?: boolean }) => {
@@ -193,7 +194,7 @@ export default function StatsPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Performance by Sport</CardTitle>
-                        <CardDescription>A breakdown of your performance across different sports and leagues.</CardDescription>
+                        <CardDescription>A breakdown of your performance. Click a sport for more details.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {loading ? (
@@ -219,7 +220,11 @@ export default function StatsPage() {
                                         const winRate = settledCount > 0 ? (sportStats.wins / settledCount) * 100 : 0;
                                         return (
                                             <TableRow key={sport}>
-                                                <TableCell className="font-medium">{sport}</TableCell>
+                                                <TableCell className="font-medium">
+                                                  <Link href={`/stats/${sport}`} className="hover:underline text-primary">
+                                                      {sport}
+                                                  </Link>
+                                                </TableCell>
                                                 <TableCell className="text-center">{sportStats.wins}-{sportStats.losses}</TableCell>
                                                 <TableCell className="text-right">{winRate.toFixed(1)}%</TableCell>
                                                 <TableCell className={cn(
