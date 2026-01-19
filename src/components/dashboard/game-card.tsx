@@ -103,7 +103,7 @@ const TeamDisplay = ({ team, sport }: { team: Team; sport: SportName }) => {
   );
 };
 
-export function GameCard({ game }: { game: Game }) {
+export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game: Game) => void }) {
   const { addPick } = useBetSlip();
 
   const gameDate = new Date(game.startTime);
@@ -128,15 +128,25 @@ export function GameCard({ game }: { game: Game }) {
       });
 
   const handleBetSelection = (
+    e: React.MouseEvent,
     pick: string,
     odds: number,
     betType: 'moneyline' | 'spread' | 'total'
   ) => {
+    e.stopPropagation();
     addPick({ pick, odds, betType, game });
   };
+  
+  const handleStarClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      // Add favorite logic here
+  }
 
   return (
-      <Card className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200">
+      <Card 
+        className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+        onClick={() => onGameClick(game)}
+      >
         <CardHeader className="flex-row items-center justify-between bg-card-foreground/5 p-3">
           <div className="text-sm font-medium">{game.sport}</div>
             <div className="flex items-center gap-2">
@@ -146,7 +156,10 @@ export function GameCard({ game }: { game: Game }) {
                         LIVE
                     </Badge>
                 )}
-                <button className="text-muted-foreground hover:text-accent transition-colors">
+                <button 
+                    onClick={handleStarClick}
+                    className="text-muted-foreground hover:text-accent transition-colors"
+                >
                     <Star className="h-5 w-5" />
                 </button>
             </div>
@@ -170,8 +183,9 @@ export function GameCard({ game }: { game: Game }) {
                   variant="outline"
                   size="sm"
                   className="flex-col h-auto py-2"
-                  onClick={() =>
+                  onClick={(e) =>
                     handleBetSelection(
+                      e,
                       game.awayTeam.name,
                       game.odds!.moneyline.away,
                       'moneyline'
@@ -192,8 +206,9 @@ export function GameCard({ game }: { game: Game }) {
                   variant="outline"
                   size="sm"
                   className="flex-col h-auto py-2"
-                  onClick={() =>
+                  onClick={(e) =>
                     handleBetSelection(
+                      e,
                       game.homeTeam.name,
                       game.odds!.moneyline.home,
                       'moneyline'
@@ -216,8 +231,9 @@ export function GameCard({ game }: { game: Game }) {
                   variant="outline"
                   size="sm"
                   className="flex-col h-auto py-2"
-                  onClick={() =>
+                  onClick={(e) =>
                     handleBetSelection(
+                      e,
                       `Over ${game.odds!.total.points}`,
                       game.odds!.total.over,
                       'total'
@@ -237,8 +253,9 @@ export function GameCard({ game }: { game: Game }) {
                   variant="outline"
                   size="sm"
                   className="flex-col h-auto py-2"
-                  onClick={() =>
+                  onClick={(e) =>
                     handleBetSelection(
+                      e,
                       `Under ${game.odds!.total.points}`,
                       game.odds!.total.under,
                       'total'

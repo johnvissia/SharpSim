@@ -124,9 +124,10 @@ const transformDailyGamesToGames = (
 type GameFeedProps = {
   selectedSport: string;
   selectedConference: string;
+  onGameClick: (game: Game) => void;
 };
 
-export function GameFeed({ selectedSport, selectedConference }: GameFeedProps) {
+export function GameFeed({ selectedSport, selectedConference, onGameClick }: GameFeedProps) {
   const firestore = useFirestore();
   
   const dailyGamesQuery = useMemoFirebase(() => {
@@ -214,7 +215,7 @@ export function GameFeed({ selectedSport, selectedConference }: GameFeedProps) {
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {filteredAndSortedGames.length > 0 ? (
         filteredAndSortedGames.map((game) => (
-            <GameCard key={game.id} game={game} />
+            <GameCard key={game.id} game={game} onGameClick={onGameClick} />
         ))
       ) : (
         <p className="text-muted-foreground md:col-span-2 lg:col-span-3 xl:col-span-4">

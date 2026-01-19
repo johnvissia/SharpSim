@@ -16,11 +16,12 @@ import { doc } from 'firebase/firestore';
 import { fetchAndSaveDailyData } from '@/lib/api';
 import { gradeUserBets } from '@/lib/bet-grading';
 import { getSports } from '@/lib/mock-data';
-import type { Sport, SystemStatus } from '@/lib/types';
+import type { Game, Sport, SystemStatus } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Loader } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { BetSlip } from '@/components/dashboard/BetSlip';
+import { GameDetailModal } from '@/components/dashboard/GameDetailModal';
 
 export default function DashboardPage() {
   const [sports, setSports] = useState<Sport[]>([]);
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   const [loadingSports, setLoadingSports] = useState(true);
   const [isFetchingManually, setIsFetchingManually] = useState(false);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
 
   const conferenceOptions = ["All", "SEC", "Big 10", "ACC", "Big 12"];
 
@@ -230,10 +232,16 @@ export default function DashboardPage() {
           <GameFeed
               selectedSport={selectedSport}
               selectedConference={selectedConference}
+              onGameClick={setSelectedGame}
           />
         )}
       </div>
       <BetSlip />
+      <GameDetailModal 
+        game={selectedGame}
+        isOpen={!!selectedGame}
+        onClose={() => setSelectedGame(null)}
+      />
     </>
   );
 }
