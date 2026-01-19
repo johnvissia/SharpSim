@@ -17,6 +17,7 @@ import {
   BookUser,
   Ticket,
   Shield,
+  BarChart3,
 } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
 import { AuthButton } from '@/components/auth/auth-button';
@@ -24,6 +25,7 @@ import { AuthButton } from '@/components/auth/auth-button';
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutGrid },
   { href: '/my-picks', label: 'My Picks', icon: Ticket },
+  { href: '/stats', label: 'Stats', icon: BarChart3 },
   { href: '/store', label: 'Store', icon: Store },
   { href: '/coaching', label: 'Coaching', icon: BookUser },
   { href: '/admin', label: 'Admin', icon: Shield },
