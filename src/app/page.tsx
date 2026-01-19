@@ -203,40 +203,60 @@ export default function DashboardPage() {
     setIsFetchingManually(false);
   };
   
-  // New merging logic
   const mergedGames = useMemo(() => {
     const rankingsMap = new Map(rankings?.map(r => [r.teamName, { rank: r.rank, conference: r.conference }]) || []);
     const oddsGames = transformDailyGamesToGames(dailyGames, rankingsMap);
 
-    if (isLoadingEspn || espnGames.length === 0) {
-        return oddsGames; // Return odds games if ESPN data is not ready
-    }
+    const finalGames = new Map<string, Game>();
 
-    // Create a map for quick lookups of ESPN games
-    const espnGameMap = new Map<string, Game>();
-    espnGames.forEach(g => {
-        const key = `${g.sport}-${g.homeTeam.name}-${g.awayTeam.name}`;
-        espnGameMap.set(key, g);
+    // Step 1: Add all games from the live ESPN feed. This is our primary source of truth for what's on today.
+    espnGames.forEach(espnGame => {
+        const key = `${espnGame.sport}-${espnGame.homeTeam.name}-${espnGame.awayTeam.name}`;
+        
+        // Enrich ESPN game with ranking/conference data right away.
+        const homeRankingInfo = rankingsMap.get(espnGame.homeTeam.name);
+        const awayRankingInfo = rankingsMap.get(espnGame.awayTeam.name);
+        const enrichedEspnGame = {
+            ...espnGame,
+            homeTeam: {
+                ...espnGame.homeTeam,
+                rank: homeRankingInfo?.rank,
+                conference: homeRankingInfo?.conference || getConference(espnGame.homeTeam.name)
+            },
+            awayTeam: {
+                ...espnGame.awayTeam,
+                rank: awayRankingInfo?.rank,
+                conference: awayRankingInfo?.conference || getConference(espnGame.awayTeam.name)
+            }
+        };
+        finalGames.set(key, enrichedEspnGame);
     });
 
-    // Enrich oddsGames with data from espnGames
-    return oddsGames.map(oddsGame => {
+    // Step 2: Enrich with odds data from The Odds API / Firestore.
+    oddsGames.forEach(oddsGame => {
         const key = `${oddsGame.sport}-${oddsGame.homeTeam.name}-${oddsGame.awayTeam.name}`;
-        const espnGame = espnGameMap.get(key);
+        const existingGame = finalGames.get(key);
 
-        if (espnGame) {
-            return {
-                ...oddsGame, // odds data from The Odds API
-                id: espnGame.id, // Use ESPN's ID for consistency in props view
-                homeTeam: { ...oddsGame.homeTeam, logo: espnGame.homeTeam.logo },
-                awayTeam: { ...oddsGame.awayTeam, logo: espnGame.awayTeam.logo },
-                liveScore: espnGame.liveScore,
-                statusDetail: espnGame.statusDetail,
-                startTime: espnGame.startTime, // Use more accurate ESPN start time
-            };
+        if (existingGame) {
+            // Game already exists from ESPN feed, merge odds into it.
+            finalGames.set(key, {
+                ...existingGame,
+                odds: oddsGame.odds,
+                allOdds: oddsGame.allOdds,
+            });
+        } else {
+            // This game has odds but wasn't in the ESPN feed. Add it.
+            finalGames.set(key, oddsGame);
         }
-        return oddsGame; // Return original if no match found
     });
+    
+    // If ESPN data is still loading, it's better to show games with odds than nothing.
+    if (isLoadingEspn && finalGames.size === 0) {
+        return oddsGames;
+    }
+    
+    return Array.from(finalGames.values());
+
   }, [dailyGames, rankings, espnGames, isLoadingEspn]);
 
   const showLoadingSpinner = isUserLoading || (isLoadingGames && !dailyGames);
