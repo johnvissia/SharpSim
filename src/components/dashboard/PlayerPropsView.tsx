@@ -105,14 +105,27 @@ function parsePlayerProps(data: any): PlayerPropMarket[] {
 
 export function PlayerPropsView({ game }: { game: Game }) {
     const { addPick } = useBetSlip();
+    const { toast } = useToast();
     const [markets, setMarkets] = useState<PlayerPropMarket[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchPlayerProps = async () => {
+            setIsLoading(true);
+            setError(null);
+            setMarkets([]);
+
             if (USE_MOCK_DATA) {
                 setMarkets(mockPlayerProps);
+                setIsLoading(false);
+                return;
+            }
+            
+            const oddsApiGameId = game.oddsApiId;
+
+            if (!oddsApiGameId) {
+                setError("Player props are only available for games with odds. Please sync odds first.");
                 setIsLoading(false);
                 return;
             }
@@ -132,7 +145,7 @@ export function PlayerPropsView({ game }: { game: Game }) {
             }
             
             try {
-                const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/events/${game.id}/odds?apiKey=${API_KEY}&regions=us&markets=player_points,player_rebounds,player_assists&oddsFormat=american`;
+                const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/events/${oddsApiGameId}/odds?apiKey=${API_KEY}&regions=us&markets=player_points,player_rebounds,player_assists&oddsFormat=american`;
                 const response = await fetch(url);
 
                 if (!response.ok) {
@@ -151,11 +164,12 @@ export function PlayerPropsView({ game }: { game: Game }) {
 
             } catch (err: any) {
                 console.error("Player prop fetch error:", err);
-                setError(err.message || 'An error occurred while fetching props.');
+                const errorMessage = err.message || 'An error occurred while fetching props.';
+                setError(errorMessage);
                 toast({
                     variant: 'destructive',
                     title: 'Could not load player props.',
-                    description: err.message,
+                    description: errorMessage,
                 });
             } finally {
                 setIsLoading(false);
@@ -163,7 +177,7 @@ export function PlayerPropsView({ game }: { game: Game }) {
         };
 
         fetchPlayerProps();
-    }, [game]);
+    }, [game, toast]);
     
     const handlePick = (
         playerName: string,

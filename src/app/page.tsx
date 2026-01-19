@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, orderBy, query } from 'firebase/firestore';
 import { fetchAndSaveDailyData } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
@@ -141,7 +141,6 @@ export default function DashboardPage() {
   const { toast } = useToast();
 
   const systemStatusRef = useMemoFirebase(() => (firestore ? doc(firestore, 'system', 'status') : null), [firestore]);
-  const { data: systemStatus, isLoading: isStatusLoading } = useDoc<SystemStatus>(systemStatusRef);
   
   // Fetching data previously in GameFeed
   const dailyGamesQuery = useMemoFirebase(() => {
@@ -244,10 +243,11 @@ export default function DashboardPage() {
                 ...existingGame,
                 odds: oddsGame.odds,
                 allOdds: oddsGame.allOdds,
+                oddsApiId: oddsGame.id,
             });
         } else {
-            // This game has odds but wasn't in the ESPN feed. Add it.
-            finalGames.set(key, oddsGame);
+            // This game has odds but wasn't in the ESPN feed. Add it with its Odds API ID.
+            finalGames.set(key, { ...oddsGame, oddsApiId: oddsGame.id });
         }
     });
     

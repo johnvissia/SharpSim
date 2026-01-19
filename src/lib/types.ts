@@ -30,6 +30,7 @@ export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'Soccer' | 'WNBA' | 'NCA
 
 export type Game = {
   id: string;
+  oddsApiId?: string;
   sport: SportName;
   startTime: string; // ISO 8601 string
   homeTeam: Team;
