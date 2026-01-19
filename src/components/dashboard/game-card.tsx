@@ -74,7 +74,7 @@ const InjuryIndicator = ({ team }: { team: Team }) => {
   );
 };
 
-const TeamDisplay = ({ team, score, sport }: { team: Team; score?: number, sport: Game['sport'] }) => {
+const TeamDisplay = ({ team, score, sport, isLive }: { team: Team; score?: number, sport: Game['sport'], isLive: boolean }) => {
   const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
 
   return (
@@ -99,6 +99,14 @@ const TeamDisplay = ({ team, score, sport }: { team: Team; score?: number, sport
         {team.name}
       </div>
       {score !== undefined && <div className="text-2xl font-bold">{score}</div>}
+       {isLive && sport === 'NBA' && team.leadingScorer ? (
+            <div className="text-xs text-muted-foreground mt-1 h-8">
+              <p className="font-semibold truncate">{team.leadingScorer.name}</p>
+              <p>{team.leadingScorer.value} PTS</p>
+            </div>
+          ) : (
+            <div className="h-8" />
+          )}
       <InjuryIndicator team={team} />
     </div>
   );
@@ -107,18 +115,10 @@ const TeamDisplay = ({ team, score, sport }: { team: Team; score?: number, sport
 export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game: Game) => void }) {
   const { addPick } = useBetSlip();
 
-  const isLive = game.statusDetail && !game.statusDetail.toLowerCase().includes('final') && !game.statusDetail.toLowerCase().includes('tba') && !game.statusDetail.toLowerCase().includes(':');
-  const isFinal = game.statusDetail && game.statusDetail.toLowerCase().includes('final');
+  const isLive = game.statusState === 'in';
+  const isFinal = game.statusState === 'post';
 
-  const gameDate = new Date(game.startTime);
-  const now = new Date();
-  const isToday = now.getFullYear() === gameDate.getFullYear() && now.getMonth() === gameDate.getMonth() && now.getDate() === gameDate.getDate();
-
-  const gameTimeOrStatus = isLive || isFinal 
-    ? game.statusDetail
-    : isToday
-      ? gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-      : gameDate.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const gameTimeOrStatus = game.statusDetail;
 
   const handleBetSelection = (
     e: React.MouseEvent,
@@ -159,11 +159,11 @@ export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game
         </CardHeader>
         <CardContent className="flex-grow p-4 flex flex-col justify-between">
           <div className="flex items-start justify-around text-center mb-4">
-            <TeamDisplay team={game.awayTeam} score={(isLive || isFinal) ? game.liveScore?.away : undefined} sport={game.sport} />
+            <TeamDisplay team={game.awayTeam} score={(isLive || isFinal) ? game.liveScore?.away : undefined} sport={game.sport} isLive={isLive} />
             <div className="flex flex-col items-center self-center px-2">
               <span className="text-lg font-bold text-muted-foreground">{isFinal ? 'F' : '@'}</span>
             </div>
-            <TeamDisplay team={game.homeTeam} score={(isLive || isFinal) ? game.liveScore?.home : undefined} sport={game.sport} />
+            <TeamDisplay team={game.homeTeam} score={(isLive || isFinal) ? game.liveScore?.home : undefined} sport={game.sport} isLive={isLive} />
           </div>
 
           {game.odds && !isFinal && ( // Hide odds if game is final

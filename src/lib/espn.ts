@@ -3,6 +3,20 @@
 import type { Game, SportName, Team } from './types';
 
 // Minimal types for ESPN Scoreboard API response
+interface EspnLeaderAthlete {
+    id: string;
+    fullName: string;
+    shortName: string;
+}
+interface EspnPointsLeader {
+    displayValue: string;
+    athlete: EspnLeaderAthlete;
+}
+interface EspnLeaderCategory {
+    name: 'points' | 'rebounds' | 'assists';
+    displayName: string;
+    leaders: EspnPointsLeader[];
+}
 interface EspnCompetitor {
     id: string;
     uid: string;
@@ -25,6 +39,7 @@ interface EspnCompetitor {
     score: string;
     linescores: { value: number }[];
     record: { name: string; abbreviation: string; summary: string }[];
+    leaders?: EspnLeaderCategory[];
 }
 
 interface EspnCompetition {
@@ -79,6 +94,22 @@ const mapEspnEventToGame = (event: EspnEvent, sport: SportName): Game | null => 
 
     if (!homeCompetitor || !awayCompetitor) return null;
 
+    const getLeadingScorer = (competitor: EspnCompetitor) => {
+        if (!competitor.leaders) return undefined;
+
+        const pointsLeaderData = competitor.leaders.find(l => l.name === 'points');
+        if (pointsLeaderData && pointsLeaderData.leaders && pointsLeaderData.leaders.length > 0) {
+            const leader = pointsLeaderData.leaders[0];
+            if (leader.athlete) {
+                return {
+                    name: leader.athlete.shortName || leader.athlete.fullName,
+                    value: leader.displayValue,
+                };
+            }
+        }
+        return undefined;
+    };
+
     const homeTeam: Team = {
         id: homeCompetitor.team.id,
         name: homeCompetitor.team.displayName,
@@ -86,6 +117,7 @@ const mapEspnEventToGame = (event: EspnEvent, sport: SportName): Game | null => 
         players: [], // Not available from scoreboard
         rank: undefined, // Not directly available
         conference: undefined, // Not available
+        leadingScorer: getLeadingScorer(homeCompetitor),
     };
 
     const awayTeam: Team = {
@@ -95,6 +127,7 @@ const mapEspnEventToGame = (event: EspnEvent, sport: SportName): Game | null => 
         players: [],
         rank: undefined,
         conference: undefined,
+        leadingScorer: getLeadingScorer(awayCompetitor),
     };
 
     return {
@@ -107,7 +140,8 @@ const mapEspnEventToGame = (event: EspnEvent, sport: SportName): Game | null => 
             home: parseInt(homeCompetitor.score, 10) || 0,
             away: parseInt(awayCompetitor.score, 10) || 0,
         },
-        statusDetail: competition.status.type.shortDetail,
+        statusDetail: competition.status.type.detail,
+        statusState: competition.status.type.state,
         // Odds data will be merged in later
     };
 };
@@ -123,7 +157,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
 
     try {
         const responses = await Promise.all(
-            endpoints.map(endpoint => fetch(endpoint.url).then(res => res.json() as Promise<EspnScoreboard>))
+            endpoints.map(endpoint => fetch(endpoint.url, { next: { revalidate: 30 } }).then(res => res.json() as Promise<EspnScoreboard>))
         );
 
         const allGames: Game[] = [];

@@ -12,6 +12,7 @@ export type Team = {
   players: Player[];
   rank?: number;
   conference?: string;
+  leadingScorer?: { name: string; value: string };
 };
 
 export type Odds = {
@@ -37,6 +38,7 @@ export type Game = {
   allOdds?: SportsbookOdds[];
   liveScore?: { home: number; away: number };
   statusDetail?: string; // e.g., "Final", "Q3 10:00" from ESPN
+  statusState?: 'pre' | 'in' | 'post';
 };
 
 export type Sport = {
