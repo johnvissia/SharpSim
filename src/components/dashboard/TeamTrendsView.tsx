@@ -6,6 +6,14 @@ import type { TeamTrend } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, teamName: string, sport: string }) {
     const [trends, setTrends] = useState<TeamTrend[] | null>(null);
@@ -38,15 +46,15 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
     
     if (loading) {
         return (
-            <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
+            <div className="space-y-3 p-6">
+                {Array.from({ length: 10 }).map((_, i) => (
                     <div key={i} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Skeleton className="h-5 w-10" />
+                        <div className="flex items-center gap-4 w-full">
+                            <Skeleton className="h-5 w-16" />
+                            <Skeleton className="h-5 w-32" />
                             <Skeleton className="h-5 w-24" />
+                            <Skeleton className="h-5 flex-1" />
                         </div>
-                        <Skeleton className="h-5 w-16" />
-                        <Skeleton className="h-5 w-20" />
                     </div>
                 ))}
             </div>
@@ -54,33 +62,66 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
     }
 
     if (error) {
-        return <p className="text-sm text-center text-muted-foreground py-4">{error}</p>
+        return <p className="text-sm text-center text-muted-foreground py-8">{error}</p>
     }
 
     if (!trends || trends.length === 0) {
-        return <p className="text-sm text-center text-muted-foreground py-4">No recent game data found.</p>
+        return <p className="text-sm text-center text-muted-foreground py-8">No recent game data found.</p>
     }
 
+    const renderAtsBadge = (status: TeamTrend['ats']) => {
+        switch (status) {
+            case 'Cover':
+                return <Badge className="bg-green-500 text-primary-foreground hover:bg-green-500/90">Cover</Badge>;
+            case 'No Cover':
+                return <Badge variant="destructive">No Cover</Badge>;
+            case 'Push':
+                return <Badge variant="secondary">Push</Badge>;
+            case 'N/A':
+            default:
+                return <span className="text-muted-foreground">-</span>;
+        }
+    };
+
+    const renderOuBadge = (status: TeamTrend['ou']) => {
+        switch (status) {
+            case 'Over':
+            case 'Under':
+            case 'Push':
+                return <Badge variant="secondary">{status}</Badge>;
+            case 'N/A':
+            default:
+                return <span className="text-muted-foreground">-</span>;
+        }
+    };
+
     return (
-        <ul className="space-y-3">
-            {trends.map((game, index) => (
-                <li key={index} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 font-medium">
-                        <span className="w-10 text-muted-foreground">{game.date}</span>
-                        <span className="w-4 text-muted-foreground">{game.opponent.at}</span>
-                        <span className="truncate w-24">{game.opponent.name}</span>
-                    </div>
-                    <span className={cn("font-semibold", game.result === 'W' ? 'text-green-600' : 'text-destructive')}>
-                        {game.result} {game.score}
-                    </span>
-                    <div className="flex gap-1">
-                        <Badge variant={game.ats === 'Cover' ? 'default' : 'destructive'} className={cn({"bg-green-500": game.ats === 'Cover', 'opacity-50': game.ats === 'N/A' || game.ats === 'Push'})}>
-                            {game.ats === 'No Cover' ? 'Fail' : game.ats}
-                        </Badge>
-                         <Badge variant="secondary">{game.ou}</Badge>
-                    </div>
-                </li>
-            ))}
-        </ul>
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead className="w-[100px]">Date</TableHead>
+                    <TableHead>Matchup</TableHead>
+                    <TableHead>Result</TableHead>
+                    <TableHead className="text-center">Spread (ATS)</TableHead>
+                    <TableHead className="text-center">Total (O/U)</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {trends.map((game, index) => (
+                    <TableRow key={index}>
+                        <TableCell className="text-muted-foreground">{game.date}</TableCell>
+                        <TableCell>
+                            <span>{game.opponent.at} </span>
+                            <span className="font-semibold">{game.opponent.name}</span>
+                        </TableCell>
+                        <TableCell className={cn("font-semibold", game.result === 'W' ? 'text-green-600' : 'text-destructive')}>
+                            {game.result} {game.score}
+                        </TableCell>
+                        <TableCell className="text-center">{renderAtsBadge(game.ats)}</TableCell>
+                        <TableCell className="text-center">{renderOuBadge(game.ou)}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
     );
 }

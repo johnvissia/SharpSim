@@ -44,12 +44,12 @@ export default function TeamStatsPage() {
                     {teamName}
                 </h1>
             </header>
-            <div className="max-w-4xl">
+            <div>
                  <Card>
                     <CardHeader>
                         <CardTitle className="text-lg font-semibold">Last 10 Games Trend</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-0">
                         <TeamTrendsView teamId={teamId} teamName={teamName} sport={sportName} />
                     </CardContent>
                 </Card>
