@@ -4,15 +4,14 @@ import { useState } from 'react';
 import type { Game } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogClose, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Trophy } from 'lucide-react';
+import { X } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { sportIconMap } from '@/lib/team-logos';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '../ui/button';
 import { MainLinesView } from './MainLinesView';
 import { PlayerPropsView } from './PlayerPropsView';
-import { Separator } from '@/components/ui/separator';
-import { TeamTrendsView } from './TeamTrendsView';
 
 interface GameDetailModalProps {
   game: Game | null;
@@ -23,8 +22,8 @@ interface GameDetailModalProps {
 const TeamHeader = ({ team, sport }: { team: Game['homeTeam'], sport: Game['sport']}) => {
     const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
     return (
-        <div className="flex flex-col items-center text-center gap-4">
-             {team.logo ? (
+        <Link href={`/stats/${sport}/${team.name}?teamId=${team.id}`} className="flex flex-col items-center text-center gap-4 p-2 rounded-lg hover:bg-accent/10 transition-colors w-48">
+            {team.logo ? (
                 <Image
                 src={team.logo}
                 alt={`${team.name} logo`}
@@ -37,11 +36,12 @@ const TeamHeader = ({ team, sport }: { team: Game['homeTeam'], sport: Game['spor
                 <FallbackIcon className="w-10 h-10 text-muted-foreground" />
                 </div>
             )}
-            <h2 className="text-2xl font-bold">
+            <h2 className="text-2xl font-bold h-16 flex items-center justify-center">
                 {team.rank && <span className="font-bold mr-2 text-muted-foreground">#{team.rank}</span>}
                 {team.name}
             </h2>
-        </div>
+            <p className="text-xs text-muted-foreground">View Team Trends &rarr;</p>
+        </Link>
     )
 }
 
@@ -116,21 +116,6 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                         <PlayerPropsView game={game} />
                     </TabsContent>
                 </Tabs>
-                
-                <Separator className="my-6" />
-
-                <div className="space-y-2 mb-4">
-                    <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
-                        <Trophy className="h-5 w-5 text-accent"/>
-                        Team Trends
-                    </h3>
-                    <p className="text-muted-foreground text-sm">A look at each team's performance in their last 10 games.</p>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <TeamTrendsView teamId={game.awayTeam.id} teamName={game.awayTeam.name} sport={game.sport} />
-                    <TeamTrendsView teamId={game.homeTeam.id} teamName={game.homeTeam.name} sport={game.sport} />
-                </div>
             </div>
         </DialogContent>
     </Dialog>
