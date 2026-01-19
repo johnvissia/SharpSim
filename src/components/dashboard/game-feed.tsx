@@ -17,15 +17,27 @@ type GameFeedProps = {
 export function GameFeed({ games, isLoading, selectedSport, selectedConference, onGameClick }: GameFeedProps) {
 
   const filteredAndSortedGames = useMemo(() => {
+    const now = new Date();
+    // Finished games will be shown for 4 hours after their start time (approx. 1 hr after they end)
+    const finishedGameCutoff = 4 * 60 * 60 * 1000; 
+
     return games.filter(game => {
         // 1. Sport Filter
         const sportMatch = selectedSport === 'All' || game.sport === selectedSport;
         if (!sportMatch) return false;
 
+        // 2. Hide old finished games
+        if (game.statusState === 'post') {
+            const gameTime = new Date(game.startTime).getTime();
+            if (now.getTime() - gameTime > finishedGameCutoff) {
+                return false;
+            }
+        }
+
         const ncaaSports = ['NCAAF', 'NCAAM'];
         const isNCAAGame = ncaaSports.includes(game.sport as any);
         
-        // 2. NCAA-specific filters
+        // 3. NCAA-specific filters
         if (isNCAAGame) {
             const isConferenceFilterActive = selectedConference !== 'All';
 
@@ -41,27 +53,26 @@ export function GameFeed({ games, isLoading, selectedSport, selectedConference, 
             return power4TeamNames.has(game.homeTeam.name) || power4TeamNames.has(game.awayTeam.name);
         }
 
-        // 3. Show all non-NCAA games that match the sport filter
+        // 4. Show all non-NCAA games that match the sport filter
         return true;
     })
     .sort((a, b) => {
         const statusOrder = {
-            'in': 1,   // Live
-            'post': 2, // Finished
-            'pre': 3,  // Upcoming
+            'post': 1, // Finished games first
+            'in': 2,   // Then live games
+            'pre': 3,  // Finally, upcoming games
         };
 
         const aStatus = a.statusState ?? 'pre';
         const bStatus = b.statusState ?? 'pre';
 
         const aOrder = statusOrder[aStatus as keyof typeof statusOrder] || 4;
-        const bOrder = bStatus[bStatus as keyof typeof statusOrder] || 4;
+        const bOrder = statusOrder[bStatus as keyof typeof statusOrder] || 4;
         
         if (aOrder !== bOrder) {
             return aOrder - bOrder;
         }
 
-        // For games in the same state, sort by time.
         // For finished games, sort descending to show most recent first.
         if (aStatus === 'post') {
             return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();

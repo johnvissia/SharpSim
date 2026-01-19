@@ -25,7 +25,6 @@ import { BetSlip } from '@/components/dashboard/BetSlip';
 import { GameDetailModal } from '@/components/dashboard/GameDetailModal';
 import { sportNameMapping } from '@/lib/sports';
 import { getConference } from '@/lib/ncaa-conferences';
-import { isSameDay } from 'date-fns';
 
 // This function is now being moved from game-feed.tsx to page.tsx
 const transformDailyGamesToGames = (
@@ -139,8 +138,6 @@ export default function DashboardPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
-
-  const systemStatusRef = useMemoFirebase(() => (firestore ? doc(firestore, 'system', 'status') : null), [firestore]);
   
   // Fetching data previously in GameFeed
   const dailyGamesQuery = useMemoFirebase(() => {
@@ -178,15 +175,18 @@ export default function DashboardPage() {
   }, []);
   
   const handleManualFetch = async () => {
-    if (!firestore || !user || !systemStatusRef) return;
+    if (!firestore || !user) return;
     setIsFetchingManually(true);
     toast({ title: 'Syncing Data...', description: 'Fetching latest odds, scores, and settling bets.' });
     try {
       await fetchAndSaveDailyData(firestore);
       toast({ title: 'Odds Sync Complete!', description: 'Now grading any settled bets.' });
       await gradeUserBets(firestore, user);
+      
+      const systemStatusRef = doc(firestore, 'system', 'status');
       const today = new Date().toISOString().split('T')[0];
       setDocumentNonBlocking(systemStatusRef, { last_updated_date: today }, { merge: true });
+      
       toast({
         title: 'Sync Protocol Complete!',
         description: 'Odds are fresh and bets are settled.',
@@ -265,19 +265,7 @@ export default function DashboardPage() {
         return oddsGames;
     }
     
-    const allGames = Array.from(finalGames.values());
-    const today = new Date();
-
-    return allGames.filter(game => {
-      const isFinal = game.statusDetail?.toLowerCase().includes('final');
-      if (!isFinal) {
-        return true; // Always show games that are not final
-      }
-
-      // If the game is final, only show it if it started today
-      const gameDate = new Date(game.startTime);
-      return isSameDay(gameDate, today);
-    });
+    return Array.from(finalGames.values());
 
   }, [dailyGames, rankings, espnGames, isLoadingEspn]);
 
