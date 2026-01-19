@@ -3,6 +3,9 @@
 import { doc, Firestore, writeBatch, collection, getDocs } from 'firebase/firestore';
 import type { DailyGame, CompletedGame } from '@/lib/types';
 
+// Helper function to introduce a delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 /**
  * Fetches daily game odds and completed game scores from The Odds API and saves them to Firestore.
  * @param firestore The Firestore instance from `useFirestore()`.
@@ -17,7 +20,7 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
     throw new Error(message);
   }
 
-  console.log("Starting Fetch...");
+  console.log("Starting Sequential Fetch...");
 
   const sportsMap = [
     { key: 'americanfootball_nfl', label: 'NFL' },
@@ -25,29 +28,28 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
     { key: 'basketball_nba', label: 'NBA' },
     { key: 'basketball_ncaab', label: 'NCAAM' },
     { key: 'icehockey_nhl', label: 'NHL' },
-    // Temporarily removed to reduce API calls and avoid rate limiting.
-    // { key: 'baseball_mlb', label: 'MLB' },
-    // { key: 'soccer_epl', label: 'Soccer' }
   ];
 
-  // 1. Fetch Upcoming Game Odds
+  // 1. Fetch Upcoming Game Odds Sequentially
+  const allGames = [];
   try {
-    const oddsRequests = sportsMap.map(sport =>
-      fetch(`https://api.the-odds-api.com/v4/sports/${sport.key}/odds/?apiKey=${API_KEY}&regions=us&markets=h2h,spreads,totals&oddsFormat=american`)
-        .then(res => {
-          if (!res.ok) {
-            return res.text().then(text => { throw new Error(`HTTP error ${res.status} for ${sport.label}: ${text}`) });
-          }
-          return res.json();
-        })
-        .catch(err => {
-          console.error(`Error fetching ${sport.label}:`, err);
-          return [];
-        })
-    );
-
-    const oddsResults = await Promise.allSettled(oddsRequests);
-    const allGames = oddsResults.flatMap(r => (r.status === 'fulfilled' ? r.value : []));
+    for (const sport of sportsMap) {
+      console.log(`Fetching odds for ${sport.label}...`);
+      try {
+        const res = await fetch(`https://api.the-odds-api.com/v4/sports/${sport.key}/odds/?apiKey=${API_KEY}&regions=us&markets=h2h,spreads,totals&oddsFormat=american`);
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`HTTP error ${res.status} for ${sport.label}: ${text}`);
+        }
+        const data = await res.json();
+        allGames.push(...data);
+      } catch (err) {
+        console.error(`Error fetching ${sport.label}:`, err);
+        // Continue to the next sport even if one fails
+      }
+      await delay(1500); // Add a 1.5 second delay between requests
+    }
+    
     console.log("Total Raw Upcoming Games Fetched:", allGames.length);
 
     const now = new Date();
@@ -91,25 +93,27 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
     throw error; // Re-throw to be caught by the UI
   }
 
-  // 2. Fetch Completed Game Scores
+  // 2. Fetch Completed Game Scores Sequentially
+  const allCompletedGames = [];
   try {
     console.log("Fetching completed game scores...");
-    const scoreRequests = sportsMap.map(sport =>
-      fetch(`https://api.the-odds-api.com/v4/sports/${sport.key}/scores/?apiKey=${API_KEY}&daysFrom=1`)
-        .then(res => {
-          if (!res.ok) {
-            return res.text().then(text => { throw new Error(`HTTP error ${res.status} for ${sport.label} scores: ${text}`) });
-          }
-          return res.json();
-        })
-        .catch(err => {
-          console.error(`Error fetching scores for ${sport.label}:`, err);
-          return [];
-        })
-    );
+    for (const sport of sportsMap) {
+      console.log(`Fetching scores for ${sport.label}...`);
+       try {
+        const res = await fetch(`https://api.the-odds-api.com/v4/sports/${sport.key}/scores/?apiKey=${API_KEY}&daysFrom=1`);
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`HTTP error ${res.status} for ${sport.label} scores: ${text}`);
+        }
+        const data = await res.json();
+        allCompletedGames.push(...data);
+      } catch (err) {
+        console.error(`Error fetching scores for ${sport.label}:`, err);
+         // Continue to the next sport
+      }
+      await delay(1500); // Add a 1.5 second delay
+    }
 
-    const scoreResults = await Promise.allSettled(scoreRequests);
-    const allCompletedGames = scoreResults.flatMap(r => (r.status === 'fulfilled' ? r.value : []));
     console.log("Total Raw Completed Games Fetched:", allCompletedGames.length);
 
     const finishedGames = allCompletedGames.filter((game: any) => game.completed === true && game.scores);
