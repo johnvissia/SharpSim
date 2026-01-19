@@ -175,6 +175,8 @@ export function BetSlip() {
           sport: pick.game.sport,
           betType: pick.betType,
           pick: pick.pick,
+          matchup: `${pick.game.awayTeam.name} @ ${pick.game.homeTeam.name}`,
+          commenceTime: pick.game.startTime,
           stake: stakeNum,
           odds: pick.odds,
           potentialWinnings: potentialPayout,

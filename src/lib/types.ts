@@ -9,7 +9,6 @@ export type Team = {
   id:string;
   name: string;
   logo: string; // URL to logo
-  record: string; // e.g., "10-5"
   players: Player[];
   rank?: number;
   conference?: string;
@@ -60,11 +59,13 @@ export interface UserBet {
   sport: SportName;
   betType: 'moneyline' | 'spread' | 'total' | 'parlay';
   pick: string; // e.g., "Golden State Warriors" or "Over 220.5"
+  matchup?: string; // e.g. "Team A @ Team B"
   stake: number;
   odds: number;
   potentialWinnings: number;
   status: 'pending' | 'won' | 'lost' | 'push';
   placedAt: string; // ISO 8601 string
+  commenceTime?: string; // ISO 8601 string
 };
 
 export interface DailyGame {

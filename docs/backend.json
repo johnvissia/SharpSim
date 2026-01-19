@@ -19,16 +19,18 @@
       "description": "Represents a single bet placed by a user.",
       "properties": {
         "id": { "type": "string", "description": "Unique identifier for the bet." },
-        "gameId": { "type": "string", "description": "The ID of the game the bet is on." },
+        "gameId": { "type": "string", "description": "The ID of the game the bet is on. For parlays, this is a comma-separated list of game IDs." },
         "userId": { "type": "string", "description": "The ID of the user who placed the bet." },
         "sport": { "type": "string", "description": "The sport of the game." },
         "betType": { "type": "string", "enum": ["moneyline", "spread", "total", "parlay"]},
-        "pick": { "type": "string", "description": "The user's selection (e.g., 'Team A' or 'Over 220.5')." },
+        "pick": { "type": "string", "description": "The user's selection. For parlays, this is a ' | ' separated string of individual picks." },
+        "matchup": { "type": "string", "description": "The matchup string for single bets, e.g., 'Team A @ Team B'." },
         "stake": { "type": "number", "description": "The amount of coins staked." },
         "odds": { "type": "number", "description": "The American odds for the bet." },
         "potentialWinnings": { "type": "number", "description": "How much the user stands to win." },
         "status": { "type": "string", "enum": ["pending", "won", "lost", "push"]},
-        "placedAt": { "type": "string", "format": "date-time" }
+        "placedAt": { "type": "string", "format": "date-time" },
+        "commenceTime": { "type": "string", "format": "date-time", "description": "The start time of the game, snapshotted at time of bet placement."}
       },
       "required": ["id", "gameId", "userId", "sport", "betType", "pick", "stake", "odds", "potentialWinnings", "status", "placedAt"]
     },

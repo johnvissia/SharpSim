@@ -6,7 +6,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { UserBet, DailyGame } from '@/lib/types';
+import type { UserBet } from '@/lib/types';
 import { Ticket } from 'lucide-react';
 
 const getBetStatusBadge = (status: UserBet['status']) => {
@@ -26,20 +26,9 @@ export default function MyPicksPage() {
     return query(collection(firestore, 'users', user.uid, 'bets'), orderBy('placedAt', 'desc'));
   }, [user, firestore]);
 
-  const dailyGamesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'daily_games');
-  }, [firestore]);
-
   const { data: bets, isLoading: isLoadingBets } = useCollection<UserBet>(betsQuery);
-  const { data: dailyGames, isLoading: isLoadingGames } = useCollection<DailyGame>(dailyGamesQuery);
   
-  const loading = isUserLoading || isLoadingBets || isLoadingGames;
-
-  const gamesMap = useMemo(() => {
-    if (!dailyGames) return new Map<string, DailyGame>();
-    return new Map(dailyGames.map(g => [g.id, g]));
-  }, [dailyGames]);
+  const loading = isUserLoading || isLoadingBets;
 
   if (loading) {
     return (
@@ -80,21 +69,27 @@ export default function MyPicksPage() {
         ) : (
             bets.map(bet => {
                 const isParlay = bet.betType === 'parlay';
-                let gameInfo: string;
-                if (isParlay) {
-                    gameInfo = `${bet.pick.split('|').length}-Leg Parlay`;
-                } else {
-                    const game = gamesMap.get(bet.gameId);
-                    gameInfo = game ? `${game.awayTeam} @ ${game.homeTeam}` : 'Loading game...';
-                }
 
                 return (
                     <Card key={bet.id} className="ticket">
                         <CardContent className="!p-0">
                             <div className="flex justify-between items-start p-4">
                                 <div className="flex-grow">
-                                    <p className="font-semibold text-lg">{bet.pick} <span className="font-mono text-muted-foreground font-normal">({bet.odds > 0 ? `+${bet.odds}`: bet.odds})</span></p>
-                                    <p className="text-sm text-muted-foreground">{gameInfo}</p>
+                                    {isParlay ? (
+                                        <div className="space-y-1">
+                                            <p className="font-semibold text-lg">{bet.pick.split(' | ').length}-Leg Parlay <span className="font-mono text-muted-foreground font-normal">({bet.odds > 0 ? `+${bet.odds}`: bet.odds})</span></p>
+                                            <ul className="text-sm text-muted-foreground list-disc pl-5">
+                                                {bet.pick.split(' | ').map((leg, index) => (
+                                                    <li key={index}>{leg}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <p className="font-semibold text-lg">{bet.pick} <span className="font-mono text-muted-foreground font-normal">({bet.odds > 0 ? `+${bet.odds}`: bet.odds})</span></p>
+                                            <p className="text-sm text-muted-foreground">{bet.matchup || 'Game details not available'}</p>
+                                        </>
+                                    )}
                                 </div>
                                 {getBetStatusBadge(bet.status)}
                             </div>
