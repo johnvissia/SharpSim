@@ -153,11 +153,11 @@ export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game
         </CardHeader>
         <CardContent className="flex-grow p-4 flex flex-col justify-between">
           <div className="flex items-start justify-around text-center mb-4">
-            <TeamDisplay team={game.awayTeam} score={game.liveScore?.away} sport={game.sport} />
+            <TeamDisplay team={game.awayTeam} score={(isLive || isFinal) ? game.liveScore?.away : undefined} sport={game.sport} />
             <div className="flex flex-col items-center self-center px-2">
               <span className="text-lg font-bold text-muted-foreground">{isFinal ? 'F' : '@'}</span>
             </div>
-            <TeamDisplay team={game.homeTeam} score={game.liveScore?.home} sport={game.sport} />
+            <TeamDisplay team={game.homeTeam} score={(isLive || isFinal) ? game.liveScore?.home : undefined} sport={game.sport} />
           </div>
 
           {game.odds && !isFinal && ( // Hide odds if game is final
