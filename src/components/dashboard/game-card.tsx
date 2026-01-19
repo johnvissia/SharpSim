@@ -108,6 +108,11 @@ export function GameCard({ game }: { game: Game }) {
 
   const gameDate = new Date(game.startTime);
   const now = new Date();
+
+  // A game is live if it started in the past.
+  // The feed already filters out games that completed more than ~2 hours ago.
+  const isLive = now > gameDate;
+
   const isToday =
     now.getFullYear() === gameDate.getFullYear() &&
     now.getMonth() === gameDate.getMonth() &&
@@ -134,10 +139,17 @@ export function GameCard({ game }: { game: Game }) {
       <Card className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200">
         <CardHeader className="flex-row items-center justify-between bg-card-foreground/5 p-3">
           <div className="text-sm font-medium">{game.sport}</div>
-          <div className="text-sm text-muted-foreground">{gameTime}</div>
-          <button className="text-muted-foreground hover:text-accent transition-colors">
-            <Star className="h-5 w-5" />
-          </button>
+            <div className="flex items-center gap-2">
+                <div className="text-sm text-muted-foreground">{gameTime}</div>
+                {isLive && (
+                    <Badge className="bg-red-600 hover:bg-red-600 text-white animate-pulse text-xs">
+                        LIVE
+                    </Badge>
+                )}
+                <button className="text-muted-foreground hover:text-accent transition-colors">
+                    <Star className="h-5 w-5" />
+                </button>
+            </div>
         </CardHeader>
         <CardContent className="flex-grow p-4 flex flex-col justify-between">
           <div className="flex items-start justify-around text-center mb-4">
