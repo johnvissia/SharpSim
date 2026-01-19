@@ -50,6 +50,7 @@ export interface UserProfile {
   isAnonymous: boolean;
   balance: number;
   createdAt: any; // Firestore ServerTimestamp
+  lastCoinCollection?: string; // ISO 8601 string
 }
 
 export interface UserBet {

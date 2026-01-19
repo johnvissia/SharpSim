@@ -91,6 +91,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
                 isAnonymous: firebaseUser.isAnonymous,
                 balance: 100, // Default starting balance
                 createdAt: serverTimestamp(),
+                lastCoinCollection: new Date(0).toISOString(), // Initialize to epoch
               });
             } catch (error) {
               console.error("Failed to create user profile:", error);
