@@ -79,7 +79,7 @@ export function BetTicket({ bet }: { bet: UserBet }) {
             <div className="border-t-2 border-dashed border-border/50 mx-4" />
             <div className="flex justify-between items-center p-4 text-sm text-muted-foreground">
               <p className="font-mono">Stake: <span className="font-semibold text-foreground">{bet.stake.toFixed(2)} coins</span></p>
-              <p className="font-mono">To Win: <span className="font-semibold text-green-600">{(bet.potentialWinnings - bet.stake).toFixed(2)} coins</span></p>
+              <p className="font-mono">Payout: <span className="font-semibold text-green-600">{bet.potentialWinnings.toFixed(2)} coins</span></p>
             </div>
           </>
         )}
