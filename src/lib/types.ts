@@ -125,3 +125,16 @@ export interface PlayerPropMarket {
   name: string; // e.g. "Player Points"
   props: PlayerProp[];
 }
+
+export interface TeamTrend {
+  date: string;
+  opponent: {
+    name: string;
+    logo: string;
+    at: '@' | 'vs';
+  };
+  result: 'W' | 'L';
+  score: string; // e.g., "112-105"
+  ats: 'Cover' | 'No Cover' | 'Push' | 'N/A';
+  ou: 'Over' | 'Under' | 'Push' | 'N/A';
+}

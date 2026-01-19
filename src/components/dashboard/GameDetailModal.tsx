@@ -4,13 +4,15 @@ import { useState } from 'react';
 import type { Game } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogClose, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X } from 'lucide-react';
+import { X, Trophy } from 'lucide-react';
 import Image from 'next/image';
 import { sportIconMap } from '@/lib/team-logos';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '../ui/button';
 import { MainLinesView } from './MainLinesView';
 import { PlayerPropsView } from './PlayerPropsView';
+import { Separator } from '@/components/ui/separator';
+import { TeamTrendsView } from './TeamTrendsView';
 
 interface GameDetailModalProps {
   game: Game | null;
@@ -51,8 +53,8 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
   const gameDate = new Date(game.startTime);
   const now = new Date();
   
-  const isLive = game.statusDetail && !game.statusDetail.toLowerCase().includes('final') && !game.statusDetail.toLowerCase().includes('tba') && !game.statusDetail.toLowerCase().includes(':');
-  const isFinal = game.statusDetail && game.statusDetail.toLowerCase().includes('final');
+  const isLive = game.statusState === 'in';
+  const isFinal = game.statusState === 'post';
 
   const isToday =
     now.getFullYear() === gameDate.getFullYear() &&
@@ -114,6 +116,21 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                         <PlayerPropsView game={game} />
                     </TabsContent>
                 </Tabs>
+                
+                <Separator className="my-6" />
+
+                <div className="space-y-2 mb-4">
+                    <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                        <Trophy className="h-5 w-5 text-accent"/>
+                        Team Trends
+                    </h3>
+                    <p className="text-muted-foreground text-sm">A look at each team's performance in their last 10 games.</p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <TeamTrendsView teamId={game.awayTeam.id} teamName={game.awayTeam.name} sport={game.sport} />
+                    <TeamTrendsView teamId={game.homeTeam.id} teamName={game.homeTeam.name} sport={game.sport} />
+                </div>
             </div>
         </DialogContent>
     </Dialog>
