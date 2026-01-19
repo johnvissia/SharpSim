@@ -75,7 +75,6 @@ export interface DailyGame {
   homeTeam: string;
   awayTeam: string;
   bookmakerOdds: string[];
-  isMock?: boolean;
 }
 
 export interface CompletedGame {
