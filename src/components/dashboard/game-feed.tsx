@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { GameCard } from './game-card';
 import type { Game } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { power4TeamNames } from '@/lib/power-4-teams';
 
 type GameFeedProps = {
   games: Game[];
@@ -19,29 +20,30 @@ export function GameFeed({ games, isLoading, selectedSport, selectedConference, 
 
   const filteredAndSortedGames = useMemo(() => {
     return games.filter(game => {
-        // 1. Sport Filter (always applied)
+        // 1. Sport Filter
         const sportMatch = selectedSport === 'All' || game.sport === selectedSport;
         if (!sportMatch) return false;
 
         const ncaaSports = ['NCAAF', 'NCAAM'];
         const isNCAAGame = ncaaSports.includes(game.sport as any);
-        const isConferenceFilterActive = selectedConference !== 'All';
-
-        // 2. Conference Filter (takes precedence for NCAA games)
-        if (isNCAAGame && isConferenceFilterActive) {
-            const homeConference = game.homeTeam.conference;
-            const awayConference = game.awayTeam.conference;
-            // A game is in the conference if at least one team is in it
-            return homeConference === selectedConference || awayConference === selectedConference;
-        }
-
-        // 3. Clutter-reduction Filter for "All Sports" view (only if conference filter is not active)
-        if (selectedSport === 'All' && isNCAAGame && !isConferenceFilterActive) {
-            // Only show ranked NCAA teams to reduce clutter in the main view
-            return !!game.homeTeam.rank || !!game.awayTeam.rank;
-        }
         
-        // 4. If none of the specific filters above apply, show the game
+        // 2. NCAA-specific filters
+        if (isNCAAGame) {
+            const isConferenceFilterActive = selectedConference !== 'All';
+
+            // A) Conference Filter (if active)
+            if (isConferenceFilterActive) {
+                const homeConference = game.homeTeam.conference;
+                const awayConference = game.awayTeam.conference;
+                return homeConference === selectedConference || awayConference === selectedConference;
+            }
+            
+            // B) Power 4 Filter (if no conference is selected)
+            // Show game if at least one team is in the Power 4 list.
+            return power4TeamNames.has(game.homeTeam.name) || power4TeamNames.has(game.awayTeam.name);
+        }
+
+        // 3. Show all non-NCAA games that match the sport filter
         return true;
     })
     .sort((a, b) => {
