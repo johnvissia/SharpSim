@@ -1,16 +1,16 @@
 'use client';
 
 import { doc, Firestore, writeBatch, collection, getDocs } from 'firebase/firestore';
-import type { DailyGame, CompletedGame } from '@/lib/types';
-
-const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
+import type { DailyGame } from '@/lib/types';
 
 /**
  * Fetches daily game odds from The Odds API and saves them to Firestore.
- * This version uses a relaxed date filter and robust fetching for debugging.
  * @param firestore The Firestore instance from `useFirestore()`.
  */
 export async function fetchAndSaveDailyData(firestore: Firestore) {
+  console.log("DEBUG - CURRENT KEY:", process.env.NEXT_PUBLIC_ODDS_API_KEY);
+  const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
+
   if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') {
     const message = 'API Key for The Odds API is missing. Please add your key to .env file and restart the development server.';
     console.error(message);
@@ -51,30 +51,28 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
 
   console.log("Total Raw Games Fetched:", allGames.length); // DEBUG LOG 1
 
-  // 2. The "Safe" Filter
   const now = new Date();
-  const yesterday = new Date(now.getTime() - (24 * 60 * 60 * 1000)); // Go back 24 hours
-
+  const cutoffTime = new Date(now.getTime() - (2 * 60 * 60 * 1000));
+  
   const activeGames = allGames.filter(game => {
     const gameTime = new Date(game.commence_time);
-    return gameTime > yesterday; // Show anything from last 24hrs + Future
+    return gameTime > cutoffTime;
   });
 
-  console.log("Games After Filtering:", activeGames.length); // DEBUG LOG 2
+  console.log("Games After Filtering:", activeGames.length);
 
-  // 3. Save to Firestore
   try {
     const batch = writeBatch(firestore);
     const dailyGamesCollectionRef = collection(firestore, 'daily_games');
-
+    
     // Delete existing games to ensure a clean slate
     const existingGamesSnapshot = await getDocs(dailyGamesCollectionRef);
     if (!existingGamesSnapshot.empty) {
-      existingGamesSnapshot.forEach(doc => {
-        batch.delete(doc.ref);
-      });
+        existingGamesSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
     }
-
+    
     // Add the new, filtered games
     activeGames.forEach(game => {
       const gameData: DailyGame = {
@@ -94,8 +92,6 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
 
   } catch (error) {
     console.error('An unexpected error occurred during the Firestore saving process:', error);
-    throw error; // Re-throw to be caught by the calling UI
+    throw error;
   }
-  
-  // NOTE: Completed game score fetching has been temporarily removed for this debug version.
 }
