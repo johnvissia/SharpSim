@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { fetchAndSaveDailyData } from '@/lib/api';
 import { gradeUserBets } from '@/lib/bet-grading';
 import { getSports } from '@/lib/mock-data';
@@ -21,6 +21,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Loader } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { BetSlip } from '@/components/dashboard/BetSlip';
+import { ToastAction } from '@/components/ui/toast';
+import { generateMockGames } from '@/lib/mock-data-generator';
 
 export default function DashboardPage() {
   const [sports, setSports] = useState<Sport[]>([]);
@@ -29,6 +31,7 @@ export default function DashboardPage() {
   const [loadingSports, setLoadingSports] = useState(true);
   const [isFetchingManually, setIsFetchingManually] = useState(false);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+  const [isSeedingMocks, setIsSeedingMocks] = useState(false);
 
   const conferenceOptions = ["All", "SEC", "Big 10", "ACC", "Big 12"];
 
@@ -117,6 +120,38 @@ export default function DashboardPage() {
     runDailySync();
   }, [systemStatus, isStatusLoading, firestore, user, systemStatusRef, toast]);
 
+  const handleLoadMockData = async () => {
+    if (!firestore) return;
+    setIsSeedingMocks(true);
+    toast({ title: 'Loading Mock Data...', description: 'Replacing live games with mock data.' });
+
+    try {
+        const batch = writeBatch(firestore);
+        const gamesCollectionRef = collection(firestore, 'daily_games');
+        const mockGames = generateMockGames();
+
+        // Clear existing games
+        const existingGamesSnapshot = await getDocs(gamesCollectionRef);
+        existingGamesSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        // Add mock games
+        mockGames.forEach(game => {
+            const docRef = doc(gamesCollectionRef, game.id);
+            batch.set(docRef, game);
+        });
+
+        await batch.commit();
+        toast({ title: 'Mock Data Loaded', description: 'The dashboard is now using mock game data.' });
+    } catch (error: any) {
+        console.error("Failed to load mock data:", error);
+        toast({ variant: 'destructive', title: 'Failed to load mock data', description: error.message });
+    } finally {
+        setIsSeedingMocks(false);
+    }
+  };
+
   const handleManualFetch = async () => {
     if (!firestore || !user) return;
     setIsFetchingManually(true);
@@ -136,6 +171,12 @@ export default function DashboardPage() {
         variant: 'destructive',
         title: 'Sync Failed',
         description: error.message || 'Could not fetch data from The Odds API.',
+        action: (
+            <ToastAction altText="Load Mock Data" onClick={handleLoadMockData}>
+                Load Mock Data
+            </ToastAction>
+        ),
+        duration: 20000,
       });
     }
     setIsFetchingManually(false);
@@ -163,16 +204,16 @@ export default function DashboardPage() {
             </div>
             <Button
               onClick={handleManualFetch}
-              disabled={
-                isFetchingManually || showLoadingSpinner
-              }
+              disabled={isFetchingManually || showLoadingSpinner || isSeedingMocks}
             >
-              {isFetchingManually || isAutoSyncing ? (
+              {isSeedingMocks ? (
+                <Loader className="mr-2 h-4 w-4 animate-spin" />
+              ) : isFetchingManually || isAutoSyncing ? (
                 <Loader className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Download className="mr-2 h-4 w-4" />
               )}
-              {isAutoSyncing ? 'Auto-Sync...' : isFetchingManually ? 'Syncing...' : 'Sync Data'}
+              {isSeedingMocks ? 'Loading Mocks...' : isAutoSyncing ? 'Auto-Sync...' : isFetchingManually ? 'Syncing...' : 'Sync Data'}
             </Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

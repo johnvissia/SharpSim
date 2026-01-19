@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import type { TeamRanking } from '@/lib/types';
-import { Shield, UploadCloud, ShieldCheck } from 'lucide-react';
+import { Shield, UploadCloud, ShieldCheck, TestTube2 } from 'lucide-react';
+import { generateMockGames } from '@/lib/mock-data-generator';
 
 const placeholderJson = JSON.stringify(
   [
@@ -54,6 +55,7 @@ export default function AdminPage() {
   const [jsonInput, setJsonInput] = useState(placeholderJson);
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [seedingMocks, setSeedingMocks] = useState(false);
 
   const handleUpdateRankings = async () => {
     setLoading(true);
@@ -129,6 +131,43 @@ export default function AdminPage() {
     setSeeding(false);
   };
 
+  const handleSeedMockData = async () => {
+    if (!firestore) return;
+    setSeedingMocks(true);
+    try {
+      const batch = writeBatch(firestore);
+      const gamesCollectionRef = collection(firestore, 'daily_games');
+      const mockGames = generateMockGames();
+
+      // First, delete all existing games to ensure a clean slate
+      const existingGamesSnapshot = await getDocs(gamesCollectionRef);
+      existingGamesSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      // Then, add the new mock games
+      mockGames.forEach(game => {
+        const docRef = doc(gamesCollectionRef, game.id);
+        batch.set(docRef, game);
+      });
+
+      await batch.commit();
+
+      toast({
+        title: 'Mock Data Seeded!',
+        description: `${mockGames.length} mock games have been added to the database.`,
+      });
+    } catch (error: any) {
+      console.error('Failed to seed mock games:', error);
+      toast({
+        title: 'Mock Seeding Failed',
+        description: 'Could not write mock games to Firestore. Check console for errors.',
+        variant: 'destructive',
+      });
+    }
+    setSeedingMocks(false);
+  };
+
   return (
     <div className="p-4 md:p-8">
       <header className="mb-8">
@@ -177,6 +216,22 @@ export default function AdminPage() {
                 <Button onClick={handleSeedRankings} disabled={seeding} size="lg" variant="secondary">
                     <ShieldCheck className="mr-2 h-5 w-5" />
                     {seeding ? 'Seeding...' : 'Seed Custom Rankings'}
+                </Button>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Seed Mock Game Data</CardTitle>
+                <CardDescription>
+                    This will delete all current games and replace them with a set of mock games for development and UI testing.
+                    This is useful if you are out of API credits. The live data sync will automatically purge these mocks.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={handleSeedMockData} disabled={seedingMocks} size="lg" variant="destructive">
+                    <TestTube2 className="mr-2 h-5 w-5" />
+                    {seedingMocks ? 'Seeding Mocks...' : 'Seed Mock Games'}
                 </Button>
             </CardContent>
         </Card>

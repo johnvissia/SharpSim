@@ -66,6 +66,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "isMock": {
+            "type": "boolean",
+            "description": "Indicates if the game data is mock data for development purposes."
         }
       },
       "required": [
