@@ -111,6 +111,12 @@ export default function DashboardPage() {
           description:
             error.message ||
             'Could not run daily protocol. It will be retried on next page load.',
+          action: (
+            <ToastAction altText="Load Mock Data" onClick={handleLoadMockData}>
+                Load Mock Data
+            </ToastAction>
+          ),
+          duration: 20000,
         });
       } finally {
         setIsAutoSyncing(false);
