@@ -10,6 +10,7 @@ import { sportIconMap } from '@/lib/team-logos';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '../ui/button';
 import { MainLinesView } from './MainLinesView';
+import { PlayerPropsView } from './PlayerPropsView';
 
 interface GameDetailModalProps {
   game: Game | null;
@@ -106,9 +107,7 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                         <MainLinesView game={game} />
                     </TabsContent>
                     <TabsContent value="player-props" className="mt-4">
-                        <p className="text-center text-muted-foreground py-8">
-                            Player props content will go here.
-                        </p>
+                        <PlayerPropsView game={game} />
                     </TabsContent>
                 </Tabs>
             </div>

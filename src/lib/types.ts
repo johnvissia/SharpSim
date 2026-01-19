@@ -68,7 +68,7 @@ export interface UserBet {
   gameId: string;
   userId: string;
   sport: SportName;
-  betType: 'moneyline' | 'spread' | 'total' | 'parlay';
+  betType: 'moneyline' | 'spread' | 'total' | 'parlay' | 'player_prop';
   pick: string; // e.g., "Golden State Warriors", "Over 220.5", or "4-Leg Parlay"
   matchup?: string; // e.g. "Team A @ Team B"
   stake: number;
@@ -107,4 +107,17 @@ export interface TeamRanking {
   teamName: string;
   rank: number;
   conference: string;
+}
+
+export interface PlayerProp {
+  playerName: string;
+  point: number;
+  overOdds: number;
+  underOdds: number;
+}
+
+export interface PlayerPropMarket {
+  key: string;
+  name: string; // e.g. "Player Points"
+  props: PlayerProp[];
 }

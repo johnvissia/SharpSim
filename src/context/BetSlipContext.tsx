@@ -8,7 +8,7 @@ export interface BetSlipPick {
   game: Game;
   pick: string;
   odds: number;
-  betType: 'moneyline' | 'spread' | 'total';
+  betType: 'moneyline' | 'spread' | 'total' | 'player_prop';
 }
 
 interface BetSlipContextType {
