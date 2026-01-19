@@ -70,7 +70,7 @@ export default function MyPicksPage() {
           Track your active and settled bets here.
         </p>
       </header>
-      <div className="space-y-4">
+      <div className="space-y-6">
         {(!bets || bets.length === 0) ? (
             <Card>
                 <CardContent className="p-6 text-center text-muted-foreground">
@@ -89,18 +89,21 @@ export default function MyPicksPage() {
                 }
 
                 return (
-                    <Card key={bet.id} className="shadow-md">
-                    <CardContent className="p-4 flex justify-between items-center gap-4">
-                        <div className="flex-grow">
-                        <p className="font-semibold text-lg">{bet.pick} <span className="text-muted-foreground font-normal">({bet.odds > 0 ? `+${bet.odds}`: bet.odds})</span></p>
-                        <p className="text-sm text-muted-foreground">{gameInfo}</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-2 text-right">
-                        {getBetStatusBadge(bet.status)}
-                        <p className="text-sm">Stake: {bet.stake.toFixed(2)} coins</p>
-                        <p className="text-sm">To Win: {(bet.potentialWinnings - bet.stake).toFixed(2)} coins</p>
-                        </div>
-                    </CardContent>
+                    <Card key={bet.id} className="ticket">
+                        <CardContent className="!p-0">
+                            <div className="flex justify-between items-start p-4">
+                                <div className="flex-grow">
+                                    <p className="font-semibold text-lg">{bet.pick} <span className="font-mono text-muted-foreground font-normal">({bet.odds > 0 ? `+${bet.odds}`: bet.odds})</span></p>
+                                    <p className="text-sm text-muted-foreground">{gameInfo}</p>
+                                </div>
+                                {getBetStatusBadge(bet.status)}
+                            </div>
+                            <div className="border-t-2 border-dashed border-border/50 mx-4" />
+                            <div className="flex justify-between items-center p-4 text-sm text-muted-foreground">
+                                <p className="font-mono">Stake: <span className="font-semibold text-foreground">{bet.stake.toFixed(2)} coins</span></p>
+                                <p className="font-mono">To Win: <span className="font-semibold text-green-600">{(bet.potentialWinnings - bet.stake).toFixed(2)} coins</span></p>
+                            </div>
+                        </CardContent>
                     </Card>
                 );
             })

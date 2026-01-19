@@ -100,3 +100,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .ticket {
+    @apply relative;
+  }
+  .ticket::before,
+  .ticket::after {
+    content: '';
+    @apply absolute w-8 h-8 bg-background rounded-full top-1/2 -translate-y-1/2;
+  }
+  .ticket::before {
+    @apply -left-4;
+  }
+  .ticket::after {
+    @apply -right-4;
+  }
+}
