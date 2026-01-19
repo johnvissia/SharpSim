@@ -1,6 +1,6 @@
 'use client';
 
-import { doc, Firestore, writeBatch, collection, getDocs } from 'firebase/firestore';
+import { doc, Firestore, writeBatch, collection, getDocs, query, where } from 'firebase/firestore';
 import type { DailyGame, CompletedGame } from '@/lib/types';
 
 // Helper function to introduce a delay
@@ -32,6 +32,8 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
 
   // 1. Fetch Upcoming Game Odds Sequentially
   const allGames = [];
+  const successfullyFetchedSportKeys: string[] = [];
+
   try {
     for (const sport of sportsMap) {
       console.log(`Fetching odds for ${sport.label}...`);
@@ -43,6 +45,7 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
         }
         const data = await res.json();
         allGames.push(...data);
+        successfullyFetchedSportKeys.push(sport.key); // Add to successful list
       } catch (err) {
         console.error(`Error fetching ${sport.label}:`, err);
         // Continue to the next sport even if one fails
@@ -65,11 +68,17 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
     const dailyGamesBatch = writeBatch(firestore);
     const dailyGamesCollectionRef = collection(firestore, 'daily_games');
     
-    const existingGamesSnapshot = await getDocs(dailyGamesCollectionRef);
-    if (!existingGamesSnapshot.empty) {
-        existingGamesSnapshot.forEach(doc => {
-            dailyGamesBatch.delete(doc.ref);
-        });
+    // --- Safer Update Logic ---
+    // Only delete games for sports that we successfully fetched new data for.
+    if (successfullyFetchedSportKeys.length > 0) {
+        const q = query(dailyGamesCollectionRef, where('sportKey', 'in', successfullyFetchedSportKeys));
+        const existingGamesSnapshot = await getDocs(q);
+        if (!existingGamesSnapshot.empty) {
+            console.log(`Deleting ${existingGamesSnapshot.size} existing games for successfully fetched sports.`);
+            existingGamesSnapshot.forEach(doc => {
+                dailyGamesBatch.delete(doc.ref);
+            });
+        }
     }
     
     activeGames.forEach(game => {
@@ -85,8 +94,12 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
       dailyGamesBatch.set(gameRef, gameData);
     });
 
-    await dailyGamesBatch.commit();
-    console.log(`${activeGames.length} active games saved to Firestore.`);
+    if (activeGames.length > 0 || (successfullyFetchedSportKeys.length > 0 && activeGames.length === 0)) {
+        await dailyGamesBatch.commit();
+        console.log(`${activeGames.length} active games saved to Firestore.`);
+    } else {
+        console.log("No new games to save and no old games to delete.");
+    }
 
   } catch (error) {
     console.error('An unexpected error occurred during the Firestore daily games saving process:', error);
