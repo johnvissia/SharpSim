@@ -210,9 +210,9 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
                         <CardContent>
                             <div className="text-2xl font-bold">{summaryStats.overallRecord}</div>
                             {summaryStats.isHomeCourtHero && (
-                                <p className="text-xs text-muted-foreground mt-1">
+                                <div className="text-xs text-muted-foreground mt-1">
                                     <Badge variant="secondary">🏠 Home Court Hero</Badge>
-                                </p>
+                                </div>
                             )}
                         </CardContent>
                     </Card>
