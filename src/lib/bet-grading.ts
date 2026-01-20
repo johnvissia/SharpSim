@@ -84,71 +84,75 @@ export async function gradeUserBets(firestore: Firestore, user: User) {
     
     // --- PARLAY GRADING LOGIC ---
     if (bet.betType === 'parlay' && bet.legs) {
-        let overallParlayStatus: UserBet['status'] = 'won'; // Assume won until a loss is found
-        let activePushLegs = 0;
+        let isFinalized = true; // Assume the parlay is fully graded until a pending leg is found
+        let hasLostLeg = false;
+        let pushCount = 0;
 
         const updatedLegs = bet.legs.map(leg => {
-            const game = completedGames.get(leg.gameId);
-            if (!game) {
-                overallParlayStatus = 'pending';
+            if (leg.status !== 'pending') { // If leg is already graded, just check its status for the overall parlay
+                if (leg.status === 'lost') hasLostLeg = true;
+                if (leg.status === 'push') pushCount++;
                 return leg;
             }
 
+            const game = completedGames.get(leg.gameId);
+            if (!game) {
+                isFinalized = false; // This leg's game is not over, so the parlay isn't finalized yet
+                return leg;
+            }
+
+            // The game for this leg is over, so let's grade it
             let legStatus: UserBet['status'] = 'lost';
             const legAsBetForGrading = { pick: leg.pick };
 
             switch(leg.betType) {
-                case 'moneyline':
-                    legStatus = gradeMoneyline(legAsBetForGrading, game);
-                    break;
-                case 'total':
-                    legStatus = gradeTotal(legAsBetForGrading, game);
-                    break;
-                case 'spread':
-                    legStatus = gradeSpread(legAsBetForGrading, game);
-                    break;
+                case 'moneyline': legStatus = gradeMoneyline(legAsBetForGrading, game); break;
+                case 'total': legStatus = gradeTotal(legAsBetForGrading, game); break;
+                case 'spread': legStatus = gradeSpread(legAsBetForGrading, game); break;
             }
 
-            if (legStatus === 'lost') {
-                overallParlayStatus = 'lost';
-            }
-            if (legStatus === 'push') {
-                activePushLegs++;
-            }
-
+            if (legStatus === 'lost') hasLostLeg = true;
+            if (legStatus === 'push') pushCount++;
+            
             return { ...leg, status: legStatus };
         });
 
-        if (updatedLegs.some(leg => leg.status === 'pending')) {
-            overallParlayStatus = 'pending';
+        // If the parlay is not finalized, just update the legs array to show partial progress.
+        // The overall bet status remains 'pending'.
+        if (!isFinalized) {
+            batch.update(betDoc.ref, { legs: updatedLegs });
+            return; // Move to the next bet in the snapshot
+        }
+        
+        // If we reach here, all games in the parlay have finished. We can set a final status.
+        let finalStatus: UserBet['status'];
+        if (hasLostLeg) {
+            finalStatus = 'lost';
+        } else if (pushCount === bet.legs.length) {
+            finalStatus = 'push'; // All legs were pushes
+        } else {
+            finalStatus = 'won'; // No losses, and at least one win
         }
 
-        if (overallParlayStatus === 'pending') {
-            return;
-        }
-
-        if (activePushLegs === bet.legs.length) {
-            overallParlayStatus = 'push';
-        }
-
-        batch.update(betDoc.ref, { status: overallParlayStatus, legs: updatedLegs });
+        batch.update(betDoc.ref, { status: finalStatus, legs: updatedLegs });
         gradedCount++;
         
-        if (overallParlayStatus === 'won') {
-            // TODO: In a real app, recalculate odds if there were pushes. For now, pay out full amount.
+        if (finalStatus === 'won') {
+            // For simulation, we pay out the full amount even if there are pushes.
+            // A real app would recalculate odds.
             totalPayout += bet.potentialWinnings;
-        } else if (overallParlayStatus === 'push') {
-            totalPayout += bet.stake;
+        } else if (finalStatus === 'push') {
+            totalPayout += bet.stake; // Return the original stake
         }
         
         return; // Done with this parlay, move to the next bet
     }
 
-    // --- SINGLE BET GRADING LOGIC (existing) ---
+    // --- SINGLE BET GRADING LOGIC ---
     const game = completedGames.get(bet.gameId);
 
     if (!game) {
-      return; 
+      return; // This bet's game hasn't finished yet.
     }
 
     let newStatus: UserBet['status'] = 'lost';
