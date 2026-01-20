@@ -1,11 +1,11 @@
 'use client';
 
-import type { UserBet } from '@/lib/types';
+import type { UserBet, ParlayLeg } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, MinusCircle } from 'lucide-react';
 
 const getBetStatusBadge = (status: UserBet['status']) => {
   if (status === 'pending') return <Badge variant="secondary">Pending</Badge>;
@@ -21,15 +21,28 @@ export function BetTicket({ bet }: { bet: UserBet }) {
   return (
     <Card className={cn(
       "ticket transition-colors",
-      { 'bg-green-100 dark:bg-green-500/10': bet.status === 'won' }
+      { 'bg-green-100 dark:bg-green-500/10': bet.status === 'won' },
+      { 'bg-red-100/50 dark:bg-red-500/10': bet.status === 'lost' }
     )}>
       <CardContent className="!p-0">
         {isParlay && bet.legs ? (
           <>
             <div className="p-4 space-y-4">
               {bet.legs.map((leg, index) => {
-                const Icon = leg.status === 'won' ? CheckCircle2 : leg.status === 'lost' ? XCircle : Clock;
-                const iconColor = leg.status === 'won' ? 'text-green-500' : leg.status === 'lost' ? 'text-red-500' : 'text-muted-foreground';
+                const getLegIconDetails = (status: ParlayLeg['status']) => {
+                  switch (status) {
+                    case 'won':
+                      return { Icon: CheckCircle2, color: 'text-green-500' };
+                    case 'lost':
+                      return { Icon: XCircle, color: 'text-red-500' };
+                    case 'push':
+                      return { Icon: MinusCircle, color: 'text-gray-500' };
+                    default: // pending
+                      return { Icon: Clock, color: 'text-muted-foreground' };
+                  }
+                };
+
+                const { Icon, color: iconColor } = getLegIconDetails(leg.status);
                 const gameDate = new Date(leg.commenceTime);
                 const gameTime = gameDate.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
