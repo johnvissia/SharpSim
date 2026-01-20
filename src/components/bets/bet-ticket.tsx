@@ -9,11 +9,34 @@ import { CheckCircle2, XCircle, Clock, MinusCircle } from 'lucide-react';
 
 const getBetStatusBadge = (status: UserBet['status']) => {
   if (status === 'pending') return <Badge variant="secondary">Pending</Badge>;
-  if (status === 'won') return <Badge className="bg-green-500 text-white">Won</Badge>;
+  if (status === 'won') return <Badge className="bg-green-500 text-white hover:bg-green-500/90">Won</Badge>;
   if (status === 'lost') return <Badge variant="destructive">Lost</Badge>;
   if (status === 'push') return <Badge>Push</Badge>;
   return <Badge variant="outline">{status}</Badge>;
 };
+
+const LegProgressBadge = ({ legs }: { legs: ParlayLeg[] }) => {
+    const totalLegs = legs.length;
+    const wonLegs = legs.filter(leg => leg.status === 'won').length;
+
+    const isPerfect = wonLegs === totalLegs;
+    const isHeartbreaker = wonLegs === totalLegs - 1 && totalLegs > 1;
+
+    let badgeClass = "bg-secondary text-secondary-foreground hover:bg-secondary/80"; // Gray/Neutral
+
+    if (isPerfect && totalLegs > 0) {
+        badgeClass = "bg-yellow-400 text-black hover:bg-yellow-400/80"; // Gold
+    } else if (isHeartbreaker) {
+        badgeClass = "bg-orange-500 text-white hover:bg-orange-500/80"; // Orange
+    }
+
+    return (
+        <Badge className={cn("border-transparent", badgeClass)}>
+            {wonLegs}/{totalLegs} Hit
+        </Badge>
+    );
+};
+
 
 export function BetTicket({ bet }: { bet: UserBet }) {
   const isParlay = bet.betType === 'parlay';
@@ -71,7 +94,10 @@ export function BetTicket({ bet }: { bet: UserBet }) {
                 <p>{bet.pick}</p>
                 <div className="flex items-center gap-4">
                   <p className="font-mono">{bet.odds > 0 ? `+${bet.odds}`: bet.odds}</p>
-                  {getBetStatusBadge(bet.status)}
+                  <div className="flex items-center gap-2">
+                    {isParlay && bet.status !== 'pending' && <LegProgressBadge legs={bet.legs} />}
+                    {getBetStatusBadge(bet.status)}
+                  </div>
                 </div>
               </div>
               <div className="flex justify-between items-center text-sm text-muted-foreground font-mono">
