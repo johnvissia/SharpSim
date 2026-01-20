@@ -100,36 +100,59 @@ export default function StatsPage() {
         return true;
     });
 
+    // First, handle overall profit/loss which is always ticket-based
     for (const bet of filteredBets) {
-        // Initialize sport stats if not present
-        if (!bySport[bet.sport]) {
-            bySport[bet.sport] = initialSportStats();
+        overall.totalWagered += bet.stake;
+        if (bet.status === 'won') {
+            overall.netProfit += (bet.potentialWinnings - bet.stake);
+        } else if (bet.status === 'lost') {
+            overall.netProfit -= bet.stake;
         }
-        const sportStats = bySport[bet.sport]!;
-
-        // Update overall and sport-specific stats
-        [overall, sportStats].forEach(s => {
-            s.totalBets += 1;
-            s.totalWagered += bet.stake;
-
-            switch (bet.status) {
-                case 'won':
-                    s.wins += 1;
-                    s.netProfit += (bet.potentialWinnings - bet.stake);
-                    break;
-                case 'lost':
-                    s.losses += 1;
-                    s.netProfit -= bet.stake;
-                    break;
-                case 'push':
-                    s.pushes += 1;
-                    break;
-                case 'pending':
-                    s.pending += 1;
-                    break;
-            }
-        });
+        // 'push' status correctly results in no change to netProfit
     }
+    
+    // Second, handle leg-based win/loss records for by-sport and overall
+    for (const bet of filteredBets) {
+        if (bet.betType === 'parlay' && bet.legs) {
+            for (const leg of bet.legs) {
+                if (!bySport[leg.sport]) {
+                    bySport[leg.sport] = initialSportStats();
+                }
+                const sportStats = bySport[leg.sport]!;
+                sportStats.totalBets += 1;
+                
+                switch(leg.status) {
+                    case 'won': sportStats.wins += 1; break;
+                    case 'lost': sportStats.losses += 1; break;
+                    case 'push': sportStats.pushes += 1; break;
+                    case 'pending': sportStats.pending += 1; break;
+                }
+            }
+        } else {
+            // Straight bet
+            if (!bySport[bet.sport]) {
+                bySport[bet.sport] = initialSportStats();
+            }
+            const sportStats = bySport[bet.sport]!;
+            sportStats.totalBets += 1;
+
+             switch (bet.status) {
+                case 'won': sportStats.wins += 1; break;
+                case 'lost': sportStats.losses += 1; break;
+                case 'push': sportStats.pushes += 1; break;
+                case 'pending': sportStats.pending += 1; break;
+            }
+        }
+    }
+
+    // Aggregate by-sport stats into the overall stats for win/loss record
+    Object.values(bySport).forEach(sportStats => {
+        overall.wins += sportStats.wins;
+        overall.losses += sportStats.losses;
+        overall.pushes += sportStats.pushes;
+        overall.pending += sportStats.pending;
+        overall.totalBets += sportStats.totalBets;
+    });
 
     const settledCount = overall.wins + overall.losses;
     const winPercentage = settledCount > 0 ? (overall.wins / settledCount) * 100 : 0;

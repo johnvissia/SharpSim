@@ -40,8 +40,43 @@ export default function SportStatsPage() {
 
     const sportBets = useMemo(() => {
         if (!allBets) return [];
-        return allBets.filter(bet => bet.sport === sportName);
+        // Include straight bets for the sport, and parlays that have at least one leg for the sport.
+        return allBets.filter(bet => {
+            if (bet.betType !== 'parlay') {
+                return bet.sport === sportName;
+            }
+            if (bet.betType === 'parlay' && bet.legs) {
+                return bet.legs.some(leg => leg.sport === sportName);
+            }
+            return false;
+        });
     }, [allBets, sportName]);
+
+    const sportRecord = useMemo(() => {
+        let wins = 0;
+        let losses = 0;
+        let pushes = 0;
+
+        for (const bet of sportBets) {
+            if (bet.betType === 'parlay' && bet.legs) {
+                for (const leg of bet.legs) {
+                    if (leg.sport === sportName) {
+                        if (leg.status === 'won') wins++;
+                        if (leg.status === 'lost') losses++;
+                        if (leg.status === 'push') pushes++;
+                    }
+                }
+            } else { // Straight bet
+                if (bet.status === 'won') wins++;
+                if (bet.status === 'lost') losses++;
+                if (bet.status === 'push') pushes++;
+            }
+        }
+        const total = wins + losses;
+        const winPct = total > 0 ? (wins / total) * 100 : 0;
+        return { wins, losses, pushes, winPct: winPct.toFixed(1) };
+    }, [sportBets, sportName]);
+
 
     const mostBetOnTeams = useMemo(() => {
         const teamCounts: Record<string, number> = {};
@@ -49,12 +84,15 @@ export default function SportStatsPage() {
         for (const bet of sportBets) {
             if (bet.betType === 'parlay' && bet.legs) {
                 for (const leg of bet.legs) {
-                    const team = getTeamFromPick(leg.pick, leg.betType);
-                    if (team) {
-                        teamCounts[team] = (teamCounts[team] || 0) + 1;
+                    // Only count legs that match the current sport page
+                    if (leg.sport === sportName) {
+                        const team = getTeamFromPick(leg.pick, leg.betType);
+                        if (team) {
+                            teamCounts[team] = (teamCounts[team] || 0) + 1;
+                        }
                     }
                 }
-            } else {
+            } else { // Straight bet
                  const team = getTeamFromPick(bet.pick, bet.betType);
                  if (team) {
                     teamCounts[team] = (teamCounts[team] || 0) + 1;
@@ -66,7 +104,7 @@ export default function SportStatsPage() {
             .sort((a, b) => b[1] - a[1])
             .slice(0, 3);
 
-    }, [sportBets]);
+    }, [sportBets, sportName]);
 
     if (loading) {
         return (
@@ -91,7 +129,7 @@ export default function SportStatsPage() {
                     </Link>
                 </Button>
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                    {sportName} Betting Stats
+                    {sportName} Betting Stats ({sportRecord.wins}-{sportRecord.losses})
                 </h1>
             </header>
 

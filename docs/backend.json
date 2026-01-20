@@ -43,9 +43,10 @@
                     "pick": { "type": "string" },
                     "betType": { "type": "string" },
                     "odds": { "type": "number" },
-                    "status": { "type": "string", "enum": ["pending", "won", "lost", "push"] }
+                    "status": { "type": "string", "enum": ["pending", "won", "lost", "push"] },
+                    "sport": { "type": "string" }
                 },
-                "required": ["gameId", "matchup", "commenceTime", "pick", "betType", "odds", "status"]
+                "required": ["gameId", "matchup", "commenceTime", "pick", "betType", "odds", "status", "sport"]
             }
         }
       },

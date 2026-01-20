@@ -57,6 +57,7 @@ export interface ParlayLeg {
   betType: 'moneyline' | 'spread' | 'total';
   odds: number;
   status: 'pending' | 'won' | 'lost' | 'push'; // Individual leg status
+  sport: SportName;
 }
 
 export interface UserProfile {

@@ -192,6 +192,7 @@ export function BetSlip() {
             betType: p.betType,
             odds: p.odds,
             status: 'pending',
+            sport: p.game.sport,
         }));
 
         newBet = {
