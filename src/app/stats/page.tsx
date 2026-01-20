@@ -56,7 +56,6 @@ type SportStats = {
     losses: number;
     pushes: number;
     pending: number;
-    totalBets: number;
     totalWagered: number;
     netProfit: number;
 };
@@ -82,12 +81,19 @@ export default function StatsPage() {
         losses: 0,
         pushes: 0,
         pending: 0,
-        totalBets: 0,
         totalWagered: 0,
         netProfit: 0,
     });
 
-    const overall = initialSportStats();
+    const overall = {
+        wins: 0, // Leg-based for Win Rate card
+        losses: 0, // Leg-based for Win Rate card
+        pushes: 0,
+        pending: 0,
+        totalBets: 0, // Slip-based for Total Bets card
+        totalWagered: 0,
+        netProfit: 0,
+    };
     const bySport: Partial<Record<SportName, SportStats>> = {};
 
     if (!bets) {
@@ -100,68 +106,85 @@ export default function StatsPage() {
         return true;
     });
 
-    // First, handle overall profit/loss which is always ticket-based
+    overall.totalBets = filteredBets.length;
+
     for (const bet of filteredBets) {
+        // Overall ticket-based calculations for wagered and profit
         overall.totalWagered += bet.stake;
         if (bet.status === 'won') {
             overall.netProfit += (bet.potentialWinnings - bet.stake);
         } else if (bet.status === 'lost') {
             overall.netProfit -= bet.stake;
         }
-        // 'push' status correctly results in no change to netProfit
-    }
-    
-    // Second, handle leg-based win/loss records for by-sport and overall
-    for (const bet of filteredBets) {
-        if (bet.betType === 'parlay' && bet.legs) {
-            for (const leg of bet.legs) {
-                if (!bySport[leg.sport]) {
-                    bySport[leg.sport] = initialSportStats();
-                }
-                const sportStats = bySport[leg.sport]!;
-                sportStats.totalBets += 1;
-                
-                switch(leg.status) {
-                    case 'won': sportStats.wins += 1; break;
-                    case 'lost': sportStats.losses += 1; break;
-                    case 'push': sportStats.pushes += 1; break;
-                    case 'pending': sportStats.pending += 1; break;
-                }
-            }
-        } else {
-            // Straight bet
-            if (!bySport[bet.sport]) {
-                bySport[bet.sport] = initialSportStats();
-            }
-            const sportStats = bySport[bet.sport]!;
-            sportStats.totalBets += 1;
 
-             switch (bet.status) {
+        // Determine legs for W-L calculation
+        const legsToProcess = bet.legs ? bet.legs : [{...bet, status: bet.status, sport: bet.sport}];
+
+        const involvedSportsForTicket = new Set<SportName>();
+        legsToProcess.forEach(l => {
+          if (l.sport) involvedSportsForTicket.add(l.sport);
+        });
+
+        for (const leg of legsToProcess) {
+            const sport = leg.sport;
+            if (!sport) continue; // Guard against old data without sport on leg
+
+            if (!bySport[sport]) {
+                bySport[sport] = initialSportStats();
+            }
+            const sportStats = bySport[sport]!;
+
+            switch(leg.status) {
                 case 'won': sportStats.wins += 1; break;
                 case 'lost': sportStats.losses += 1; break;
                 case 'push': sportStats.pushes += 1; break;
                 case 'pending': sportStats.pending += 1; break;
             }
         }
+        
+        // Distribute wager/profit across involved sports for that ticket
+        if (involvedSportsForTicket.size > 0) {
+          const profit = (bet.status === 'won' ? (bet.potentialWinnings - bet.stake) : (bet.status === 'lost' ? -bet.stake : 0));
+          const profitPerSport = profit / involvedSportsForTicket.size;
+          const wagerPerSport = bet.stake / involvedSportsForTicket.size;
+
+          involvedSportsForTicket.forEach(sport => {
+            const sportStats = bySport[sport];
+            if (sportStats) {
+                sportStats.netProfit += profitPerSport;
+                sportStats.totalWagered += wagerPerSport;
+            }
+          });
+        }
     }
 
-    // Aggregate by-sport stats into the overall stats for win/loss record
+    // Aggregate leg-based W/L into overall W/L for the top-level card
+    let totalLegWins = 0;
+    let totalLegLosses = 0;
+    let totalPending = 0;
     Object.values(bySport).forEach(sportStats => {
-        overall.wins += sportStats.wins;
-        overall.losses += sportStats.losses;
-        overall.pushes += sportStats.pushes;
-        overall.pending += sportStats.pending;
-        overall.totalBets += sportStats.totalBets;
+        if(sportStats) {
+            totalLegWins += sportStats.wins;
+            totalLegLosses += sportStats.losses;
+            totalPending += sportStats.pending;
+        }
     });
 
-    const settledCount = overall.wins + overall.losses;
-    const winPercentage = settledCount > 0 ? (overall.wins / settledCount) * 100 : 0;
+    const settledLegCount = totalLegWins + totalLegLosses;
+    const winPercentage = settledLegCount > 0 ? (totalLegWins / settledLegCount) * 100 : 0;
+    
+    overall.wins = totalLegWins;
+    overall.losses = totalLegLosses;
+    overall.pending = totalPending;
     
     return { overall, bySport, winPercentage };
   }, [bets, filter]);
 
   const sortedSports = useMemo(() => {
-    return Object.entries(stats.bySport).sort(([, a], [, b]) => b.totalBets - a.totalBets);
+    return Object.entries(stats.bySport).sort(([, a], [, b]) => {
+        if (!a || !b) return 0;
+        return (b.wins + b.losses) - (a.wins + a.losses);
+    });
   }, [stats.bySport]);
 
   return (
@@ -188,28 +211,28 @@ export default function StatsPage() {
                         title="Total Bets"
                         value={stats.overall.totalBets.toString()}
                         icon={<Target className="h-4 w-4 text-muted-foreground" />}
-                        description={`${stats.overall.pending} pending`}
+                        description={`${stats.overall.pending} pending legs`}
                         loading={loading}
                     />
                     <StatCard
                         title="Win Rate"
                         value={`${stats.winPercentage.toFixed(1)}%`}
                         icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
-                        description={`${stats.overall.wins}W - ${stats.overall.losses}L`}
+                        description={`${stats.overall.wins}W - ${stats.overall.losses}L (by leg)`}
                         loading={loading}
                     />
                     <StatCard
                         title="Total Wagered"
                         value={`${stats.overall.totalWagered.toFixed(2)} coins`}
                         icon={<Coins className="h-4 w-4 text-muted-foreground" />}
-                        description="Total amount staked on all bets."
+                        description="Total amount staked on all slips."
                         loading={loading}
                     />
                     <StatCard
                         title="Net Profit / Loss"
                         value={`${stats.overall.netProfit.toFixed(2)} coins`}
                         icon={<Coins className={cn("h-4 w-4", stats.overall.netProfit >= 0 ? 'text-green-500' : 'text-destructive')} />}
-                        description="Based on settled bets."
+                        description="Based on settled slips."
                         loading={loading}
                     />
                 </div>
@@ -217,7 +240,7 @@ export default function StatsPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Performance by Sport</CardTitle>
-                        <CardDescription>A breakdown of your performance. Click a sport for more details.</CardDescription>
+                        <CardDescription>A breakdown of your performance by leg. Click a sport for more details.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {loading ? (
@@ -239,6 +262,7 @@ export default function StatsPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {sortedSports.map(([sport, sportStats]) => {
+                                        if (!sportStats) return null;
                                         const settledCount = sportStats.wins + sportStats.losses;
                                         const winRate = settledCount > 0 ? (sportStats.wins / settledCount) * 100 : 0;
                                         return (
