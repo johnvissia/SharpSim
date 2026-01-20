@@ -15,6 +15,38 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+const renderMargin = (result: 'W' | 'L', margin: number) => {
+    const absMargin = Math.abs(margin);
+
+    if (result === 'W') {
+        if (absMargin >= 1 && absMargin <= 3) {
+            return (
+                <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-yellow-500" />
+                    <span className="text-yellow-600">Close Win</span>
+                </div>
+            );
+        }
+        if (absMargin >= 15) {
+            return <span className="font-bold text-green-600">Blowout</span>;
+        }
+        return <span className="text-green-600">+{absMargin}</span>;
+    }
+
+    // It's a loss
+    if (absMargin >= 15) {
+        return <span className="font-bold text-destructive">Crushed</span>;
+    }
+    return <span className="text-destructive">-{absMargin}</span>;
+}
+
+const renderRest = (restDays?: number) => {
+    if (restDays === undefined) return <span className="text-muted-foreground">-</span>;
+    if (restDays === 0) return <Badge variant="destructive">B2B</Badge>;
+    if (restDays >= 3) return <span className="text-green-600 font-medium">{restDays}d Rest</span>
+    return <span className="text-muted-foreground">-</span>;
+}
+
 export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, teamName: string, sport: string }) {
     const [trends, setTrends] = useState<TeamTrend[] | null>(null);
     const [loading, setLoading] = useState(true);
@@ -46,17 +78,25 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
     
     if (loading) {
         return (
-            <div className="space-y-3 p-6">
-                {Array.from({ length: 10 }).map((_, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 w-full">
-                            <Skeleton className="h-5 w-16" />
-                            <Skeleton className="h-5 w-32" />
-                            <Skeleton className="h-5 w-24" />
-                            <Skeleton className="h-5 flex-1" />
-                        </div>
-                    </div>
-                ))}
+            <div className="space-y-1 p-2">
+                 <Table>
+                    <TableHeader>
+                        <TableRow>
+                            {Array.from({ length: 7 }).map((_, i) => (
+                                <TableHead key={i}><Skeleton className="h-5 w-16" /></TableHead>
+                            ))}
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {Array.from({ length: 10 }).map((_, i) => (
+                            <TableRow key={i}>
+                                {Array.from({ length: 7 }).map((_, j) => (
+                                    <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             </div>
         )
     }
@@ -77,7 +117,6 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
                 return <Badge variant="destructive">No Cover</Badge>;
             case 'Push':
                 return <Badge variant="secondary">Push</Badge>;
-            case 'N/A':
             default:
                 return <span className="text-muted-foreground">-</span>;
         }
@@ -89,7 +128,6 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
             case 'Under':
             case 'Push':
                 return <Badge variant="secondary">{status}</Badge>;
-            case 'N/A':
             default:
                 return <span className="text-muted-foreground">-</span>;
         }
@@ -102,6 +140,8 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
                     <TableHead className="w-[100px]">Date</TableHead>
                     <TableHead>Matchup</TableHead>
                     <TableHead>Result</TableHead>
+                    <TableHead>Margin</TableHead>
+                    <TableHead>Rest</TableHead>
                     <TableHead className="text-center">Spread (ATS)</TableHead>
                     <TableHead className="text-center">Total (O/U)</TableHead>
                 </TableRow>
@@ -116,6 +156,12 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
                         </TableCell>
                         <TableCell className={cn("font-semibold", game.result === 'W' ? 'text-green-600' : 'text-destructive')}>
                             {game.result} {game.score}
+                        </TableCell>
+                        <TableCell>
+                            {renderMargin(game.result, game.margin)}
+                        </TableCell>
+                         <TableCell>
+                            {renderRest(game.restDays)}
                         </TableCell>
                         <TableCell className="text-center">{renderAtsBadge(game.ats)}</TableCell>
                         <TableCell className="text-center">{renderOuBadge(game.ou)}</TableCell>

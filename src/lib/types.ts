@@ -128,6 +128,7 @@ export interface PlayerPropMarket {
 
 export interface TeamTrend {
   date: string;
+  fullDate: string;
   opponent: {
     name: string;
     logo: string;
@@ -137,4 +138,6 @@ export interface TeamTrend {
   score: string; // e.g., "112-105"
   ats: 'Cover' | 'No Cover' | 'Push' | 'N/A';
   ou: 'Over' | 'Under' | 'Push' | 'N/A';
+  margin: number;
+  restDays?: number;
 }

@@ -1,6 +1,7 @@
 'use server';
 
 import type { TeamTrend } from './types';
+import { differenceInCalendarDays } from 'date-fns';
 
 // Minimal types for ESPN Schedule API response
 interface EspnScheduleCompetitor {
@@ -65,16 +66,16 @@ export async function fetchTeamTrends(teamId: string): Promise<TeamTrend[]> {
 
     const completedGames = scheduleData.events
         .filter(event => event.competitions[0]?.status?.type.completed)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 10);
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    return completedGames.map(event => {
+    const trends: TeamTrend[] = completedGames.map((event, index, allCompleted) => {
         const competition = event.competitions[0];
         const myTeam = competition.competitors.find(c => c.id === teamId)!;
         const opponent = competition.competitors.find(c => c.id !== teamId)!;
 
         const myScore = myTeam.score.value;
         const opponentScore = opponent.score.value;
+        const margin = myScore - opponentScore;
 
         // ATS and O/U Logic
         let atsResult: TeamTrend['ats'] = 'N/A';
@@ -92,30 +93,41 @@ export async function fetchTeamTrends(teamId: string): Promise<TeamTrend[]> {
 
 
             // ATS
-            if (odds.details) {
-                if (odds.details.toUpperCase() === 'EVEN') {
-                    atsResult = 'Push';
-                } else {
-                    const parts = odds.details.split(' ');
-                    if (parts.length >= 2) {
-                        const favoriteAbbrev = parts[0];
-                        const spread = parseFloat(parts[1]);
+            if (odds.details && odds.details.toUpperCase() !== 'EVEN') {
+                const parts = odds.details.split(' ');
+                if (parts.length >= 2) {
+                    const favoriteAbbrev = parts[0];
+                    const spread = parseFloat(parts[1]);
 
-                        if (!isNaN(spread)) {
-                             const myTeamSpread = myTeam.team.abbreviation === favoriteAbbrev ? spread : -spread;
-                            const margin = myScore - opponentScore;
-
-                            if (margin + myTeamSpread > 0) atsResult = 'Cover';
-                            else if (margin + myTeamSpread < 0) atsResult = 'No Cover';
-                            else atsResult = 'Push';
-                        }
+                    if (!isNaN(spread)) {
+                        const myTeamLine = myTeam.team.abbreviation === favoriteAbbrev ? spread : -spread;
+                        const coverMargin = margin + myTeamLine;
+                        
+                        if (coverMargin > 0) atsResult = 'Cover';
+                        else if (coverMargin < 0) atsResult = 'No Cover';
+                        else atsResult = 'Push';
                     }
                 }
+            } else if (odds.details && odds.details.toUpperCase() === 'EVEN') {
+                 if (margin > 0) atsResult = 'Cover';
+                 else if (margin < 0) atsResult = 'No Cover';
+                 else atsResult = 'Push';
             }
         }
+        
+        // Rest days calculation
+        let restDays: number | undefined = undefined;
+        const previousGame = allCompleted[index + 1];
+        if (previousGame) {
+            const currentGameDate = new Date(event.date);
+            const previousGameDate = new Date(previousGame.date);
+            restDays = differenceInCalendarDays(currentGameDate, previousGameDate);
+        }
+
 
         return {
             date: new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            fullDate: event.date,
             opponent: {
                 name: opponent.team.displayName,
                 logo: opponent.team.logo,
@@ -125,6 +137,10 @@ export async function fetchTeamTrends(teamId: string): Promise<TeamTrend[]> {
             score: `${myScore}-${opponentScore}`,
             ats: atsResult,
             ou: ouResult,
+            margin,
+            restDays,
         };
-    });
+    }).slice(0, 10);
+
+    return trends;
 }
