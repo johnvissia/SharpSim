@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { fetchTeamTrends } from '@/lib/espn-trends';
 import type { TeamTrend } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TrendingUp } from 'lucide-react';
+
 
 const renderMargin = (result: 'W' | 'L', margin: number) => {
     const absMargin = Math.abs(margin);
@@ -44,7 +47,7 @@ const renderRest = (restDays?: number) => {
     if (restDays === undefined) return <span className="text-muted-foreground">-</span>;
     if (restDays === 0) return <Badge variant="destructive">B2B</Badge>;
     if (restDays >= 3) return <span className="text-green-600 font-medium">{restDays}d Rest</span>
-    return <span className="text-muted-foreground">-</span>;
+    return <span className="text-muted-foreground">{restDays}d Rest</span>;
 }
 
 export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, teamName: string, sport: string }) {
@@ -76,9 +79,68 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
         getTrends();
     }, [teamId, teamName, sport]);
     
+    const summaryStats = useMemo(() => {
+        if (!trends || trends.length === 0) {
+            return null;
+        }
+
+        let homeWins = 0;
+        let homeLosses = 0;
+        let homeMarginSum = 0;
+        let awayWins = 0;
+        let awayLosses = 0;
+        let awayMarginSum = 0;
+
+        trends.forEach(game => {
+            if (game.opponent.at === 'vs') { // Home game
+                homeMarginSum += game.margin;
+                if (game.result === 'W') {
+                    homeWins++;
+                } else {
+                    homeLosses++;
+                }
+            } else { // Away game
+                awayMarginSum += game.margin;
+                if (game.result === 'W') {
+                    awayWins++;
+                } else {
+                    awayLosses++;
+                }
+            }
+        });
+
+        const totalHomeGames = homeWins + homeLosses;
+        const totalAwayGames = awayWins + awayLosses;
+        const totalWins = homeWins + awayWins;
+        const totalLosses = homeLosses + awayLosses;
+
+        const avgHomeMargin = totalHomeGames > 0 ? homeMarginSum / totalHomeGames : 0;
+        const avgAwayMargin = totalAwayGames > 0 ? awayMarginSum / totalAwayGames : 0;
+        
+        const homeWinPct = totalHomeGames > 0 ? homeWins / totalHomeGames : 0;
+        const awayWinPct = totalAwayGames > 0 ? awayWins / totalAwayGames : 0;
+        
+        const isHomeCourtHero = homeWinPct - awayWinPct > 0.20;
+
+        return {
+            overallRecord: `${totalWins}-${totalLosses}`,
+            homeRecord: `${homeWins}-${homeLosses}`,
+            awayRecord: `${awayWins}-${awayLosses}`,
+            avgHomeMargin,
+            avgAwayMargin,
+            isHomeCourtHero
+        };
+
+    }, [trends]);
+
     if (loading) {
         return (
-            <div className="space-y-1 p-2">
+            <div className="space-y-4">
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                 </div>
                  <Table>
                     <TableHeader>
                         <TableRow>
@@ -125,49 +187,94 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
     const renderOuBadge = (status: TeamTrend['ou']) => {
         switch (status) {
             case 'Over':
+                return <Badge variant="outline" className="text-blue-600 border-blue-600/50">Over</Badge>
             case 'Under':
+                return <Badge variant="outline" className="text-purple-600 border-purple-600/50">Under</Badge>
             case 'Push':
-                return <Badge variant="secondary">{status}</Badge>;
+                return <Badge variant="secondary">Push</Badge>;
             default:
                 return <span className="text-muted-foreground">-</span>;
         }
     };
 
     return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead className="w-[100px]">Date</TableHead>
-                    <TableHead>Matchup</TableHead>
-                    <TableHead>Result</TableHead>
-                    <TableHead>Margin</TableHead>
-                    <TableHead>Rest</TableHead>
-                    <TableHead className="text-center">Spread (ATS)</TableHead>
-                    <TableHead className="text-center">Total (O/U)</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {trends.map((game, index) => (
-                    <TableRow key={index}>
-                        <TableCell className="text-muted-foreground">{game.date}</TableCell>
-                        <TableCell>
-                            <span>{game.opponent.at} </span>
-                            <span className="font-semibold">{game.opponent.name}</span>
-                        </TableCell>
-                        <TableCell className={cn("font-semibold", game.result === 'W' ? 'text-green-600' : 'text-destructive')}>
-                            {game.result} {game.score}
-                        </TableCell>
-                        <TableCell>
-                            {renderMargin(game.result, game.margin)}
-                        </TableCell>
-                         <TableCell>
-                            {renderRest(game.restDays)}
-                        </TableCell>
-                        <TableCell className="text-center">{renderAtsBadge(game.ats)}</TableCell>
-                        <TableCell className="text-center">{renderOuBadge(game.ou)}</TableCell>
+        <div>
+            {summaryStats && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Last 10 Games</CardTitle>
+                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{summaryStats.overallRecord}</div>
+                            {summaryStats.isHomeCourtHero && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    <Badge variant="secondary">🏠 Home Court Hero</Badge>
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">🏠 Home Splits</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{summaryStats.homeRecord}</div>
+                            <p className={cn("text-xs", summaryStats.avgHomeMargin >= 0 ? "text-green-600" : "text-destructive")}>
+                                Avg. Margin: {summaryStats.avgHomeMargin.toFixed(1)} pts
+                            </p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">✈️ Away Splits</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{summaryStats.awayRecord}</div>
+                             <p className={cn("text-xs", summaryStats.avgAwayMargin >= 0 ? "text-green-600" : "text-destructive")}>
+                                Avg. Margin: {summaryStats.avgAwayMargin.toFixed(1)} pts
+                            </p>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="w-[100px]">Date</TableHead>
+                        <TableHead>Matchup</TableHead>
+                        <TableHead>Result</TableHead>
+                        <TableHead>Margin</TableHead>
+                        <TableHead>Rest</TableHead>
+                        <TableHead className="text-center">Spread (ATS)</TableHead>
+                        <TableHead className="text-center">Total (O/U)</TableHead>
                     </TableRow>
-                ))}
-            </TableBody>
-        </Table>
+                </TableHeader>
+                <TableBody>
+                    {trends.map((game, index) => (
+                        <TableRow key={index}>
+                            <TableCell className="text-muted-foreground">{game.date}</TableCell>
+                            <TableCell>
+                                <span>{game.opponent.at} </span>
+                                <span className="font-semibold">{game.opponent.name}</span>
+                            </TableCell>
+                            <TableCell className={cn("font-semibold", game.result === 'W' ? 'text-green-600' : 'text-destructive')}>
+                                {game.result} {game.score}
+                            </TableCell>
+                            <TableCell>
+                                {renderMargin(game.result, game.margin)}
+                            </TableCell>
+                            <TableCell>
+                                {renderRest(game.restDays)}
+                            </TableCell>
+                            <TableCell className="text-center">{renderAtsBadge(game.ats)}</TableCell>
+                            <TableCell className="text-center">{renderOuBadge(game.ou)}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </div>
     );
 }
