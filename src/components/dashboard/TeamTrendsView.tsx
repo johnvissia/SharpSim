@@ -56,9 +56,10 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (sport !== 'NBA') {
+        const supportedSports = ['NBA', 'NHL'];
+        if (!supportedSports.includes(sport)) {
             setLoading(false);
-            setError('Team trends are currently available for NBA only.');
+            setError(`Team trends are currently available for ${supportedSports.join(' and ')} only.`);
             return;
         }
 
@@ -66,7 +67,7 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
             setLoading(true);
             setError(null);
             try {
-                const data = await fetchTeamTrends(teamId);
+                const data = await fetchTeamTrends(teamId, sport);
                 setTrends(data);
             } catch (e: any) {
                 console.error(`Failed to load trends for ${teamName}`, e);

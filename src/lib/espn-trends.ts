@@ -15,7 +15,7 @@ interface EspnScheduleCompetitor {
         id: string;
         abbreviation: string;
         displayName: string;
-        logo: string;
+        logo?: string;
     };
     score: {
         value: number;
@@ -53,9 +53,20 @@ interface EspnTeamSchedule {
     events: EspnScheduleEvent[];
 }
 
+const sportToPath: Record<string, string> = {
+    'NBA': 'basketball/nba',
+    'NHL': 'hockey/nhl',
+};
+
+
 // Main fetch function
-export async function fetchTeamTrends(teamId: string): Promise<TeamTrend[]> {
-    const url = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${teamId}/schedule`;
+export async function fetchTeamTrends(teamId: string, sport: string): Promise<TeamTrend[]> {
+    const path = sportToPath[sport];
+    if (!path) {
+        throw new Error(`Team trends are not supported for the sport: ${sport}`);
+    }
+
+    const url = `https://site.api.espn.com/apis/site/v2/sports/${path}/teams/${teamId}/schedule`;
 
     const response = await fetch(url, { next: { revalidate: 3600 } }); // Cache for 1 hour
     if (!response.ok) {
@@ -72,6 +83,8 @@ export async function fetchTeamTrends(teamId: string): Promise<TeamTrend[]> {
         const competition = event.competitions[0];
         const myTeam = competition.competitors.find(c => c.id === teamId)!;
         const opponent = competition.competitors.find(c => c.id !== teamId)!;
+        
+        const opponentLogo = opponent.team?.logo || '';
 
         const myScore = myTeam.score.value;
         const opponentScore = opponent.score.value;
@@ -130,7 +143,7 @@ export async function fetchTeamTrends(teamId: string): Promise<TeamTrend[]> {
             fullDate: event.date,
             opponent: {
                 name: opponent.team.displayName,
-                logo: opponent.team.logo,
+                logo: opponentLogo,
                 at: myTeam.homeAway === 'home' ? 'vs' : '@',
             },
             result: myTeam.winner ? 'W' : 'L',
