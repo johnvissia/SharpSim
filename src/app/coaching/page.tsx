@@ -20,12 +20,49 @@ import {
 import { Bar, BarChart as RechartsBarChart, XAxis, YAxis } from 'recharts';
 
 const mockBettingHistory: UserBet[] = [
-  { id: 'bh1', gameId: 'g1', userId: 'u1', sport: 'NBA', betType: 'moneyline', pick: 'Team A', stake: 10, odds: -150, status: 'won', placedAt: '...', potentialWinnings: 16.67 },
-  { id: 'bh2', gameId: 'g2', userId: 'u1', sport: 'NFL', betType: 'spread', pick: 'Team B +3.5', stake: 5, odds: -110, status: 'lost', placedAt: '...', potentialWinnings: 9.55 },
-  { id: 'bh3', gameId: 'g3', userId: 'u1', sport: 'NBA', betType: 'total', pick: 'Over 220', stake: 5, odds: -110, status: 'won', placedAt: '...', potentialWinnings: 9.55 },
-  { id: 'bh4', gameId: 'g4', userId: 'u1', sport: 'NHL', betType: 'moneyline', pick: 'Team C', stake: 10, odds: 200, status: 'lost', placedAt: '...', potentialWinnings: 30 },
-  { id: 'bh5', gameId: 'g5', userId: 'u1', sport: 'MLB', betType: 'moneyline', pick: 'Team D', stake: 10, odds: -120, status: 'won', placedAt: '...', potentialWinnings: 18.33 },
+  // The "19th" slip: A 3-leg parlay, 2 won, 1 lost. Overall status is 'lost'.
+  {
+    id: 'parlay1',
+    gameId: 'p1,p2,p3',
+    userId: 'u1',
+    sport: 'NBA', // Main sport for the ticket
+    betType: 'parlay',
+    pick: '3-Leg Parlay',
+    stake: 10,
+    odds: 595, // Example combined odds
+    potentialWinnings: 69.5,
+    status: 'lost',
+    placedAt: '2024-01-19T10:00:00Z',
+    legs: [
+      { gameId: 'g1', matchup: 'Lakers @ Warriors', commenceTime: '2024-01-19T19:00:00Z', pick: 'Golden State Warriors', betType: 'moneyline', odds: -150, status: 'won', sport: 'NBA' },
+      { gameId: 'g2', matchup: 'Suns @ Mavericks', commenceTime: '2024-01-19T20:00:00Z', pick: 'Over 225.5', betType: 'total', odds: -110, status: 'won', sport: 'NBA' },
+      { gameId: 'g3', matchup: 'Knicks @ Nets', commenceTime: '2024-01-19T20:30:00Z', pick: 'New York Knicks -2.5', betType: 'spread', odds: -110, status: 'lost', sport: 'NBA' },
+    ]
+  },
+  // A won parlay from the "18th".
+  {
+    id: 'parlay2',
+    gameId: 'p4,p5',
+    userId: 'u1',
+    sport: 'NFL',
+    betType: 'parlay',
+    pick: '2-Leg Parlay',
+    stake: 20,
+    odds: 264,
+    potentialWinnings: 72.8,
+    status: 'won',
+    placedAt: '2024-01-18T11:00:00Z',
+    legs: [
+      { gameId: 'g4', matchup: 'Eagles @ Chiefs', commenceTime: '2024-01-18T13:00:00Z', pick: 'Kansas City Chiefs -3.5', betType: 'spread', odds: -110, status: 'won', sport: 'NFL' },
+      { gameId: 'g5', matchup: 'Bills @ Bengals', commenceTime: '2024-01-18T16:30:00Z', pick: 'Over 48.5', betType: 'total', odds: -110, status: 'won', sport: 'NFL' },
+    ]
+  },
+  // A single bet from the "18th" that was pending and is now lost.
+  { id: 'bh2', gameId: 'g2', userId: 'u1', sport: 'NFL', betType: 'spread', pick: 'Team B +3.5', stake: 5, odds: -110, status: 'lost', placedAt: '2024-01-18T09:00:00Z', potentialWinnings: 9.55 },
+  // Another single bet to round it out.
+  { id: 'bh1', gameId: 'g1', userId: 'u1', sport: 'NBA', betType: 'moneyline', pick: 'Team A', stake: 10, odds: -150, status: 'won', placedAt: '2024-01-18T08:00:00Z', potentialWinnings: 16.67 },
 ];
+
 
 const chartData = [
     { sport: 'NBA', wins: 15, losses: 5 },

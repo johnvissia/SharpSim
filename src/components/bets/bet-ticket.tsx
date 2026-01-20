@@ -102,7 +102,13 @@ export function BetTicket({ bet }: { bet: UserBet }) {
               </div>
               <div className="flex justify-between items-center text-sm text-muted-foreground font-mono">
                 <p>Risk: <span className="font-semibold text-foreground">{bet.stake.toFixed(2)} coins</span></p>
-                <p>Payout: <span className="font-semibold text-green-600">{bet.potentialWinnings.toFixed(2)} coins</span></p>
+                <p>Payout: <span className="font-semibold text-green-600">
+                    {(
+                        bet.status === 'lost' ? 0 :
+                        bet.status === 'push' ? bet.stake :
+                        bet.potentialWinnings
+                    ).toFixed(2)} coins
+                </span></p>
               </div>
             </div>
           </>
@@ -118,7 +124,13 @@ export function BetTicket({ bet }: { bet: UserBet }) {
             <div className="border-t-2 border-dashed border-border/50 mx-4" />
             <div className="flex justify-between items-center p-4 text-sm text-muted-foreground">
               <p className="font-mono">Stake: <span className="font-semibold text-foreground">{bet.stake.toFixed(2)} coins</span></p>
-              <p className="font-mono">Payout: <span className="font-semibold text-green-600">{bet.potentialWinnings.toFixed(2)} coins</span></p>
+              <p className="font-mono">Payout: <span className="font-semibold text-green-600">
+                {(
+                    bet.status === 'lost' ? 0 :
+                    bet.status === 'push' ? bet.stake :
+                    bet.potentialWinnings
+                ).toFixed(2)} coins
+              </span></p>
             </div>
           </>
         )}
