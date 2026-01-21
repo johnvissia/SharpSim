@@ -65,9 +65,16 @@ export function BetTicket({ bet }: { bet: UserBet }) {
 
   const ticketLabel = isParlay ? bet.pick : 'Single Bet';
   
+  const toWinLabel = useMemo(() => {
+    if (bet.status === 'won') {
+      return 'Payout';
+    }
+    return 'To Win';
+  }, [bet.status]);
+
   const toWinAmount = useMemo(() => {
     if (bet.status === 'won') {
-        return bet.potentialWinnings - bet.stake;
+        return bet.potentialWinnings;
     }
     if (bet.status === 'lost' || bet.status === 'push') {
         return 0;
@@ -140,7 +147,7 @@ export function BetTicket({ bet }: { bet: UserBet }) {
             </div>
             
             <div className="text-right flex flex-col">
-              <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">To Win</span>
+              <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">{toWinLabel}</span>
               <span className="text-xl font-black text-emerald-400 drop-shadow-sm">
                 ${toWinAmount.toFixed(2)}
               </span>
