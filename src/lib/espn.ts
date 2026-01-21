@@ -34,7 +34,8 @@ interface EspnCompetitor {
         shortDisplayName: string;
         color: string;
         alternateColor: string;
-        logo: string;
+        logo?: string;
+        logos?: { href: string }[];
     };
     score: string;
     linescores: { value: number }[];
@@ -110,10 +111,14 @@ const mapEspnEventToGame = (event: EspnEvent, sport: SportName): Game | null => 
         return undefined;
     };
 
+    const getLogo = (competitor: EspnCompetitor) => {
+        return competitor.team.logo || competitor.team.logos?.[0]?.href || '';
+    }
+
     const homeTeam: Team = {
         id: homeCompetitor.team.id,
         name: homeCompetitor.team.displayName,
-        logo: homeCompetitor.team.logo,
+        logo: getLogo(homeCompetitor),
         players: [], // Not available from scoreboard
         rank: undefined, // Not directly available
         conference: undefined, // Not available
@@ -123,7 +128,7 @@ const mapEspnEventToGame = (event: EspnEvent, sport: SportName): Game | null => 
     const awayTeam: Team = {
         id: awayCompetitor.team.id,
         name: awayCompetitor.team.displayName,
-        logo: awayCompetitor.team.logo,
+        logo: getLogo(awayCompetitor),
         players: [],
         rank: undefined,
         conference: undefined,
