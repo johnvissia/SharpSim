@@ -9,7 +9,14 @@
         "isAnonymous": { "type": "boolean", "description": "Whether the user is anonymous." },
         "balance": { "type": "number", "description": "The user's current coin balance." },
         "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the profile was created."},
-        "lastCoinCollection": { "type": "string", "format": "date-time", "description": "Timestamp of when the user last collected their daily coins."}
+        "lastCoinCollection": { "type": "string", "format": "date-time", "description": "Timestamp of when the user last collected their daily coins."},
+        "favoriteTeams": {
+            "type": "array",
+            "description": "A list of the user's favorite team names.",
+            "items": {
+                "type": "string"
+            }
+        }
       },
       "required": ["uid", "isAnonymous", "balance", "createdAt"]
     },

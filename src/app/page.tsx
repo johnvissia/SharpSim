@@ -11,13 +11,13 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
 import { fetchAndSaveDailyData } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
 import { gradeUserBets, calculateLegResult } from '@/lib/bet-grading';
 import { getSports } from '@/lib/mock-data';
-import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, CompletedGame, ParlayLeg } from '@/lib/types';
+import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, CompletedGame, ParlayLeg, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Loader } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -139,6 +139,13 @@ export default function DashboardPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
+
+  const userProfileRef = useMemoFirebase(
+    () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
+    [user, firestore]
+  );
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const favoriteTeams = useMemo(() => userProfile?.favoriteTeams || [], [userProfile]);
   
   // Fetching data previously in GameFeed
   const dailyGamesQuery = useMemoFirebase(() => {
@@ -438,6 +445,14 @@ export default function DashboardPage() {
         return true;
     })
     .sort((a, b) => {
+        const isFavA = favoriteTeams.includes(a.homeTeam.name) || favoriteTeams.includes(a.awayTeam.name);
+        const isFavB = favoriteTeams.includes(b.homeTeam.name) || favoriteTeams.includes(b.awayTeam.name);
+
+        // Super-priority sort: favorites on top
+        if (isFavA !== isFavB) {
+            return isFavA ? -1 : 1;
+        }
+
         const aHasBet = !!a.oddsApiId && activeBetGameIds.has(a.oddsApiId);
         const bHasBet = !!b.oddsApiId && activeBetGameIds.has(b.oddsApiId);
 
@@ -472,7 +487,7 @@ export default function DashboardPage() {
         // For live and upcoming, sort ascending to show soonest first.
         return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
     });
-  }, [mergedGames, selectedSport, selectedConference, activeBetGameIds]);
+  }, [mergedGames, selectedSport, selectedConference, activeBetGameIds, favoriteTeams]);
 
 
   const showLoadingSpinner = isUserLoading || (isLoadingGames && !dailyGames);

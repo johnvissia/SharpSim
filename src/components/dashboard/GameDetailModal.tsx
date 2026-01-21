@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import type { Game } from '@/lib/types';
+import type { Game, UserProfile } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogClose, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X } from 'lucide-react';
+import { X, Heart } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { sportIconMap } from '@/lib/team-logos';
@@ -12,6 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '../ui/button';
 import { MainLinesView } from './MainLinesView';
 import { PlayerPropsView } from './PlayerPropsView';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { cn } from '@/lib/utils';
 
 interface GameDetailModalProps {
   game: Game | null;
@@ -19,34 +22,73 @@ interface GameDetailModalProps {
   onClose: () => void;
 }
 
-const TeamHeader = ({ team, sport }: { team: Game['homeTeam'], sport: Game['sport']}) => {
+const TeamHeader = ({ team, sport, isFavorite, onToggleFavorite, isUpdating }: { 
+    team: Game['homeTeam'], 
+    sport: Game['sport'],
+    isFavorite: boolean,
+    onToggleFavorite: () => void,
+    isUpdating: boolean
+}) => {
     const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
     return (
-        <Link href={`/stats/${sport}/${team.name}?teamId=${team.id}`} className="flex flex-col items-center text-center gap-4 p-2 rounded-lg hover:bg-accent/10 transition-colors w-48">
-            {team.logo ? (
-                <Image
-                src={team.logo}
-                alt={`${team.name} logo`}
-                width={80}
-                height={80}
-                className="object-contain h-20 w-20"
-                />
-            ) : (
-                <div className="w-20 h-20 flex items-center justify-center bg-muted rounded-full">
-                <FallbackIcon className="w-10 h-10 text-muted-foreground" />
-                </div>
-            )}
-            <h2 className="text-2xl font-bold h-16 flex items-center justify-center">
-                {team.rank && <span className="font-bold mr-2 text-muted-foreground">#{team.rank}</span>}
-                {team.name}
-            </h2>
-            <p className="text-xs text-muted-foreground">View Team Trends &rarr;</p>
-        </Link>
+        <div className="flex flex-col items-center text-center gap-2 w-48">
+             <Button variant="ghost" size="icon" onClick={onToggleFavorite} disabled={isUpdating} className="h-8 w-8 mb-2">
+                <Heart className={cn(
+                    "h-7 w-7 transition-all", 
+                    isFavorite ? 'text-red-500 fill-red-500' : 'text-muted-foreground hover:text-red-400'
+                )} />
+            </Button>
+            <Link href={`/stats/${sport}/${team.name}?teamId=${team.id}`} className="flex flex-col items-center text-center gap-2 p-2 rounded-lg hover:bg-accent/10 transition-colors">
+                {team.logo ? (
+                    <Image
+                    src={team.logo}
+                    alt={`${team.name} logo`}
+                    width={80}
+                    height={80}
+                    className="object-contain h-20 w-20"
+                    />
+                ) : (
+                    <div className="w-20 h-20 flex items-center justify-center bg-muted rounded-full">
+                    <FallbackIcon className="w-10 h-10 text-muted-foreground" />
+                    </div>
+                )}
+                <h2 className="text-2xl font-bold h-16 flex items-center justify-center">
+                    {team.rank && <span className="font-bold mr-2 text-muted-foreground">#{team.rank}</span>}
+                    {team.name}
+                </h2>
+                <p className="text-xs text-muted-foreground">View Team Trends &rarr;</p>
+            </Link>
+        </div>
     )
 }
 
 export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps) {
   const [activeTab, setActiveTab] = useState('main-lines');
+  const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false);
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const userProfileRef = useMemoFirebase(
+    () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
+    [user, firestore]
+  );
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const favoriteTeams = userProfile?.favoriteTeams || [];
+  
+  const handleToggleFavorite = async (teamName: string) => {
+    if (!userProfileRef) return;
+    setIsUpdatingFavorite(true);
+    const isCurrentlyFavorite = favoriteTeams.includes(teamName);
+    try {
+        await updateDoc(userProfileRef, {
+            favoriteTeams: isCurrentlyFavorite ? arrayRemove(teamName) : arrayUnion(teamName),
+        });
+    } catch (error) {
+        console.error("Failed to update favorites:", error);
+    } finally {
+        setIsUpdatingFavorite(false);
+    }
+  };
 
   if (!game) return null;
 
@@ -88,9 +130,15 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                         <span className="sr-only">Close</span>
                     </Button>
                 </DialogClose>
-                <div className="flex items-center justify-around pt-8">
-                    <TeamHeader team={game.awayTeam} sport={game.sport} />
-                    <div className="flex flex-col items-center self-center text-center">
+                <div className="flex items-start justify-around pt-8">
+                    <TeamHeader 
+                        team={game.awayTeam} 
+                        sport={game.sport}
+                        isFavorite={favoriteTeams.includes(game.awayTeam.name)}
+                        onToggleFavorite={() => handleToggleFavorite(game.awayTeam.name)}
+                        isUpdating={isUpdatingFavorite}
+                    />
+                    <div className="flex flex-col items-center self-center text-center pt-10">
                         <span className="text-4xl font-bold text-muted-foreground">VS</span>
                          <div className="text-sm text-muted-foreground mt-2">{gameTimeOrStatus}</div>
                         {isLive && (
@@ -99,7 +147,13 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                             </Badge>
                         )}
                     </div>
-                    <TeamHeader team={game.homeTeam} sport={game.sport} />
+                    <TeamHeader 
+                        team={game.homeTeam} 
+                        sport={game.sport}
+                        isFavorite={favoriteTeams.includes(game.homeTeam.name)}
+                        onToggleFavorite={() => handleToggleFavorite(game.homeTeam.name)}
+                        isUpdating={isUpdatingFavorite}
+                    />
                 </div>
             </DialogHeader>
 

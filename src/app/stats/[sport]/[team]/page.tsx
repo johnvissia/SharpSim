@@ -4,17 +4,48 @@ import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { TeamTrendsView } from '@/components/dashboard/TeamTrendsView';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Heart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import type { UserProfile } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 export default function TeamStatsPage() {
     const params = useParams();
     const searchParams = useSearchParams();
+    const { user } = useUser();
+    const firestore = useFirestore();
+    const [isUpdating, setIsUpdating] = useState(false);
 
     // Decode URI-encoded parameters
     const sportName = params.sport ? decodeURIComponent(params.sport as string) : '';
     const teamName = params.team ? decodeURIComponent(params.team as string) : '';
     const teamId = searchParams.get('teamId');
+
+    const userProfileRef = useMemoFirebase(
+        () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
+        [user, firestore]
+    );
+    const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+    const favoriteTeams = userProfile?.favoriteTeams || [];
+    const isFavorite = favoriteTeams.includes(teamName);
+
+    const handleToggleFavorite = async () => {
+        if (!userProfileRef) return;
+        setIsUpdating(true);
+        try {
+            await updateDoc(userProfileRef, {
+                favoriteTeams: isFavorite ? arrayRemove(teamName) : arrayUnion(teamName)
+            });
+        } catch (error) {
+            console.error("Failed to update favorites", error);
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
 
     if (!teamId || !sportName || !teamName) {
         return (
@@ -40,9 +71,17 @@ export default function TeamStatsPage() {
                         Back to {sportName} Stats
                     </Link>
                 </Button>
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                    {teamName}
-                </h1>
+                <div className="flex items-center gap-4">
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                        {teamName}
+                    </h1>
+                     <Button variant="ghost" size="icon" onClick={handleToggleFavorite} disabled={isUpdating}>
+                        <Heart className={cn(
+                            "h-7 w-7 transition-all", 
+                            isFavorite ? 'text-red-500 fill-red-500' : 'text-muted-foreground hover:text-red-400'
+                        )} />
+                    </Button>
+                </div>
             </header>
             <div>
                  <Card>

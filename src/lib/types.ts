@@ -66,6 +66,7 @@ export interface UserProfile {
   balance: number;
   createdAt: any; // Firestore ServerTimestamp
   lastCoinCollection?: string; // ISO 8601 string
+  favoriteTeams?: string[];
 }
 
 export interface UserBet {

@@ -10,11 +10,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Star, Ticket } from 'lucide-react';
+import { Ticket } from 'lucide-react';
 import Image from 'next/image';
 import { sportIconMap } from '@/lib/team-logos';
 import { useBetSlip, type BetSlipPick } from '@/context/BetSlipContext';
-import { cn } from '@/lib/utils';
 
 const OddsButton = ({
   onClick,
@@ -102,11 +101,6 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
     addPick({ pick, odds, betType, game });
   };
   
-  const handleStarClick = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      // Add favorite logic here
-  }
-
   const { odds } = game;
   const homeSpreadPoints = odds?.spread?.points ?? 0;
   const awaySpreadPoints = -homeSpreadPoints;
@@ -138,12 +132,6 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                <button 
-                    onClick={handleStarClick}
-                    className="text-muted-foreground hover:text-accent transition-colors"
-                >
-                    <Star className="h-5 w-5" />
-                </button>
             </div>
         </div>
 
