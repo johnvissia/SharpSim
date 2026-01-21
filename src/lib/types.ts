@@ -54,7 +54,7 @@ export interface ParlayLeg {
   matchup: string;
   commenceTime: string;
   pick: string; // The specific selection, e.g., "Los Angeles Lakers"
-  betType: 'moneyline' | 'spread' | 'total';
+  betType: 'moneyline' | 'spread' | 'total' | 'player_prop';
   odds: number;
   status: 'pending' | 'won' | 'lost' | 'push'; // Individual leg status
   sport: SportName;
