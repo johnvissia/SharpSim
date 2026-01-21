@@ -1,7 +1,7 @@
 'use client';
 
 import { collection, doc, getDocs, query, where, writeBatch, Firestore, User, increment } from 'firebase/firestore';
-import type { CompletedGame, UserBet } from './types';
+import type { CompletedGame, UserBet, ParlayLeg } from './types';
 
 const gradeMoneyline = (bet: Pick<UserBet, 'pick'>, game: CompletedGame): 'won' | 'lost' => {
   const isHomePick = bet.pick === game.homeTeam;
@@ -10,6 +10,7 @@ const gradeMoneyline = (bet: Pick<UserBet, 'pick'>, game: CompletedGame): 'won' 
   if (isHomePick && game.homeScore > game.awayScore) return 'won';
   if (isAwayPick && game.awayScore > game.homeScore) return 'won';
   
+  // Tie is a loss for moneyline
   return 'lost';
 };
 
@@ -43,6 +44,26 @@ const gradeSpread = (bet: Pick<UserBet, 'pick'>, game: CompletedGame): 'won' | '
   if (cover + points > 0) return 'won';
   if (cover + points < 0) return 'lost';
   return 'push';
+};
+
+/**
+ * A helper function that calculates the result of a single bet or leg.
+ * @param leg The bet leg to grade.
+ * @param game The completed game data.
+ * @returns The result of the leg ('won', 'lost', or 'push').
+ */
+const calculateLegResult = (leg: Pick<ParlayLeg, 'pick' | 'betType'>, game: CompletedGame): 'won' | 'lost' | 'push' => {
+  switch (leg.betType) {
+    case 'moneyline':
+      return gradeMoneyline({ pick: leg.pick }, game);
+    case 'spread':
+      return gradeSpread({ pick: leg.pick }, game);
+    case 'total':
+      return gradeTotal({ pick: leg.pick }, game);
+    default:
+      console.warn(`Grading for leg bet type "${leg.betType}" is not implemented.`);
+      return 'lost';
+  }
 };
 
 
@@ -102,14 +123,7 @@ export async function gradeUserBets(firestore: Firestore, user: User) {
             }
 
             // The game for this leg is over, so let's grade it
-            let legStatus: UserBet['status'] = 'lost';
-            const legAsBetForGrading = { pick: leg.pick };
-
-            switch(leg.betType) {
-                case 'moneyline': legStatus = gradeMoneyline(legAsBetForGrading, game); break;
-                case 'total': legStatus = gradeTotal(legAsBetForGrading, game); break;
-                case 'spread': legStatus = gradeSpread(legAsBetForGrading, game); break;
-            }
+            const legStatus = calculateLegResult(leg, game);
 
             if (legStatus === 'lost') hasLostLeg = true;
             if (legStatus === 'push') pushCount++;
@@ -155,21 +169,11 @@ export async function gradeUserBets(firestore: Firestore, user: User) {
       return; // This bet's game hasn't finished yet.
     }
 
-    let newStatus: UserBet['status'] = 'lost';
-    
-    switch (bet.betType) {
-        case 'moneyline':
-            newStatus = gradeMoneyline(bet, game);
-            break;
-        case 'total':
-            newStatus = gradeTotal(bet, game);
-            break;
-        case 'spread':
-            newStatus = gradeSpread(bet, game);
-            break;
-        default:
-             console.warn(`Grading for bet type "${bet.betType}" is not implemented.`);
-             return; // Skip this bet
+    const newStatus = calculateLegResult(bet, game);
+
+    // Should not happen as we check for game existence, but for type safety
+    if (newStatus === 'pending') {
+        return;
     }
     
     batch.update(betDoc.ref, { status: newStatus });
