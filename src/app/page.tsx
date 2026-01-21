@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { GameFeed } from '@/components/dashboard/game-feed';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -119,8 +121,6 @@ export default function DashboardPage() {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [espnGames, setEspnGames] = useState<Game[]>([]);
   const [isLoadingEspn, setIsLoadingEspn] = useState(true);
-
-  const categories = ['All', 'Favorites', 'NBA', 'NCAAM', 'NHL', 'NFL', 'NCAAF'];
 
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -350,26 +350,56 @@ export default function DashboardPage() {
 
   const showLoadingSpinner = isUserLoading || (isLoadingGames && !dailyGames);
 
+  const navItems = [
+    { href: '/', id: 'dashboard', label: '🔥 Dashboard' },
+    { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
+    { href: '/stats', id: 'stats', label: '📊 Stats' },
+    { href: '/store', id: 'store', label: '🛒 Store' },
+    { href: '/coaching', id: 'coaching', label: '🎓 Coaching' },
+    { href: '/admin', id: 'admin', label: '🛡️ Admin' }
+  ];
+
+  const pathname = usePathname();
+  
+  const getActiveTabId = () => {
+    if (pathname === '/') return 'dashboard';
+    if (pathname.startsWith('/my-picks')) return 'picks';
+    if (pathname.startsWith('/stats')) return 'stats';
+    if (pathname.startsWith('/store')) return 'store';
+    if (pathname.startsWith('/coaching')) return 'coaching';
+    if (pathname.startsWith('/admin')) return 'admin';
+    return '';
+  }
+  const activeTab = getActiveTabId();
+
+
   return (
     <>
       <div className="max-w-4xl mx-auto">
         <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 py-3 mb-4">
-            <div className="flex gap-2 overflow-x-auto px-4 no-scrollbar">
-                {categories.map(cat => (
-                <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`
-                    px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all
-                    ${selectedCategory === cat 
-                        ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}
-                    `}
+            <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full px-2">
+              {[
+                { href: '/', id: 'dashboard', label: '🔥 Dashboard' },
+                { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
+                { href: '/stats', id: 'stats', label: '📊 Stats' },
+                { href: '/store', id: 'store', label: '🛒 Store' },
+                { href: '/coaching', id: 'coaching', label: '🎓 Coaching' },
+                { href: '/admin', id: 'admin', label: '🛡️ Admin' }
+              ].map((tab) => (
+                <Link
+                  key={tab.id}
+                  href={tab.href}
+                  className={`
+                    px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all flex-shrink-0
+                    ${activeTab === tab.id 
+                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'}
+                  `}
                 >
-                    {cat}
-                </button>
-                ))}
-            </div>
+                  {tab.label}
+                </Link>
+              ))}
+            </nav>
         </div>
 
         <div className="px-4 pb-8">
