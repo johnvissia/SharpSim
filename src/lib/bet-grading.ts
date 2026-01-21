@@ -69,41 +69,24 @@ const calculateLegResult = (leg: Pick<ParlayLeg, 'pick' | 'betType'>, game: Comp
 
 /**
  * Grades all pending bets for a given user against a set of completed games.
- * @param firestore The Firestore instance.
- * @param user The authenticated user object.
+ * This is a pure function that returns a list of required updates.
+ * @param pendingBets The user's bets that have a 'pending' status.
+ * @param completedGamesMap A Map of completed game data, with game ID as the key.
+ * @returns An object with an array of bet updates and the total payout to be applied.
  */
-export async function gradeUserBets(firestore: Firestore, user: User) {
-  // 1. Get all completed games from our database
-  const completedGamesSnapshot = await getDocs(collection(firestore, 'completed_games'));
-  const completedGames = new Map<string, CompletedGame>();
-  completedGamesSnapshot.forEach(doc => {
-    const game = doc.data() as CompletedGame;
-    completedGames.set(game.id, game);
-  });
+export function gradeUserBets(
+  pendingBets: UserBet[],
+  completedGamesMap: Map<string, CompletedGame>
+): { updates: { betId: string, payload: Partial<UserBet> }[]; totalPayout: number } {
   
-  if (completedGames.size === 0) {
-    console.log("No completed games found in Firestore to grade bets against.");
-    return;
+  if (!pendingBets || pendingBets.length === 0 || completedGamesMap.size === 0) {
+    return { updates: [], totalPayout: 0 };
   }
 
-  // 2. Get the current user's pending bets
-  const betsRef = collection(firestore, 'users', user.uid, 'bets');
-  const q = query(betsRef, where('status', '==', 'pending'));
-  const pendingBetsSnapshot = await getDocs(q);
-
-  if (pendingBetsSnapshot.empty) {
-    console.log("No pending bets to grade for this user.");
-    return;
-  }
-
-  const batch = writeBatch(firestore);
+  const updates: { betId: string, payload: Partial<UserBet> }[] = [];
   let totalPayout = 0;
-  let gradedCount = 0;
 
-  pendingBetsSnapshot.forEach(betDoc => {
-    const bet = betDoc.data() as UserBet;
-    
-    // Create a unified list of legs to process for both single bets and parlays
+  for (const bet of pendingBets) {
     const legsToProcess: ParlayLeg[] = bet.legs ? bet.legs : [
         {
             gameId: bet.gameId,
@@ -123,25 +106,21 @@ export async function gradeUserBets(firestore: Firestore, user: User) {
     let betChanged = false;
 
     const updatedLegs = legsToProcess.map(leg => {
-        // If leg is already settled, just account for its status
         if (leg.status !== 'pending') {
             if (leg.status === 'lost') hasLostLeg = true;
             if (leg.status === 'push') pushCount++;
             return leg;
         }
 
-        // Find the completed game for the current leg
-        const game = completedGames.get(leg.gameId);
+        const game = completedGamesMap.get(leg.gameId);
 
-        // If game isn't completed yet, the whole bet remains pending
         if (!game) {
             isFinalized = false;
             return leg;
         }
 
-        // Game is completed, so grade the leg
+        betChanged = true;
         const newLegStatus = calculateLegResult(leg, game);
-        betChanged = true; // A leg's status has changed from pending
 
         if (newLegStatus === 'lost') hasLostLeg = true;
         if (newLegStatus === 'push') pushCount++;
@@ -149,55 +128,41 @@ export async function gradeUserBets(firestore: Firestore, user: User) {
         return { ...leg, status: newLegStatus };
     });
 
-    // If the bet isn't fully finalized (some legs are still pending)
     if (!isFinalized) {
-        // For parlays, if any leg was updated, we update the legs array to show progress
         if (bet.betType === 'parlay' && betChanged) {
-            batch.update(betDoc.ref, { legs: updatedLegs });
+            updates.push({
+                betId: bet.id,
+                payload: { legs: updatedLegs },
+            });
         }
-        return; // Move to the next bet
+        continue;
     }
 
-    // If we reach here, all games in the bet have finished. We can set a final status.
     let finalStatus: UserBet['status'];
     if (hasLostLeg) {
         finalStatus = 'lost';
     } else if (pushCount === updatedLegs.length) {
-        finalStatus = 'push'; // All legs were pushes
+        finalStatus = 'push';
     } else {
-        finalStatus = 'won'; // No losses, and at least one win
+        finalStatus = 'won';
     }
 
-    // Prepare update payload
-    const updatePayload: { status: UserBet['status'], legs?: ParlayLeg[] } = { status: finalStatus };
+    const payload: Partial<UserBet> = { status: finalStatus };
     if (bet.betType === 'parlay') {
-        updatePayload.legs = updatedLegs;
+        payload.legs = updatedLegs;
     }
     
-    batch.update(betDoc.ref, updatePayload);
-    gradedCount++;
-    
-    // Calculate payout
+    // Only add to updates if the status actually changed
+    if (bet.status !== finalStatus || betChanged) {
+      updates.push({ betId: bet.id, payload });
+    }
+
     if (finalStatus === 'won') {
-        // For simulation, we pay out the full amount even if there are pushes.
-        // A real app would recalculate odds.
         totalPayout += bet.potentialWinnings;
     } else if (finalStatus === 'push') {
-        totalPayout += bet.stake; // Return the original stake
+        totalPayout += bet.stake;
     }
-  });
-
-  // Apply balance update if there are any payouts
-  if (totalPayout > 0) {
-    const userRef = doc(firestore, 'users', user.uid);
-    batch.update(userRef, { balance: increment(totalPayout) });
   }
 
-  // Commit all the changes to Firestore if anything was graded
-  if (gradedCount > 0) {
-    await batch.commit();
-    console.log(`Graded ${gradedCount} bets. Total payout applied: ${totalPayout.toFixed(2)} coins.`);
-  } else if (pendingBetsSnapshot.size > 0) {
-    console.log("Found pending bets, but their games may not be completed yet or leg statuses were already updated.")
-  }
+  return { updates, totalPayout };
 }

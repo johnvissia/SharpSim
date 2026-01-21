@@ -12,12 +12,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
 import { fetchAndSaveDailyData } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
 import { gradeUserBets } from '@/lib/bet-grading';
 import { getSports } from '@/lib/mock-data';
-import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet } from '@/lib/types';
+import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, CompletedGame } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Loader } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -152,16 +152,24 @@ export default function DashboardPage() {
   }, [firestore]);
   const { data: rankings, isLoading: isLoadingRankings } = useCollection<TeamRanking>(rankingsQuery);
 
-  const betsQuery = useMemoFirebase(() => {
+  // Fetch completed games for the watchdog effect
+  const completedGamesQuery = useMemoFirebase(() => {
+      if (!firestore) return null;
+      return collection(firestore, 'completed_games');
+  }, [firestore]);
+  const { data: completedGames } = useCollection<CompletedGame>(completedGamesQuery);
+
+  // Fetch only pending bets
+  const pendingBetsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'users', user.uid, 'bets'), where('status', '==', 'pending'));
   }, [user, firestore]);
-  const { data: userBets } = useCollection<UserBet>(betsQuery);
+  const { data: pendingBets } = useCollection<UserBet>(pendingBetsQuery);
 
   const activeBetGameIds = useMemo(() => {
-    if (!userBets) return new Set<string>();
+    if (!pendingBets) return new Set<string>();
     const gameIds = new Set<string>();
-    userBets.forEach(bet => {
+    pendingBets.forEach(bet => {
         if (bet.betType === 'parlay' && bet.legs) {
             bet.legs.forEach(leg => gameIds.add(leg.gameId));
         } else if (bet.gameId) {
@@ -173,7 +181,47 @@ export default function DashboardPage() {
         }
     });
     return gameIds;
-  }, [userBets]);
+  }, [pendingBets]);
+
+  // "Watchdog" useEffect to automatically grade bets
+  useEffect(() => {
+    const runAutoSettlement = async () => {
+      if (!firestore || !user || !pendingBets || !completedGames || pendingBets.length === 0 || completedGames.length === 0) {
+        return;
+      }
+
+      const completedGamesMap = new Map(completedGames.map(g => [g.id, g]));
+      const { updates, totalPayout } = gradeUserBets(pendingBets, completedGamesMap);
+
+      if (updates.length > 0) {
+        console.log(`Auto-settlement: Found ${updates.length} bets to update.`);
+        const batch = writeBatch(firestore);
+        
+        updates.forEach(update => {
+          const betRef = doc(firestore, 'users', user.uid, 'bets', update.betId);
+          batch.update(betRef, update.payload);
+        });
+
+        if (totalPayout > 0) {
+          const userRef = doc(firestore, 'users', user.uid);
+          batch.update(userRef, { balance: increment(totalPayout) });
+        }
+        
+        try {
+          await batch.commit();
+          toast({
+              title: "Bets Settled",
+              description: `${updates.length} of your bets have been automatically graded.`
+          });
+        } catch (error) {
+          console.error("Auto-settlement failed:", error);
+        }
+      }
+    };
+
+    runAutoSettlement();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedGames, pendingBets, firestore, user]);
 
 
   // Fetch static sports list
@@ -204,16 +252,15 @@ export default function DashboardPage() {
     toast({ title: 'Syncing Data...', description: 'Fetching latest odds, scores, and settling bets.' });
     try {
       await fetchAndSaveDailyData(firestore);
-      toast({ title: 'Odds Sync Complete!', description: 'Now grading any settled bets.' });
-      await gradeUserBets(firestore, user);
+      // The watchdog useEffect will now handle grading automatically.
       
       const systemStatusRef = doc(firestore, 'system', 'status');
       const today = new Date().toISOString().split('T')[0];
       setDocumentNonBlocking(systemStatusRef, { last_updated_date: today }, { merge: true });
       
       toast({
-        title: 'Sync Protocol Complete!',
-        description: 'Odds are fresh and bets are settled.',
+        title: 'Sync Complete!',
+        description: 'Latest data fetched. Any settled bets will be graded shortly.',
       });
     } catch (error: any) {
       console.error('Failed during manual sync protocol:', error);
