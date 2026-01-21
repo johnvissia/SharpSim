@@ -58,8 +58,8 @@ export function GameFeed({ games, isLoading, selectedSport, selectedConference, 
         return true;
     })
     .sort((a, b) => {
-        const aHasBet = activeBetGameIds.has(a.oddsApiId || '');
-        const bHasBet = activeBetGameIds.has(b.oddsApiId || '');
+        const aHasBet = activeBetGameIds.has(a.id);
+        const bHasBet = activeBetGameIds.has(b.id);
 
         // Primary sort: games with active bets on top
         if (aHasBet !== bHasBet) {
@@ -112,7 +112,7 @@ export function GameFeed({ games, isLoading, selectedSport, selectedConference, 
               key={`${game.id}-${game.homeTeam.name}`} 
               game={game} 
               onGameClick={onGameClick}
-              hasActiveBet={activeBetGameIds.has(game.oddsApiId || '')}
+              hasActiveBet={activeBetGameIds.has(game.id)}
             />
         ))
       ) : (
