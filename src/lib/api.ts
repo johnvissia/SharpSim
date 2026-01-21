@@ -55,15 +55,9 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
     
     console.log("Total Raw Upcoming Games Fetched:", allGames.length);
 
-    const now = new Date();
-    const cutoffTime = new Date(now.getTime() - (2 * 60 * 60 * 1000));
-    
-    const activeGames = allGames.filter(game => {
-      const gameTime = new Date(game.commence_time);
-      return gameTime > cutoffTime;
-    });
-
-    console.log("Active Upcoming Games After Filtering:", activeGames.length);
+    // We no longer filter here. We save all games returned from the API.
+    // The UI is responsible for filtering out old/irrelevant games for display.
+    // This ensures the bet grader has access to data for recently completed games.
 
     const dailyGamesBatch = writeBatch(firestore);
     const dailyGamesCollectionRef = collection(firestore, 'daily_games');
@@ -81,7 +75,7 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
         }
     }
     
-    activeGames.forEach(game => {
+    allGames.forEach(game => {
       const gameData: DailyGame = {
         id: game.id,
         sportKey: game.sport_key,
@@ -94,9 +88,9 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
       dailyGamesBatch.set(gameRef, gameData);
     });
 
-    if (activeGames.length > 0 || (successfullyFetchedSportKeys.length > 0 && activeGames.length === 0)) {
+    if (allGames.length > 0 || (successfullyFetchedSportKeys.length > 0 && allGames.length === 0)) {
         await dailyGamesBatch.commit();
-        console.log(`${activeGames.length} active games saved to Firestore.`);
+        console.log(`${allGames.length} games saved to Firestore.`);
     } else {
         console.log("No new games to save and no old games to delete.");
     }
