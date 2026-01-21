@@ -44,12 +44,15 @@ const TeamInfo = ({ team, sportSlug }: { team: Team, sportSlug: string | undefin
                     alt={team.name}
                     className="w-8 h-8 object-contain"
                     onError={(e) => {
+                        // STOP FLICKERING: Only retry once, then give up.
                         const target = e.currentTarget;
-                        if (target.src.includes('default')) return;
-
+                        if (target.src.includes('default')) return; // Already failed, do nothing.
+                        
+                        // Fallback: Try the generic NCAA folder if it's college
                         if (sportSlug === 'mens-college-basketball' && !target.src.includes('ncaa')) {
                             target.src = `https://a.espncdn.com/i/teamlogos/ncaa/500/${team.id}.png`;
                         } else {
+                            // Final Fallback: The Globe
                             target.src = "https://a.espncdn.com/i/teamlogos/default.png";
                         }
                     }}
