@@ -21,8 +21,6 @@ export function gradeUserBets(
   const updates: { betId: string, payload: Partial<UserBet> }[] = [];
   let totalPayout = 0;
 
-  const completedGames: CompletedGame[] = Array.from(completedGamesMap.values());
-
   const extractNumber = (str: string | undefined): number | null => {
     if (!str) return null;
     const match = str.match(/[-+]?\d*\.?\d+/);
@@ -60,14 +58,18 @@ export function gradeUserBets(
             return leg;
         }
 
+        // --- 1. ROBUST GAME FINDER ---
         let game: CompletedGame | undefined = completedGamesMap.get(leg.gameId);
+        
         if (!game) {
-            game = completedGames.find(g => 
-                (leg.matchup && g.homeTeam && leg.matchup.includes(g.homeTeam)) || 
-                (leg.matchup && g.awayTeam && leg.matchup.includes(g.awayTeam))
+            // Fallback: Search by matching both team names within the matchup string.
+            const completedGamesArray = Array.from(completedGamesMap.values());
+            game = completedGamesArray.find(g => 
+               (leg.matchup && g.homeTeam && leg.matchup.includes(g.homeTeam)) && 
+               (leg.matchup && g.awayTeam && leg.matchup.includes(g.awayTeam))
             );
         }
-
+        
         if (!game) {
             isFinalized = false;
             return leg;
@@ -82,24 +84,39 @@ export function gradeUserBets(
             const line = extractNumber(leg.pick);
 
             if (line === null) {
-              console.warn(`Could not parse spread line from pick: "${leg.pick}". Skipping leg.`);
-              isFinalized = false;
-              return leg;
+                console.warn(`Could not parse spread line from pick: "${leg.pick}". Skipping leg.`);
+                isFinalized = false;
+                return leg;
             }
-            
+
             const teamName = leg.pick.substring(0, leg.pick.lastIndexOf(' ')).trim();
-            const isHomePick = game.homeTeam.includes(teamName);
-            const scoreDiff = isHomePick ? (homeScore - awayScore) : (awayScore - homeScore);
+            const homeTeamName = game.homeTeam.trim();
+            const awayTeamName = game.awayTeam.trim();
+            
+            const isHomePick = homeTeamName.includes(teamName) || teamName.includes(homeTeamName);
+            const isAwayPick = awayTeamName.includes(teamName) || teamName.includes(awayTeamName);
+
+            let scoreDiff;
+            if (isHomePick) {
+                scoreDiff = homeScore - awayScore;
+            } else if (isAwayPick) {
+                scoreDiff = awayScore - homeScore;
+            } else {
+                console.warn(`Could not confidently match picked team "${teamName}" in game ${game.id}. Skipping leg.`);
+                isFinalized = false;
+                return leg;
+            }
+
             const finalMargin = scoreDiff + line;
             
-            if (finalMargin > 0) isWin = true;
-            else if (finalMargin < 0) isWin = false;
-            else isPush = true;
-            
-            console.log(`GRADING ${leg.pick}:`);
-            console.log(`Scores: ${homeScore}-${awayScore} | Margin for pick: ${scoreDiff}`);
-            console.log(`Line Used: ${line} | Final: ${finalMargin} (${isPush ? 'PUSH' : isWin ? 'WIN' : 'LOSS'})`);
-
+            if (finalMargin > 0) {
+                isWin = true;
+            } else if (finalMargin < 0) {
+                isWin = false;
+            } else {
+                isPush = true;
+            }
+        
         } else if (leg.betType === 'total') {
             const line = extractNumber(leg.pick);
             if (line === null) {
