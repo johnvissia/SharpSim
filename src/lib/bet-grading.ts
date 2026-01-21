@@ -3,6 +3,18 @@
 import { collection, doc, getDocs, query, where, writeBatch, Firestore, User, increment } from 'firebase/firestore';
 import type { CompletedGame, UserBet, ParlayLeg } from './types';
 
+// Helper to extract team name from a pick.
+function getTeamFromPick(pick: string, betType: UserBet['betType']): string | null {
+    if (betType === 'total' || betType === 'player_prop') return null;
+    if (betType === 'moneyline') return pick;
+    if (betType === 'spread') {
+        const lastSpaceIndex = pick.lastIndexOf(' ');
+        if (lastSpaceIndex === -1) return pick; // Fallback for weirdly formatted picks
+        return pick.substring(0, lastSpaceIndex).trim();
+    }
+    return null;
+}
+
 const gradeMoneyline = (bet: Pick<UserBet, 'pick'>, game: CompletedGame): 'won' | 'lost' => {
   const isHomePick = bet.pick === game.homeTeam;
   const isAwayPick = bet.pick === game.awayTeam;
@@ -89,7 +101,14 @@ export function gradeUserBets(
   const updates: { betId: string, payload: Partial<UserBet> }[] = [];
   let totalPayout = 0;
 
+  const completedGames: CompletedGame[] = Array.from(completedGamesMap.values());
+
   for (const bet of pendingBets) {
+    // Only process bets that are actually pending
+    if (bet.status !== 'pending') {
+        continue;
+    }
+
     const legsToProcess: ParlayLeg[] = bet.legs ? bet.legs : [
         {
             gameId: bet.gameId,
@@ -115,13 +134,29 @@ export function gradeUserBets(
             return leg;
         }
 
-        const game = completedGamesMap.get(leg.gameId);
+        // --- ROBUST GAME FINDER ---
+        // 1. Try to find the game by its ID first for efficiency.
+        let game: CompletedGame | undefined = completedGamesMap.get(leg.gameId);
+        
+        // 2. If not found by ID, fall back to searching by team name.
+        if (!game) {
+            const teamNameInPick = getTeamFromPick(leg.pick, leg.betType);
+            if (teamNameInPick) {
+                // Find game where this team is either home or away.
+                // This is less efficient but robust against ID changes.
+                game = completedGames.find(g => 
+                    g.homeTeam === teamNameInPick || g.awayTeam === teamNameInPick
+                );
+            }
+        }
 
+        // If game is still not found or not completed, it remains pending.
         if (!game) {
             isFinalized = false;
             return leg;
         }
-
+        
+        // --- Grade the leg ---
         betChanged = true;
         const newLegStatus = calculateLegResult(leg, game);
 
@@ -131,6 +166,8 @@ export function gradeUserBets(
         return { ...leg, status: newLegStatus };
     });
 
+    // If any leg is still pending, the whole ticket is not finalized yet.
+    // However, we might still want to update the individual leg statuses.
     if (!isFinalized) {
         if (bet.betType === 'parlay' && betChanged) {
             updates.push({
@@ -141,6 +178,7 @@ export function gradeUserBets(
         continue;
     }
 
+    // --- Determine Final Ticket Status ---
     let finalStatus: UserBet['status'];
     if (hasLostLeg) {
         finalStatus = 'lost';
@@ -150,20 +188,20 @@ export function gradeUserBets(
         finalStatus = 'won';
     }
 
-    const payload: Partial<UserBet> = { status: finalStatus };
-    if (bet.betType === 'parlay') {
-        payload.legs = updatedLegs;
-    }
-    
-    // Only add to updates if the status actually changed
+    // If the status changed, prepare the update.
     if (bet.status !== finalStatus || betChanged) {
+      const payload: Partial<UserBet> = { status: finalStatus };
+      if (bet.betType === 'parlay') {
+          payload.legs = updatedLegs;
+      }
       updates.push({ betId: bet.id, payload });
-    }
 
-    if (finalStatus === 'won') {
-        totalPayout += bet.potentialWinnings;
-    } else if (finalStatus === 'push') {
-        totalPayout += bet.stake;
+      // Calculate payout on status finalization
+      if (finalStatus === 'won') {
+          totalPayout += bet.potentialWinnings;
+      } else if (finalStatus === 'push') {
+          totalPayout += bet.stake;
+      }
     }
   }
 
