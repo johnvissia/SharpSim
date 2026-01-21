@@ -62,6 +62,7 @@ interface EspnCompetition {
             shortDetail: string;
         };
     };
+    odds?: any[];
 }
 
 interface EspnEvent {
@@ -87,7 +88,15 @@ interface EspnScoreboard {
 }
 
 export async function fetchEspnSchedule(): Promise<Game[]> {
-    const endpoints = [
+    const getEspnDateString = (daysOffset = 0) => {
+        const date = new Date();
+        date.setDate(date.getDate() + daysOffset);
+        return date.toISOString().split('T')[0].replace(/-/g, '');
+    };
+    const todayStr = getEspnDateString(0);
+    const yesterdayStr = getEspnDateString(-1);
+
+    const sources = [
         { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', sport: 'NBA' as SportName, slug: 'nba' },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard', sport: 'NFL' as SportName, slug: 'nfl' },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard', sport: 'NHL' as SportName, slug: 'nhl' },
@@ -96,100 +105,75 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
     ];
 
     try {
-        const responses = await Promise.all(
-            endpoints.map(endpoint => fetch(endpoint.url, { next: { revalidate: 30 } }).then(res => res.json() as Promise<EspnScoreboard>))
-        );
-
-        const allGames: Game[] = [];
-
-        responses.forEach((scoreboard, index) => {
-            const endpointInfo = endpoints[index];
-            if (scoreboard.events) {
-                const games = scoreboard.events
-                    .map(event => {
-                        const competition = event.competitions[0];
-                        if (!competition) return null;
-
-                        const homeCompetitor = competition.competitors.find(c => c.homeAway === 'home');
-                        const awayCompetitor = competition.competitors.find(c => c.homeAway === 'away');
-
-                        if (!homeCompetitor || !awayCompetitor) return null;
-
-                        const getLeadingScorer = (competitor: EspnCompetitor) => {
-                            if (!competitor.leaders) return undefined;
-                            const pointsLeaderData = competitor.leaders.find(l => l.name === 'points');
-                            if (pointsLeaderData && pointsLeaderData.leaders && pointsLeaderData.leaders.length > 0) {
-                                const leader = pointsLeaderData.leaders[0];
-                                if (leader.athlete) {
-                                    return {
-                                        name: leader.athlete.shortName || leader.athlete.fullName,
-                                        value: leader.displayValue,
-                                    };
-                                }
-                            }
-                            return undefined;
-                        };
-
-                        const getLogo = (competitor: EspnCompetitor) => {
-                            if (competitor.team.logo) return competitor.team.logo;
-                            if (competitor.team.logos && competitor.team.logos.length > 0) {
-                                const defaultLogo = competitor.team.logos.find(l => l.rel?.includes('default'));
-                                if (defaultLogo) return defaultLogo.href;
-                                return competitor.team.logos[0].href;
-                            }
-                            return '';
-                        }
-                        
-                        let finalSlug = endpointInfo.slug;
-                        if (!finalSlug && scoreboard.leagues?.[0]?.slug) {
-                            finalSlug = scoreboard.leagues[0].slug;
-                        }
-
-                        const homeTeam: Team = {
-                            id: homeCompetitor.team.id,
-                            name: homeCompetitor.team.displayName,
-                            logo: getLogo(homeCompetitor),
-                            players: [],
-                            rank: undefined,
-                            conference: undefined,
-                            leadingScorer: getLeadingScorer(homeCompetitor),
-                        };
-
-                        const awayTeam: Team = {
-                            id: awayCompetitor.team.id,
-                            name: awayCompetitor.team.displayName,
-                            logo: getLogo(awayCompetitor),
-                            players: [],
-                            rank: undefined,
-                            conference: undefined,
-                            leadingScorer: getLeadingScorer(awayCompetitor),
-                        };
-
-                        const game: Game = {
-                            id: event.id,
-                            sport: endpointInfo.sport,
-                            sportSlug: finalSlug,
-                            startTime: event.date,
-                            homeTeam,
-                            awayTeam,
-                            liveScore: {
-                                home: parseInt(homeCompetitor.score, 10) || 0,
-                                away: parseInt(awayCompetitor.score, 10) || 0,
-                            },
-                            statusDetail: competition.status.type.detail,
-                            statusState: competition.status.type.state,
-                        };
-                        return game;
-
-                    })
-                    .filter((g): g is Game => g !== null);
-                allGames.push(...games);
-            }
+        const promises: Promise<{ data: EspnScoreboard, slug: string, sport: SportName }>[] = [];
+        sources.forEach(source => {
+            promises.push(fetch(`${source.url}?dates=${todayStr}&limit=100`).then(r => r.json()).then(data => ({ data, slug: source.slug, sport: source.sport })));
+            promises.push(fetch(`${source.url}?dates=${yesterdayStr}&limit=100`).then(r => r.json()).then(data => ({ data, slug: source.slug, sport: source.sport })));
         });
 
-        return allGames;
+        const results = await Promise.all(promises);
+        let allGames: Game[] = [];
+
+        results.forEach(({ data, slug, sport }) => {
+            if (!data.events) return;
+
+            const sportGames = data.events.map(event => {
+                const comp = event.competitions[0];
+                if (!comp) return null;
+                const home = comp.competitors.find(c => c.homeAway === 'home');
+                const away = comp.competitors.find(c => c.homeAway === 'away');
+                if (!home || !away) return null;
+
+                const getLogo = (competitor: EspnCompetitor) => {
+                    if (competitor.team.logo) return competitor.team.logo;
+                    if (competitor.team.logos && competitor.team.logos.length > 0) {
+                        const defaultLogo = competitor.team.logos.find(l => l.rel?.includes('default'));
+                        if (defaultLogo) return defaultLogo.href;
+                        return competitor.team.logos[0].href;
+                    }
+                    return '';
+                };
+
+                const homeTeam: Team = {
+                    id: String(home.team.id),
+                    name: home.team.displayName,
+                    logo: getLogo(home),
+                    players: [],
+                };
+
+                const awayTeam: Team = {
+                    id: String(away.team.id),
+                    name: away.team.displayName,
+                    logo: getLogo(away),
+                    players: [],
+                };
+
+                const game: Game = {
+                    id: event.id,
+                    sport: sport,
+                    sportSlug: slug,
+                    startTime: event.date,
+                    homeTeam,
+                    awayTeam,
+                    liveScore: {
+                        home: parseInt(home.score, 10) || 0,
+                        away: parseInt(away.score, 10) || 0,
+                    },
+                    statusDetail: comp.status.type.detail,
+                    statusState: comp.status.type.state,
+                };
+                return game;
+            }).filter((g): g is Game => g !== null);
+
+            allGames.push(...sportGames);
+        });
+
+        const uniqueGames = Array.from(new Map(allGames.map(g => [g.id, g])).values());
+        console.log(`✅ Refreshed ${uniqueGames.length} games with correct slugs.`);
+        return uniqueGames;
+
     } catch (error) {
         console.error("Failed to fetch ESPN schedule:", error);
-        return []; // Return empty array on failure
+        return [];
     }
 }

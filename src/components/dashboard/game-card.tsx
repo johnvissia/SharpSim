@@ -36,30 +36,23 @@ const OddsButton = ({
 );
 
 const TeamInfo = ({ team, sportSlug }: { team: Team, sportSlug: string | undefined }) => {
-    const getLogoUrl = () => {
-        let slug = sportSlug;
-        if (sportSlug === 'mens-college-basketball') {
-            slug = 'ncaam';
-        } else if (sportSlug === 'college-football') {
-            slug = 'ncaaf';
-        } else if (!slug) {
-            slug = 'nba'; // Default fallback if slug is somehow missing
-        }
-        return `https://a.espncdn.com/i/teamlogos/${slug}/500/${team.id}.png`;
-    };
-
-    const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-        e.currentTarget.src = 'https://a.espncdn.com/i/teamlogos/default.png';
-    };
-
     return (
         <div className="flex items-center gap-2 text-sm font-semibold">
             <div className="w-8 h-8 mr-3 flex-shrink-0 flex items-center justify-center">
                 <img
-                    src={getLogoUrl()}
-                    onError={handleImageError}
-                    alt={`${team.name} logo`}
+                    src={`https://a.espncdn.com/i/teamlogos/${sportSlug}/500/${team.id}.png`}
+                    alt={team.name}
                     className="w-8 h-8 object-contain"
+                    onError={(e) => {
+                        const target = e.currentTarget;
+                        if (target.src.includes('default')) return;
+
+                        if (sportSlug === 'mens-college-basketball' && !target.src.includes('ncaa')) {
+                            target.src = `https://a.espncdn.com/i/teamlogos/ncaa/500/${team.id}.png`;
+                        } else {
+                            target.src = "https://a.espncdn.com/i/teamlogos/default.png";
+                        }
+                    }}
                 />
             </div>
             <span className="truncate">{team.name}</span>
