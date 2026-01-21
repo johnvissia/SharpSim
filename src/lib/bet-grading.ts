@@ -21,7 +21,6 @@ export function gradeUserBets(
   const updates: { betId: string, payload: Partial<UserBet> }[] = [];
   let totalPayout = 0;
   
-  // Helper to extract number from text (e.g. "Indiana +15.5" -> 15.5)
   const extractNumber = (str: string | undefined): number | null => {
     if (!str) return null;
     const match = str.match(/[-+]?\d*\.?\d+/);
@@ -31,7 +30,6 @@ export function gradeUserBets(
   const completedGamesArray = Array.from(completedGamesMap.values());
 
   for (const bet of pendingBets) {
-    // Only process bets that are actually pending
     if (bet.status !== 'pending') {
         continue;
     }
@@ -49,7 +47,7 @@ export function gradeUserBets(
         }
     ];
 
-    let isFinalized = true; // Assume the whole ticket can be finalized
+    let isFinalized = true;
     let hasLostLeg = false;
     let pushCount = 0;
     let betChanged = false;
@@ -61,7 +59,6 @@ export function gradeUserBets(
             return leg;
         }
 
-        // --- 1. GAME FINDER ---
         let game: CompletedGame | undefined = completedGamesMap.get(leg.gameId);
         
         if (!game) {
@@ -72,57 +69,43 @@ export function gradeUserBets(
         }
         
         // --- GATEKEEPER RULE ---
-        if (!game || !game.completed) {
+        // Only grade if the game is found, marked completed, AND its start time is in the past.
+        if (!game || !game.completed || new Date(game.commenceTime) > new Date()) {
             isFinalized = false;
             return leg;
         }
         
         // --- SAFETY CHECK ---
+        // Failsafe to prevent grading games with 0-0 scores that might have slipped through.
         if (game.homeScore === 0 && game.awayScore === 0) {
             isFinalized = false;
             return leg;
         }
 
-        // --- 2. GRADING LOGIC ---
         const homeScore = game.homeScore;
         const awayScore = game.awayScore;
         let isWin = false;
         let isPush = false;
         
         if (leg.betType === 'spread') {
-            let line = extractNumber(leg.pick);
-
+            const line = extractNumber(leg.pick);
             if (line === null) {
                 isFinalized = false;
                 return leg;
             }
+            const teamNameFromPick = leg.pick.replace(/[-+0-9\.]/g, '').trim();
+            const isHomePick = game.homeTeam.includes(teamNameFromPick);
+            const isAwayPick = game.awayTeam.includes(teamNameFromPick);
 
-            const teamName = leg.pick.substring(0, leg.pick.lastIndexOf(' ')).trim();
-            const homeTeamName = game.homeTeam.trim();
-            const awayTeamName = game.awayTeam.trim();
-            
-            const isHomePick = homeTeamName.includes(teamName) || teamName.includes(homeTeamName);
-            const isAwayPick = awayTeamName.includes(teamName) || teamName.includes(awayTeamName);
-
-            let scoreDiff;
-            if (isHomePick) {
-                scoreDiff = homeScore - awayScore;
-            } else if (isAwayPick) {
-                scoreDiff = awayScore - homeScore;
-            } else {
+            if (!isHomePick && !isAwayPick) {
                 isFinalized = false;
                 return leg;
             }
-            
-            const finalMargin = scoreDiff + line;
-            if (finalMargin > 0) {
-                isWin = true;
-            } else if (finalMargin < 0) {
-                isWin = false;
-            } else {
-                isPush = true;
-            }
-        
+            const margin = isHomePick ? (homeScore - awayScore) : (awayScore - homeScore);
+            const finalMargin = margin + line;
+            isWin = finalMargin > 0;
+            if (finalMargin === 0) isPush = true;
+
         } else if (leg.betType === 'total') {
             const line = extractNumber(leg.pick);
             if (line === null) {
@@ -135,7 +118,7 @@ export function gradeUserBets(
               isPush = true;
             } else if (leg.pick.toLowerCase().includes('over')) {
                 isWin = totalScore > line;
-            } else { // Under
+            } else {
                 isWin = totalScore < line;
             }
         } else if (leg.betType === 'moneyline') {
