@@ -1,21 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import { AppSidebar } from './app-sidebar';
+import { useEffect } from 'react';
 import { useAuth, useUser } from '@/firebase';
 import { signInAnonymously } from 'firebase/auth';
 
 export function SiteLayout({ children }: { children: React.ReactNode }) {
-  const [isSidebarDefaultOpen, setSidebarDefaultOpen] = useState(true);
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
-
-  useEffect(() => {
-    // Read cookie on client-side to avoid hydration mismatch
-    const isSidebarOpen = document.cookie.includes('sidebar_state=true');
-    setSidebarDefaultOpen(isSidebarOpen);
-  }, []);
 
   useEffect(() => {
     // Automatically sign in the user anonymously if they are not logged in.
@@ -27,11 +18,8 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   }, [auth, user, isUserLoading]);
 
   return (
-    <SidebarProvider defaultOpen={isSidebarDefaultOpen}>
-      <div className="flex min-h-screen">
-        <AppSidebar />
-        <SidebarInset>{children}</SidebarInset>
-      </div>
-    </SidebarProvider>
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+        <main>{children}</main>
+    </div>
   );
 }

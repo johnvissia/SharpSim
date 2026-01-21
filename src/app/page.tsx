@@ -2,30 +2,20 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { GameFeed } from '@/components/dashboard/game-feed';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
 import { fetchAndSaveDailyData } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
 import { gradeUserBets, calculateLegResult } from '@/lib/bet-grading';
-import { getSports } from '@/lib/mock-data';
-import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, CompletedGame, ParlayLeg, UserProfile } from '@/lib/types';
+import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Download, Loader } from 'lucide-react';
+import { Loader } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { BetSlip } from '@/components/dashboard/BetSlip';
 import { GameDetailModal } from '@/components/dashboard/GameDetailModal';
 import { sportNameMapping } from '@/lib/sports';
 import { getConference } from '@/lib/ncaa-conferences';
-import { power4TeamNames } from '@/lib/power-4-teams';
 
 // This function is now being moved from game-feed.tsx to page.tsx
 const transformDailyGamesToGames = (
@@ -125,16 +115,12 @@ const transformDailyGamesToGames = (
 
 
 export default function DashboardPage() {
-  const [sports, setSports] = useState<Sport[]>([]);
-  const [selectedSport, setSelectedSport] = useState('All');
-  const [selectedConference, setSelectedConference] = useState('All');
-  const [loadingSports, setLoadingSports] = useState(true);
-  const [isFetchingManually, setIsFetchingManually] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
-  const [espnGames, setEspnGames] = useState<Game[]>([]); // State for new ESPN data
+  const [espnGames, setEspnGames] = useState<Game[]>([]);
   const [isLoadingEspn, setIsLoadingEspn] = useState(true);
 
-  const conferenceOptions = ["All", "SEC", "Big 10", "ACC", "Big 12"];
+  const categories = ['All', 'Favorites', 'NBA', 'NCAAM', 'NHL', 'NFL', 'NCAAF'];
 
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -147,7 +133,6 @@ export default function DashboardPage() {
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
   const favoriteTeams = useMemo(() => userProfile?.favoriteTeams || [], [userProfile]);
   
-  // Fetching data previously in GameFeed
   const dailyGamesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'daily_games'), orderBy('commenceTime'));
@@ -160,14 +145,12 @@ export default function DashboardPage() {
   }, [firestore]);
   const { data: rankings, isLoading: isLoadingRankings } = useCollection<TeamRanking>(rankingsQuery);
 
-  // Fetch completed games for the watchdog effect
   const completedGamesQuery = useMemoFirebase(() => {
       if (!firestore) return null;
       return collection(firestore, 'completed_games');
   }, [firestore]);
   const { data: completedGames } = useCollection<CompletedGame>(completedGamesQuery);
 
-  // Fetch only pending bets
   const pendingBetsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'users', user.uid, 'bets'), where('status', '==', 'pending'));
@@ -191,7 +174,6 @@ export default function DashboardPage() {
     return gameIds;
   }, [pendingBets]);
 
-  // "Watchdog" useEffect to automatically grade bets
   useEffect(() => {
     const runAutoSettlement = async () => {
       if (!firestore || !user || !pendingBets || !completedGames || pendingBets.length === 0 || completedGames.length === 0) {
@@ -231,19 +213,6 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completedGames, pendingBets, firestore, user]);
 
-
-  // Fetch static sports list
-  useEffect(() => {
-    const fetchSportsData = async () => {
-      setLoadingSports(true);
-      const sportsData = await getSports();
-      setSports(sportsData);
-      setLoadingSports(false);
-    };
-    fetchSportsData();
-  }, []);
-
-  // New effect to fetch live ESPN data
   useEffect(() => {
     const getEspnData = async () => {
         setIsLoadingEspn(true);
@@ -254,89 +223,6 @@ export default function DashboardPage() {
     getEspnData();
   }, []);
   
-  const handleManualFetch = async () => {
-    if (!firestore || !user) return;
-    setIsFetchingManually(true);
-    toast({ title: 'Syncing Data...', description: 'Fetching latest odds, scores, and settling bets.' });
-    try {
-      await fetchAndSaveDailyData(firestore);
-      // The watchdog useEffect will now handle grading automatically.
-      
-      const systemStatusRef = doc(firestore, 'system', 'status');
-      const today = new Date().toISOString().split('T')[0];
-      setDocumentNonBlocking(systemStatusRef, { last_updated_date: today }, { merge: true });
-      
-      toast({
-        title: 'Sync Complete!',
-        description: 'Latest data fetched. Any settled bets will be graded shortly.',
-      });
-    } catch (error: any) {
-      console.error('Failed during manual sync protocol:', error);
-      toast({ 
-        variant: 'destructive', 
-        title: 'Sync Failed', 
-        description: error.message || 'Could not run sync protocol.', 
-        duration: 20000 
-      });
-    }
-    setIsFetchingManually(false);
-  };
-  
-    const runDebug = () => {
-    if (!pendingBets || !completedGames) {
-      console.log("🐞 Debugger cannot run: pendingBets or completedGames not loaded yet.");
-      return;
-    }
-    console.log("🐞 STARTING DEBUGGER 🐞");
-    console.log(`Checking ${pendingBets.length} pending Bets against ${completedGames.length} completed Games...`);
-
-    pendingBets.forEach(bet => {
-      console.log(`\n🎫 Checking Bet ID: ${bet.id} (Status: ${bet.status})`);
-
-      const legsToDebug: ParlayLeg[] = bet.legs ? bet.legs : [
-        {
-          gameId: bet.gameId,
-          pick: bet.pick,
-          betType: bet.betType as 'moneyline' | 'spread' | 'total' | 'player_prop',
-          matchup: bet.matchup || '',
-          commenceTime: bet.commenceTime || '',
-          odds: bet.odds,
-          status: bet.status,
-          sport: bet.sport,
-        },
-      ];
-
-      legsToDebug.forEach(leg => {
-        console.log(`   🦵 Leg: ${leg.pick} (Game ID: ${leg.gameId})`);
-
-        // 1. Try to find the game in completed games
-        const game = completedGames.find(g => g.id === leg.gameId);
-        
-        if (!game) {
-            console.error(`      ❌ GAME NOT FOUND in completed_games!`);
-            
-            const dailyGame = dailyGames?.find(dg => dg.id === leg.gameId);
-            if(dailyGame) {
-                console.log(`      ℹ️  Game is still in daily_games list and not yet completed. Commence Time: ${dailyGame.commenceTime}`);
-            } else {
-                console.error(`      ❌ Game ID ${leg.gameId} not found in 'daily_games' or 'completed_games'. This is likely the root of the problem.`);
-            }
-
-        } else {
-            console.log(`      ✅ Game Found: ${game.homeTeam} vs ${game.awayTeam}`);
-            
-            const homeScore = game.homeScore;
-            const awayScore = game.awayScore;
-            console.log(`      🔢 Scores Read As -> Home: ${homeScore}, Away: ${awayScore}`);
-
-            const legResult = calculateLegResult(leg, game);
-            console.log(`      🧐 Simulated leg result: ${legResult}`);
-        }
-      });
-    });
-    console.log("🐞 DEBUGGER FINISHED 🐞");
-  };
-
   const mergedGames = useMemo(() => {
     const teamNameNormalizationMap: Record<string, string> = {
       'LA Clippers': 'Los Angeles Clippers',
@@ -348,13 +234,11 @@ export default function DashboardPage() {
 
     const finalGames = new Map<string, Game>();
 
-    // Step 1: Add all games from the live ESPN feed. This is our primary source of truth for what's on today.
     espnGames.forEach(espnGame => {
         const homeName = normalizeTeamName(espnGame.homeTeam.name);
         const awayName = normalizeTeamName(espnGame.awayTeam.name);
         const key = `${espnGame.sport}-${homeName}-${awayName}`;
         
-        // Enrich ESPN game with ranking/conference data right away.
         const homeRankingInfo = rankingsMap.get(espnGame.homeTeam.name);
         const awayRankingInfo = rankingsMap.get(espnGame.awayTeam.name);
         const enrichedEspnGame = {
@@ -373,7 +257,6 @@ export default function DashboardPage() {
         finalGames.set(key, enrichedEspnGame);
     });
 
-    // Step 2: Enrich with odds data from The Odds API / Firestore.
     oddsGames.forEach(oddsGame => {
         const homeName = normalizeTeamName(oddsGame.homeTeam.name);
         const awayName = normalizeTeamName(oddsGame.awayTeam.name);
@@ -381,21 +264,18 @@ export default function DashboardPage() {
         const existingGame = finalGames.get(key);
 
         if (existingGame) {
-            // Game already exists from ESPN feed, merge odds into it.
             finalGames.set(key, {
                 ...existingGame,
                 odds: oddsGame.odds,
                 allOdds: oddsGame.allOdds,
-                id: existingGame.id, // Prioritize ESPN ID
-                oddsApiId: oddsGame.id, // Keep Odds API ID for grading
+                id: existingGame.id,
+                oddsApiId: oddsGame.id,
             });
         } else {
-            // This game has odds but wasn't in the ESPN feed. Add it with its Odds API ID.
             finalGames.set(key, { ...oddsGame, id: oddsGame.id, oddsApiId: oddsGame.id });
         }
     });
     
-    // If ESPN data is still loading, it's better to show games with odds than nothing.
     if (isLoadingEspn && finalGames.size === 0) {
         return oddsGames;
     }
@@ -406,15 +286,19 @@ export default function DashboardPage() {
 
   const filteredAndSortedGames = useMemo(() => {
     const now = new Date();
-    // Finished games will be shown for 4 hours after their start time (approx. 1 hr after they end)
     const finishedGameCutoff = 4 * 60 * 60 * 1000; 
 
     return mergedGames.filter(game => {
-        // 1. Sport Filter
-        const sportMatch = selectedSport === 'All' || game.sport === selectedSport;
-        if (!sportMatch) return false;
+        if (selectedCategory === 'Favorites') {
+            if (!favoriteTeams.includes(game.homeTeam.name) && !favoriteTeams.includes(game.awayTeam.name)) {
+                return false;
+            }
+        } else if (selectedCategory !== 'All') {
+            if (game.sport !== selectedCategory) {
+                return false;
+            }
+        }
 
-        // 2. Hide old finished games
         if (game.statusState === 'post') {
             const gameTime = new Date(game.startTime).getTime();
             if (now.getTime() - gameTime > finishedGameCutoff) {
@@ -422,33 +306,12 @@ export default function DashboardPage() {
             }
         }
 
-        const ncaaSports = ['NCAAF', 'NCAAM'];
-        const isNCAAGame = ncaaSports.includes(game.sport as any);
-        
-        // 3. NCAA-specific filters
-        if (isNCAAGame) {
-            const isConferenceFilterActive = selectedConference !== 'All';
-
-            // A) Conference Filter (if active)
-            if (isConferenceFilterActive) {
-                const homeConference = game.homeTeam.conference;
-                const awayConference = game.awayTeam.conference;
-                return homeConference === selectedConference || awayConference === selectedConference;
-            }
-            
-            // B) Power 4 Filter (if no conference is selected)
-            // Show game if at least one team is in the Power 4 list.
-            return power4TeamNames.has(game.homeTeam.name) || power4TeamNames.has(game.awayTeam.name);
-        }
-
-        // 4. Show all non-NCAA games that match the sport filter
         return true;
     })
     .sort((a, b) => {
         const isFavA = favoriteTeams.includes(a.homeTeam.name) || favoriteTeams.includes(a.awayTeam.name);
         const isFavB = favoriteTeams.includes(b.homeTeam.name) || favoriteTeams.includes(b.awayTeam.name);
 
-        // Super-priority sort: favorites on top
         if (isFavA !== isFavB) {
             return isFavA ? -1 : 1;
         }
@@ -456,15 +319,14 @@ export default function DashboardPage() {
         const aHasBet = !!a.oddsApiId && activeBetGameIds.has(a.oddsApiId);
         const bHasBet = !!b.oddsApiId && activeBetGameIds.has(b.oddsApiId);
 
-        // Primary sort: games with active bets on top
         if (aHasBet !== bHasBet) {
             return aHasBet ? -1 : 1;
         }
 
         const statusOrder = {
-            'in': 1,   // Then live games
-            'pre': 2,  // Then upcoming games
-            'post': 3, // Finally, finished games
+            'in': 1,
+            'pre': 2,
+            'post': 3,
         };
 
         const aStatus = a.statusState ?? 'pre';
@@ -473,103 +335,63 @@ export default function DashboardPage() {
         const aOrder = statusOrder[aStatus as keyof typeof statusOrder] || 4;
         const bOrder = statusOrder[bStatus as keyof typeof statusOrder] || 4;
         
-        // Secondary sort: by game state
         if (aOrder !== bOrder) {
             return aOrder - bOrder;
         }
 
-        // Tertiary sort: by time
-        // For finished games, sort descending to show most recent first.
         if (aStatus === 'post') {
             return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
         }
         
-        // For live and upcoming, sort ascending to show soonest first.
         return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
     });
-  }, [mergedGames, selectedSport, selectedConference, activeBetGameIds, favoriteTeams]);
+  }, [mergedGames, selectedCategory, activeBetGameIds, favoriteTeams]);
 
 
   const showLoadingSpinner = isUserLoading || (isLoadingGames && !dailyGames);
 
-  const ncaaSports = ['NCAAF', 'NCAAM'];
-  const isConferenceFilterEnabled = ncaaSports.includes(selectedSport);
-
   return (
     <>
-      <div className="flex flex-col gap-8 p-4 md:p-8">
-        <header className="flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                Today's Games
-              </h1>
-              <p className="text-muted-foreground">
-                {selectedSport === 'All'
-                  ? 'All upcoming games'
-                  : `Upcoming ${selectedSport} games`}
-              </p>
-            </div>
-             <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleManualFetch}
-                  disabled={isFetchingManually || showLoadingSpinner}
+      <div className="max-w-4xl mx-auto">
+        <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 py-3 mb-4">
+            <div className="flex gap-2 overflow-x-auto px-4 no-scrollbar">
+                {categories.map(cat => (
+                <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`
+                    px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all
+                    ${selectedCategory === cat 
+                        ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}
+                    `}
                 >
-                  {isFetchingManually ? (
-                    <Loader className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="mr-2 h-4 w-4" />
-                  )}
-                  {isFetchingManually ? 'Syncing...' : 'Sync Odds'}
-                </Button>
-                <Button 
-                    onClick={runDebug} 
-                    variant="destructive"
-                    disabled={isFetchingManually || showLoadingSpinner}
-                >
-                    🐞 Debug Pending Tickets
-                </Button>
+                    {cat}
+                </button>
+                ))}
             </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {loadingSports ? (
-                  <Skeleton className="h-10" />
-              ) : (
-                  <Select onValueChange={setSelectedSport} defaultValue={selectedSport} disabled={showLoadingSpinner}>
-                      <SelectTrigger><SelectValue placeholder="Select a sport" /></SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="All">All Sports</SelectItem>
-                          {sports.map((sport) => ( <SelectItem key={sport.id} value={sport.name}>{sport.name}</SelectItem> ))}
-                      </SelectContent>
-                  </Select>
-              )}
-              <Select onValueChange={setSelectedConference} defaultValue={selectedConference} disabled={showLoadingSpinner || !isConferenceFilterEnabled}>
-                  <SelectTrigger><SelectValue placeholder="Filter by Conference" /></SelectTrigger>
-                  <SelectContent>
-                      {conferenceOptions.map((conf) => ( <SelectItem key={conf} value={conf}>{conf}</SelectItem> ))}
-                  </SelectContent>
-              </Select>
-          </div>
-        </header>
+        </div>
 
-        {showLoadingSpinner ? (
-          <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
-            <Loader className="h-12 w-12 animate-spin text-primary" />
-            <h2 className="text-xl font-semibold text-foreground">
-              {isUserLoading ? 'Authenticating...' : 'Loading Daily Lines...'}
-            </h2>
-            <p className="text-muted-foreground">
-              {isUserLoading ? 'Preparing your session...' : 'Getting the latest game information.'}
-            </p>
-          </div>
-        ) : (
-          <GameFeed
-              games={filteredAndSortedGames}
-              isLoading={isLoadingGames || isLoadingEspn}
-              onGameClick={setSelectedGame}
-              activeBetGameIds={activeBetGameIds}
-          />
-        )}
+        <div className="px-4 pb-8">
+            {showLoadingSpinner ? (
+            <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
+                <Loader className="h-12 w-12 animate-spin text-primary" />
+                <h2 className="text-xl font-semibold text-foreground">
+                {isUserLoading ? 'Authenticating...' : 'Loading Daily Lines...'}
+                </h2>
+                <p className="text-muted-foreground">
+                {isUserLoading ? 'Preparing your session...' : 'Getting the latest game information.'}
+                </p>
+            </div>
+            ) : (
+            <GameFeed
+                games={filteredAndSortedGames}
+                isLoading={isLoadingGames || isLoadingEspn}
+                onGameClick={setSelectedGame}
+                activeBetGameIds={activeBetGameIds}
+            />
+            )}
+        </div>
       </div>
       <BetSlip />
       <GameDetailModal game={selectedGame} isOpen={!!selectedGame} onClose={() => setSelectedGame(null)} />
