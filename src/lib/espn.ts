@@ -35,7 +35,7 @@ interface EspnCompetitor {
         color: string;
         alternateColor: string;
         logo?: string;
-        logos?: { href: string }[];
+        logos?: { href: string; rel?: string[] }[];
     };
     score: string;
     linescores: { value: number }[];
@@ -112,7 +112,22 @@ const mapEspnEventToGame = (event: EspnEvent, sport: SportName): Game | null => 
     };
 
     const getLogo = (competitor: EspnCompetitor) => {
-        return competitor.team.logo || competitor.team.logos?.[0]?.href || '';
+        // The primary `logo` field is often the best one if it exists.
+        if (competitor.team.logo) {
+            return competitor.team.logo;
+        }
+        // If not, check the `logos` array.
+        if (competitor.team.logos && competitor.team.logos.length > 0) {
+            // Prefer the logo marked as 'default'.
+            const defaultLogo = competitor.team.logos.find(l => l.rel?.includes('default'));
+            if (defaultLogo) {
+                return defaultLogo.href;
+            }
+            // Otherwise, fall back to the very first logo in the array.
+            return competitor.team.logos[0].href;
+        }
+        // If no logo can be found, return an empty string.
+        return '';
     }
 
     const homeTeam: Team = {
