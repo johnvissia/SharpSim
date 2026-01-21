@@ -307,13 +307,9 @@ export function BetSlip() {
                     onChange={(e) => setStake(e.target.value)} 
                 />
             </div>
-            <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">To Win</span>
-                <span className="font-bold text-green-600">{(potentialPayout - parseFloat(stake || '0')).toFixed(2)} coins</span>
-            </div>
              <div className="flex justify-between items-center text-sm font-semibold">
-                <span className="text-muted-foreground">Total Payout</span>
-                <span className="text-green-500">{potentialPayout.toFixed(2)} coins</span>
+                <span className="text-muted-foreground">To Win</span>
+                <span className="font-bold text-green-500">{potentialPayout.toFixed(2)} coins</span>
             </div>
             <Button 
               className="w-full"
