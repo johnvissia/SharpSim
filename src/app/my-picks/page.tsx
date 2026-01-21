@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,7 +15,12 @@ import { BetTicket } from '@/components/bets/bet-ticket';
 export default function MyPicksPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>();
+
+  useEffect(() => {
+    // Set the date only on the client-side to prevent hydration mismatch
+    setSelectedDate(new Date());
+  }, []);
 
   const betsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -27,11 +32,11 @@ export default function MyPicksPage() {
   const loading = isUserLoading || isLoadingBets;
 
   const filteredBets = useMemo(() => {
-    if (!bets) return [];
+    if (!bets || !selectedDate) return [];
     return bets.filter(bet => isSameDay(new Date(bet.placedAt), selectedDate));
   }, [bets, selectedDate]);
 
-  if (loading) {
+  if (loading || !selectedDate) {
     return (
       <div className="p-4 md:p-8">
         <header className="mb-8">
