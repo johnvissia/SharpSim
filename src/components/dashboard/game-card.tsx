@@ -1,5 +1,5 @@
 'use client';
-
+import React from 'react';
 import type { Game, Team } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,20 +36,36 @@ const OddsButton = ({
 );
 
 const TeamInfo = ({ team, sportSlug }: { team: Team, sportSlug: string | undefined }) => {
-  return (
-    <div className="flex items-center gap-2 text-sm font-semibold">
-      <div className="flex flex-col text-[10px] font-mono leading-tight mr-3">
-        <span className="bg-red-900/40 text-red-200 px-1 rounded border border-red-500/30 mb-1">
-          ID: {team.id || "NULL"}
-        </span>
-        <span className="bg-blue-900/40 text-blue-200 px-1 rounded border border-blue-500/30">
-          Slug: {sportSlug || "NULL"}
-        </span>
-      </div>
-      <span className="truncate">{team.name}</span>
-      {team.rank && <span className="font-bold text-muted-foreground ml-auto">#{team.rank}</span>}
-    </div>
-  );
+    const getLogoUrl = () => {
+        let slug = sportSlug;
+        if (sportSlug === 'mens-college-basketball') {
+            slug = 'ncaam';
+        } else if (sportSlug === 'college-football') {
+            slug = 'ncaaf';
+        } else if (!slug) {
+            slug = 'nba'; // Default fallback if slug is somehow missing
+        }
+        return `https://a.espncdn.com/i/teamlogos/${slug}/500/${team.id}.png`;
+    };
+
+    const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        e.currentTarget.src = 'https://a.espncdn.com/i/teamlogos/default.png';
+    };
+
+    return (
+        <div className="flex items-center gap-2 text-sm font-semibold">
+            <div className="w-8 h-8 mr-3 flex-shrink-0 flex items-center justify-center">
+                <img
+                    src={getLogoUrl()}
+                    onError={handleImageError}
+                    alt={`${team.name} logo`}
+                    className="w-8 h-8 object-contain"
+                />
+            </div>
+            <span className="truncate">{team.name}</span>
+            {team.rank && <span className="font-bold text-muted-foreground ml-auto">#{team.rank}</span>}
+        </div>
+    );
 };
 
 
