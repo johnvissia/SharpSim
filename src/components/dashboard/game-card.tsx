@@ -14,28 +14,6 @@ import { Ticket } from 'lucide-react';
 import { useBetSlip, type BetSlipPick } from '@/context/BetSlipContext';
 
 
-const TeamLogo = ({ teamId, sportSlug, teamName }: { teamId: string, sportSlug: string | undefined, teamName: string }) => {
-  // 1. Clean the Sport Slug (ESPN naming quirks)
-  let cleanSport = sportSlug || 'nba'; // Default to NBA if missing
-  
-  // 2. Construct The URL
-  // ESPN pattern: https://a.espncdn.com/i/teamlogos/[SPORT]/500/[ID].png
-  const logoUrl = `https://a.espncdn.com/i/teamlogos/${cleanSport}/500/${teamId}.png`;
-
-  return (
-    <img
-      src={logoUrl}
-      alt={teamName}
-      className="h-6 w-6 object-contain"
-      onError={(e) => {
-        // If the specific ID fails, fall back to the default globe logo
-        (e.currentTarget as HTMLImageElement).src = "https://a.espncdn.com/i/teamlogos/default.png";
-      }}
-    />
-  );
-};
-
-
 const OddsButton = ({
   onClick,
   children,
@@ -60,7 +38,14 @@ const OddsButton = ({
 const TeamInfo = ({ team, sportSlug }: { team: Team, sportSlug: string | undefined }) => {
   return (
     <div className="flex items-center gap-2 text-sm font-semibold">
-      <TeamLogo teamId={team.id} sportSlug={sportSlug} teamName={team.name} />
+      <div className="flex flex-col text-[10px] font-mono leading-tight mr-3">
+        <span className="bg-red-900/40 text-red-200 px-1 rounded border border-red-500/30 mb-1">
+          ID: {team.id || "NULL"}
+        </span>
+        <span className="bg-blue-900/40 text-blue-200 px-1 rounded border border-blue-500/30">
+          Slug: {sportSlug || "NULL"}
+        </span>
+      </div>
       <span className="truncate">{team.name}</span>
       {team.rank && <span className="font-bold text-muted-foreground ml-auto">#{team.rank}</span>}
     </div>
