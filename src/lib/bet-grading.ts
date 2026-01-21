@@ -43,18 +43,13 @@ const gradeSpread = (bet: Pick<UserBet, 'pick'>, game: CompletedGame): 'won' | '
   const teamName = bet.pick.substring(0, lastSpaceIndex).trim();
   const points = parseFloat(bet.pick.substring(lastSpaceIndex + 1));
 
-  let cover = 0;
-  if (teamName === game.homeTeam) {
-      cover = game.homeScore - game.awayScore;
-  } else if (teamName === game.awayTeam) {
-      cover = game.awayScore - game.homeScore;
-  } else {
-      console.warn(`Picked team "${teamName}" does not match teams in game ${game.id}.`);
-      return 'lost'; // Picked team doesn't match game
-  }
+  const isHomePick = game.homeTeam.includes(teamName);
 
-  if (cover + points > 0) return 'won';
-  if (cover + points < 0) return 'lost';
+  // Margin from the perspective of the picked team
+  const margin = isHomePick ? (game.homeScore - game.awayScore) : (game.awayScore - game.homeScore);
+
+  if ((margin + points) > 0) return 'won';
+  if ((margin + points) < 0) return 'lost';
   return 'push';
 };
 
@@ -138,16 +133,13 @@ export function gradeUserBets(
         // 1. Try to find the game by its ID first for efficiency.
         let game: CompletedGame | undefined = completedGamesMap.get(leg.gameId);
         
-        // 2. If not found by ID, fall back to searching by team name.
+        // 2. If not found by ID, fall back to searching by team names in matchup string
         if (!game) {
-            const teamNameInPick = getTeamFromPick(leg.pick, leg.betType);
-            if (teamNameInPick) {
-                // Find game where this team is either home or away.
-                // This is less efficient but robust against ID changes.
-                game = completedGames.find(g => 
-                    g.homeTeam === teamNameInPick || g.awayTeam === teamNameInPick
-                );
-            }
+            game = completedGames.find(g => 
+                leg.matchup && g.homeTeam && g.awayTeam &&
+                leg.matchup.includes(g.homeTeam) &&
+                leg.matchup.includes(g.awayTeam)
+            );
         }
 
         // If game is still not found or not completed, it remains pending.
