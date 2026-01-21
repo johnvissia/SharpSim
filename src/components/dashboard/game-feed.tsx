@@ -14,16 +14,16 @@ type GameFeedProps = {
 export function GameFeed({ games, isLoading, onGameClick, activeBetGameIds }: GameFeedProps) {
   if (isLoading && games.length === 0) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className="h-64 w-full" />
+          <Skeleton key={i} className="h-32 w-full" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4">
       {games.length > 0 ? (
         games.map((game) => (
             <GameCard 
@@ -34,7 +34,7 @@ export function GameFeed({ games, isLoading, onGameClick, activeBetGameIds }: Ga
             />
         ))
       ) : (
-        <p className="text-muted-foreground md:col-span-2 lg:col-span-3 xl:col-span-4">
+        <p className="text-muted-foreground">
             Loading today's lines or no games match your filter...
         </p>
       )}
