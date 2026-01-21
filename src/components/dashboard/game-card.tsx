@@ -10,8 +10,31 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Ticket, Trophy } from 'lucide-react';
+import { Ticket } from 'lucide-react';
 import { useBetSlip, type BetSlipPick } from '@/context/BetSlipContext';
+
+
+const TeamLogo = ({ teamId, sportSlug, teamName }: { teamId: string, sportSlug: string | undefined, teamName: string }) => {
+  // 1. Clean the Sport Slug (ESPN naming quirks)
+  let cleanSport = sportSlug || 'nba'; // Default to NBA if missing
+  
+  // 2. Construct The URL
+  // ESPN pattern: https://a.espncdn.com/i/teamlogos/[SPORT]/500/[ID].png
+  const logoUrl = `https://a.espncdn.com/i/teamlogos/${cleanSport}/500/${teamId}.png`;
+
+  return (
+    <img
+      src={logoUrl}
+      alt={teamName}
+      className="h-6 w-6 object-contain"
+      onError={(e) => {
+        // If the specific ID fails, fall back to the default globe logo
+        (e.currentTarget as HTMLImageElement).src = "https://a.espncdn.com/i/teamlogos/default.png";
+      }}
+    />
+  );
+};
+
 
 const OddsButton = ({
   onClick,
@@ -35,24 +58,9 @@ const OddsButton = ({
 );
 
 const TeamInfo = ({ team, sportSlug }: { team: Team, sportSlug: string | undefined }) => {
-  const FallbackIcon = Trophy;
-  
-  const logoUrl = sportSlug ? `https://a.espncdn.com/i/teamlogos/${sportSlug}/500/${team.id}.png` : '';
-
   return (
     <div className="flex items-center gap-2 text-sm font-semibold">
-      {sportSlug ? (
-        <img
-          src={logoUrl}
-          alt={`${team.name} logo`}
-          className="h-6 w-6 object-contain"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://a.espncdn.com/i/teamlogos/default-logo.png'; }}
-        />
-      ) : (
-        <div className="w-6 h-6 flex items-center justify-center bg-muted rounded-full">
-          <FallbackIcon className="w-4 h-4 text-muted-foreground" />
-        </div>
-      )}
+      <TeamLogo teamId={team.id} sportSlug={sportSlug} teamName={team.name} />
       <span className="truncate">{team.name}</span>
       {team.rank && <span className="font-bold text-muted-foreground ml-auto">#{team.rank}</span>}
     </div>
