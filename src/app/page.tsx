@@ -12,12 +12,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, orderBy, query } from 'firebase/firestore';
+import { collection, doc, orderBy, query, where } from 'firebase/firestore';
 import { fetchAndSaveDailyData } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
 import { gradeUserBets } from '@/lib/bet-grading';
 import { getSports } from '@/lib/mock-data';
-import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds } from '@/lib/types';
+import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Loader } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -151,6 +151,30 @@ export default function DashboardPage() {
     return collection(firestore, 'rankings');
   }, [firestore]);
   const { data: rankings, isLoading: isLoadingRankings } = useCollection<TeamRanking>(rankingsQuery);
+
+  const betsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, 'users', user.uid, 'bets'), where('status', '==', 'pending'));
+  }, [user, firestore]);
+  const { data: userBets } = useCollection<UserBet>(betsQuery);
+
+  const activeBetGameIds = useMemo(() => {
+    if (!userBets) return new Set<string>();
+    const gameIds = new Set<string>();
+    userBets.forEach(bet => {
+        if (bet.betType === 'parlay' && bet.legs) {
+            bet.legs.forEach(leg => gameIds.add(leg.gameId));
+        } else if (bet.gameId) {
+            if (bet.gameId.includes(',')) {
+                bet.gameId.split(',').forEach(id => gameIds.add(id));
+            } else {
+                gameIds.add(bet.gameId);
+            }
+        }
+    });
+    return gameIds;
+  }, [userBets]);
+
 
   // Fetch static sports list
   useEffect(() => {
@@ -339,6 +363,7 @@ export default function DashboardPage() {
               selectedSport={selectedSport}
               selectedConference={selectedConference}
               onGameClick={setSelectedGame}
+              activeBetGameIds={activeBetGameIds}
           />
         )}
       </div>

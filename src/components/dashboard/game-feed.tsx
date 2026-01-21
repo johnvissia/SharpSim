@@ -12,9 +12,10 @@ type GameFeedProps = {
   selectedSport: string;
   selectedConference: string;
   onGameClick: (game: Game) => void;
+  activeBetGameIds: Set<string>;
 };
 
-export function GameFeed({ games, isLoading, selectedSport, selectedConference, onGameClick }: GameFeedProps) {
+export function GameFeed({ games, isLoading, selectedSport, selectedConference, onGameClick, activeBetGameIds }: GameFeedProps) {
 
   const filteredAndSortedGames = useMemo(() => {
     const now = new Date();
@@ -57,10 +58,18 @@ export function GameFeed({ games, isLoading, selectedSport, selectedConference, 
         return true;
     })
     .sort((a, b) => {
+        const aHasBet = activeBetGameIds.has(a.oddsApiId || '');
+        const bHasBet = activeBetGameIds.has(b.oddsApiId || '');
+
+        // Primary sort: games with active bets on top
+        if (aHasBet !== bHasBet) {
+            return aHasBet ? -1 : 1;
+        }
+
         const statusOrder = {
-            'post': 1, // Finished games first
-            'in': 2,   // Then live games
-            'pre': 3,  // Finally, upcoming games
+            'in': 1,   // Then live games
+            'pre': 2,  // Then upcoming games
+            'post': 3, // Finally, finished games
         };
 
         const aStatus = a.statusState ?? 'pre';
@@ -69,10 +78,12 @@ export function GameFeed({ games, isLoading, selectedSport, selectedConference, 
         const aOrder = statusOrder[aStatus as keyof typeof statusOrder] || 4;
         const bOrder = statusOrder[bStatus as keyof typeof statusOrder] || 4;
         
+        // Secondary sort: by game state
         if (aOrder !== bOrder) {
             return aOrder - bOrder;
         }
 
+        // Tertiary sort: by time
         // For finished games, sort descending to show most recent first.
         if (aStatus === 'post') {
             return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
@@ -81,7 +92,7 @@ export function GameFeed({ games, isLoading, selectedSport, selectedConference, 
         // For live and upcoming, sort ascending to show soonest first.
         return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
     });
-  }, [games, selectedSport, selectedConference]);
+  }, [games, selectedSport, selectedConference, activeBetGameIds]);
 
   if (isLoading && games.length === 0) {
     return (
@@ -97,7 +108,12 @@ export function GameFeed({ games, isLoading, selectedSport, selectedConference, 
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {filteredAndSortedGames.length > 0 ? (
         filteredAndSortedGames.map((game) => (
-            <GameCard key={`${game.id}-${game.homeTeam.name}`} game={game} onGameClick={onGameClick} />
+            <GameCard 
+              key={`${game.id}-${game.homeTeam.name}`} 
+              game={game} 
+              onGameClick={onGameClick}
+              hasActiveBet={activeBetGameIds.has(game.oddsApiId || '')}
+            />
         ))
       ) : (
         <p className="text-muted-foreground md:col-span-2 lg:col-span-3 xl:col-span-4">

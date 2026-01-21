@@ -10,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Star } from 'lucide-react';
+import { Star, Ticket } from 'lucide-react';
 import Image from 'next/image';
 import { sportIconMap } from '@/lib/team-logos';
 import { useBetSlip } from '@/context/BetSlipContext';
@@ -112,7 +112,7 @@ const TeamDisplay = ({ team, score, sport, isLive }: { team: Team; score?: numbe
   );
 };
 
-export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game: Game) => void }) {
+export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGameClick: (game: Game) => void, hasActiveBet: boolean }) {
   const { addPick } = useBetSlip();
 
   const isLive = game.statusState === 'in';
@@ -159,6 +159,18 @@ export function GameCard({ game, onGameClick }: { game: Game, onGameClick: (game
         <CardHeader className="flex-row items-center justify-between bg-card-foreground/5 p-3">
           <div className="text-sm font-medium">{game.sport}</div>
             <div className="flex items-center gap-2">
+                {hasActiveBet && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Ticket className="h-5 w-5 text-primary" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>You have a pending bet on this game.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 <div className="text-sm text-muted-foreground">{gameTimeOrStatus}</div>
                 {isLive && (
                     <Badge className="bg-red-600 hover:bg-red-600 text-white animate-pulse text-xs">
