@@ -64,6 +64,17 @@ export function BetTicket({ bet }: { bet: UserBet }) {
   }, [bet, isParlay]);
 
   const ticketLabel = isParlay ? bet.pick : 'Single Bet';
+  
+  const toWinAmount = useMemo(() => {
+    if (bet.status === 'won') {
+        return bet.potentialWinnings - bet.stake;
+    }
+    if (bet.status === 'lost' || bet.status === 'push') {
+        return 0;
+    }
+    // for pending bets, show potential profit
+    return bet.potentialWinnings - bet.stake;
+  }, [bet.status, bet.potentialWinnings, bet.stake]);
 
   return (
     <Card className={cn(
@@ -95,7 +106,7 @@ export function BetTicket({ bet }: { bet: UserBet }) {
               <div key={index}>
                 <div className="flex justify-between items-center text-sm">
                   <p className="font-bold truncate pr-2">{leg.matchup}</p>
-                  <p className="font-mono font-semibold">{leg.odds > 0 ? `+${leg.odds}` : leg.odds}</p>
+                  <p className="font-semibold">{leg.odds > 0 ? `+${leg.odds}` : leg.odds}</p>
                 </div>
                 <p className="text-xs text-muted-foreground">{gameTime}</p>
                 <div className="flex items-center gap-2 mt-1">
@@ -111,26 +122,29 @@ export function BetTicket({ bet }: { bet: UserBet }) {
           })}
         </div>
         <div className="border-t-2 border-dashed border-border/50 mx-4" />
-        <div className="p-4 space-y-2">
+        <div className="p-4">
           <div className="flex justify-between items-center font-bold text-base">
             <p>{ticketLabel}</p>
             <div className="flex items-center gap-4">
-              <p className="font-mono">{bet.odds > 0 ? `+${bet.odds}`: bet.odds}</p>
+              <p className="font-semibold">{bet.odds > 0 ? `+${bet.odds}`: bet.odds}</p>
               <div className="flex items-center gap-2">
                 {isParlay && bet.status !== 'pending' && <LegProgressBadge legs={legs} />}
                 {getBetStatusBadge(bet.status)}
               </div>
             </div>
           </div>
-          <div className="flex justify-between items-center text-sm text-muted-foreground font-mono">
-            <p>Risk: <span className="font-semibold text-foreground">{bet.stake.toFixed(2)} coins</span></p>
-            <p>Payout: <span className="font-semibold text-green-600">
-                {(
-                    bet.status === 'lost' ? 0 :
-                    bet.status === 'push' ? bet.stake :
-                    bet.potentialWinnings
-                ).toFixed(2)} coins
-            </span></p>
+          <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-800">
+            <div className="flex flex-col">
+              <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">Risk</span>
+              <span className="text-lg font-bold text-white">${bet.stake.toFixed(2)}</span>
+            </div>
+            
+            <div className="text-right flex flex-col">
+              <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">To Win</span>
+              <span className="text-xl font-black text-emerald-400 drop-shadow-sm">
+                ${toWinAmount.toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
       </CardContent>
