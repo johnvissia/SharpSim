@@ -160,6 +160,15 @@ export function BetSlip() {
       return;
     }
     
+    if (picks.some(p => !p.game.oddsApiId)) {
+        toast({
+            variant: 'destructive',
+            title: 'Bet Incomplete',
+            description: 'One or more games on your slip are missing odds data required for grading. Try syncing odds.',
+        });
+        return;
+    }
+
     const userDocRef = doc(firestore, 'users', user.uid);
     const betsCollectionRef = collection(firestore, 'users', user.uid, 'bets');
     const batch = writeBatch(firestore);
@@ -170,7 +179,7 @@ export function BetSlip() {
       if (picks.length === 1) {
         const pick = picks[0];
         newBet = {
-          gameId: pick.game.id,
+          gameId: pick.game.oddsApiId!, // Use Odds API ID for grading
           userId: user.uid,
           sport: pick.game.sport,
           betType: pick.betType,
@@ -185,7 +194,7 @@ export function BetSlip() {
         };
       } else {
         const parlayLegs: ParlayLeg[] = picks.map(p => ({
-            gameId: p.game.id,
+            gameId: p.game.oddsApiId!, // Use Odds API ID for grading
             matchup: `${p.game.awayTeam.name} @ ${p.game.homeTeam.name}`,
             commenceTime: p.game.startTime,
             pick: p.pick,
@@ -196,7 +205,7 @@ export function BetSlip() {
         }));
 
         newBet = {
-          gameId: picks.map(p => p.game.id).join(','),
+          gameId: picks.map(p => p.game.oddsApiId!).join(','), // Use Odds API IDs
           userId: user.uid,
           sport: picks[0].game.sport, // Use first pick's sport for parlay
           betType: 'parlay',
