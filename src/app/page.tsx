@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { GameFeed } from '@/components/dashboard/game-feed';
+import { GameCard } from '@/components/dashboard/game-card';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
@@ -347,26 +347,62 @@ export default function DashboardPage() {
 
 
   const showLoadingSpinner = isUserLoading || (isLoadingGames && !dailyGames);
+  const isLoading = isLoadingGames || isLoadingEspn;
 
   return (
     <>
       {showLoadingSpinner ? (
-      <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
-          <Loader className="h-12 w-12 animate-spin text-primary" />
-          <h2 className="text-xl font-semibold text-foreground">
-          {isUserLoading ? 'Authenticating...' : 'Loading Daily Lines...'}
-          </h2>
-          <p className="text-muted-foreground">
-          {isUserLoading ? 'Preparing your session...' : 'Getting the latest game information.'}
-          </p>
-      </div>
+        <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
+            <Loader className="h-12 w-12 animate-spin text-primary" />
+            <h2 className="text-xl font-semibold text-foreground">
+            {isUserLoading ? 'Authenticating...' : 'Loading Daily Lines...'}
+            </h2>
+            <p className="text-muted-foreground">
+            {isUserLoading ? 'Preparing your session...' : 'Getting the latest game information.'}
+            </p>
+        </div>
       ) : (
-      <GameFeed
-          games={filteredAndSortedGames}
-          isLoading={isLoadingGames || isLoadingEspn}
-          onGameClick={setSelectedGame}
-          activeBetGameIds={activeBetGameIds}
-      />
+        <div className="flex flex-col gap-4 w-full">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+            {['All', 'Favorites', 'NBA', 'NCAAM', 'NHL', 'NFL'].map(sport => (
+                <button
+                key={sport}
+                onClick={() => setSelectedCategory(sport)}
+                className={`
+                    px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all border
+                    ${selectedCategory === sport
+                    ? 'bg-white text-slate-950 border-white shadow-lg' // Active: Bright White
+                    : 'bg-slate-900/50 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'}
+                `}
+                >
+                {sport}
+                </button>
+            ))}
+            </div>
+
+            <div className="flex flex-col gap-3">
+            {isLoading && filteredAndSortedGames.length === 0 ? (
+                <div className="grid grid-cols-1 gap-4">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                    <Skeleton key={i} className="h-32 w-full" />
+                    ))}
+                </div>
+            ) : filteredAndSortedGames.length > 0 ? (
+                filteredAndSortedGames.map((game) => (
+                    <GameCard 
+                        key={`${game.id}-${game.homeTeam.name}`} 
+                        game={game} 
+                        onGameClick={setSelectedGame}
+                        hasActiveBet={!!game.oddsApiId && activeBetGameIds.has(game.oddsApiId)}
+                    />
+                ))
+            ) : (
+                <p className="text-muted-foreground text-center py-8">
+                    No games match your filter.
+                </p>
+            )}
+            </div>
+        </div>
       )}
       <BetSlip />
       <GameDetailModal game={selectedGame} isOpen={!!selectedGame} onClose={() => setSelectedGame(null)} />
