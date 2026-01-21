@@ -32,6 +32,7 @@ export type Game = {
   id: string;
   oddsApiId?: string;
   sport: SportName;
+  sportSlug?: string;
   startTime: string; // ISO 8601 string
   homeTeam: Team;
   awayTeam: Team;

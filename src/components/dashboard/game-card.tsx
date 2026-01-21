@@ -10,9 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Ticket } from 'lucide-react';
-import Image from 'next/image';
-import { sportIconMap } from '@/lib/team-logos';
+import { Ticket, Trophy } from 'lucide-react';
 import { useBetSlip, type BetSlipPick } from '@/context/BetSlipContext';
 
 const OddsButton = ({
@@ -36,17 +34,19 @@ const OddsButton = ({
   </Button>
 );
 
-const TeamInfo = ({ team, sport }: { team: Team, sport: Game['sport'] }) => {
-  const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
+const TeamInfo = ({ team, sportSlug }: { team: Team, sportSlug: string | undefined }) => {
+  const FallbackIcon = Trophy;
+  
+  const logoUrl = sportSlug ? `https://a.espncdn.com/i/teamlogos/${sportSlug}/500/${team.id}.png` : '';
+
   return (
     <div className="flex items-center gap-2 text-sm font-semibold">
-      {team.logo ? (
-        <Image
-          src={team.logo}
+      {sportSlug ? (
+        <img
+          src={logoUrl}
           alt={`${team.name} logo`}
-          width={24}
-          height={24}
           className="h-6 w-6 object-contain"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://a.espncdn.com/i/teamlogos/default-logo.png'; }}
         />
       ) : (
         <div className="w-6 h-6 flex items-center justify-center bg-muted rounded-full">
@@ -141,7 +141,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
             <div className="text-center font-semibold text-xs text-muted-foreground">Total</div>
             <div className="text-center font-semibold text-xs text-muted-foreground">Moneyline</div>
 
-            <TeamInfo team={game.awayTeam} sport={game.sport} />
+            <TeamInfo team={game.awayTeam} sportSlug={game.sportSlug} />
             
             {odds?.spread ? (
               <OddsButton 
@@ -175,7 +175,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                 </OddsButton>
             ) : <div />}
 
-            <TeamInfo team={game.homeTeam} sport={game.sport} />
+            <TeamInfo team={game.homeTeam} sportSlug={game.sportSlug} />
 
             {odds?.spread ? (
              <OddsButton 

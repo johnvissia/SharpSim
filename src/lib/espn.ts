@@ -86,7 +86,7 @@ interface EspnScoreboard {
     events: EspnEvent[];
 }
 
-const mapEspnEventToGame = (event: EspnEvent, sport: SportName): Game | null => {
+const mapEspnEventToGame = (event: EspnEvent, sport: SportName, sportSlug: string): Game | null => {
     const competition = event.competitions[0];
     if (!competition) return null;
 
@@ -153,6 +153,7 @@ const mapEspnEventToGame = (event: EspnEvent, sport: SportName): Game | null => 
     return {
         id: event.id,
         sport: sport,
+        sportSlug: sportSlug,
         startTime: event.date,
         homeTeam,
         awayTeam,
@@ -168,11 +169,11 @@ const mapEspnEventToGame = (event: EspnEvent, sport: SportName): Game | null => 
 
 export async function fetchEspnSchedule(): Promise<Game[]> {
     const endpoints = [
-        { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', sport: 'NBA' as SportName },
-        { url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard', sport: 'NFL' as SportName },
-        { url: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard', sport: 'NHL' as SportName },
-        { url: 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard', sport: 'NCAAF' as SportName },
-        { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard', sport: 'NCAAM' as SportName },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', sport: 'NBA' as SportName, slug: 'nba' },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard', sport: 'NFL' as SportName, slug: 'nfl' },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard', sport: 'NHL' as SportName, slug: 'nhl' },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard', sport: 'NCAAF' as SportName, slug: 'college-football' },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard', sport: 'NCAAM' as SportName, slug: 'mens-college-basketball' },
     ];
 
     try {
@@ -183,10 +184,10 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
         const allGames: Game[] = [];
 
         responses.forEach((scoreboard, index) => {
-            const { sport } = endpoints[index];
+            const { sport, slug } = endpoints[index];
             if (scoreboard.events) {
                 const games = scoreboard.events
-                    .map(event => mapEspnEventToGame(event, sport))
+                    .map(event => mapEspnEventToGame(event, sport, slug))
                     .filter((g): g is Game => g !== null);
                 allGames.push(...games);
             }
