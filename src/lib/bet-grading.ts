@@ -52,7 +52,7 @@ const gradeSpread = (bet: Pick<UserBet, 'pick'>, game: CompletedGame): 'won' | '
  * @param game The completed game data.
  * @returns The result of the leg ('won', 'lost', or 'push').
  */
-const calculateLegResult = (leg: Pick<ParlayLeg, 'pick' | 'betType'>, game: CompletedGame): 'won' | 'lost' | 'push' => {
+export const calculateLegResult = (leg: Pick<ParlayLeg, 'pick' | 'betType'>, game: CompletedGame): 'won' | 'lost' | 'push' => {
   switch (leg.betType) {
     case 'moneyline':
       return gradeMoneyline({ pick: leg.pick }, game);
@@ -60,6 +60,9 @@ const calculateLegResult = (leg: Pick<ParlayLeg, 'pick' | 'betType'>, game: Comp
       return gradeSpread({ pick: leg.pick }, game);
     case 'total':
       return gradeTotal({ pick: leg.pick }, game);
+    case 'player_prop':
+        // For now, player props are not auto-graded. This can be expanded.
+        return 'pending' as any; // Should not happen if we only grade completed games
     default:
       console.warn(`Grading for leg bet type "${leg.betType}" is not implemented.`);
       return 'lost';
@@ -93,7 +96,7 @@ export function gradeUserBets(
             matchup: bet.matchup || 'N/A',
             commenceTime: bet.commenceTime || new Date(0).toISOString(),
             pick: bet.pick,
-            betType: bet.betType as Exclude<UserBet['betType'], 'parlay'>,
+            betType: bet.betType as Exclude<UserBet['betType'], 'parlay' | 'player_prop'>,
             odds: bet.odds,
             status: bet.status,
             sport: bet.sport,

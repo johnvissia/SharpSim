@@ -15,9 +15,9 @@ import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebas
 import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
 import { fetchAndSaveDailyData } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
-import { gradeUserBets } from '@/lib/bet-grading';
+import { gradeUserBets, calculateLegResult } from '@/lib/bet-grading';
 import { getSports } from '@/lib/mock-data';
-import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, CompletedGame } from '@/lib/types';
+import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, CompletedGame, ParlayLeg } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, Loader } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -274,6 +274,61 @@ export default function DashboardPage() {
     setIsFetchingManually(false);
   };
   
+    const runDebug = () => {
+    if (!pendingBets || !completedGames) {
+      console.log("🐞 Debugger cannot run: pendingBets or completedGames not loaded yet.");
+      return;
+    }
+    console.log("🐞 STARTING DEBUGGER 🐞");
+    console.log(`Checking ${pendingBets.length} pending Bets against ${completedGames.length} completed Games...`);
+
+    pendingBets.forEach(bet => {
+      console.log(`\n🎫 Checking Bet ID: ${bet.id} (Status: ${bet.status})`);
+
+      const legsToDebug: ParlayLeg[] = bet.legs ? bet.legs : [
+        {
+          gameId: bet.gameId,
+          pick: bet.pick,
+          betType: bet.betType as 'moneyline' | 'spread' | 'total' | 'player_prop',
+          matchup: bet.matchup || '',
+          commenceTime: bet.commenceTime || '',
+          odds: bet.odds,
+          status: bet.status,
+          sport: bet.sport,
+        },
+      ];
+
+      legsToDebug.forEach(leg => {
+        console.log(`   🦵 Leg: ${leg.pick} (Game ID: ${leg.gameId})`);
+
+        // 1. Try to find the game in completed games
+        const game = completedGames.find(g => g.id === leg.gameId);
+        
+        if (!game) {
+            console.error(`      ❌ GAME NOT FOUND in completed_games!`);
+            
+            const dailyGame = dailyGames?.find(dg => dg.id === leg.gameId);
+            if(dailyGame) {
+                console.log(`      ℹ️  Game is still in daily_games list and not yet completed. Commence Time: ${dailyGame.commenceTime}`);
+            } else {
+                console.error(`      ❌ Game ID ${leg.gameId} not found in 'daily_games' or 'completed_games'. This is likely the root of the problem.`);
+            }
+
+        } else {
+            console.log(`      ✅ Game Found: ${game.homeTeam} vs ${game.awayTeam}`);
+            
+            const homeScore = game.homeScore;
+            const awayScore = game.awayScore;
+            console.log(`      🔢 Scores Read As -> Home: ${homeScore}, Away: ${awayScore}`);
+
+            const legResult = calculateLegResult(leg, game);
+            console.log(`      🧐 Simulated leg result: ${legResult}`);
+        }
+      });
+    });
+    console.log("🐞 DEBUGGER FINISHED 🐞");
+  };
+
   const mergedGames = useMemo(() => {
     const teamNameNormalizationMap: Record<string, string> = {
       'LA Clippers': 'Los Angeles Clippers',
@@ -323,11 +378,12 @@ export default function DashboardPage() {
                 ...existingGame,
                 odds: oddsGame.odds,
                 allOdds: oddsGame.allOdds,
-                oddsApiId: oddsGame.id,
+                id: existingGame.id, // Prioritize ESPN ID
+                oddsApiId: oddsGame.id, // Keep Odds API ID for grading
             });
         } else {
             // This game has odds but wasn't in the ESPN feed. Add it with its Odds API ID.
-            finalGames.set(key, { ...oddsGame, oddsApiId: oddsGame.id });
+            finalGames.set(key, { ...oddsGame, id: oddsGame.id, oddsApiId: oddsGame.id });
         }
     });
     
@@ -360,17 +416,26 @@ export default function DashboardPage() {
                   : `Upcoming ${selectedSport} games`}
               </p>
             </div>
-            <Button
-              onClick={handleManualFetch}
-              disabled={isFetchingManually || showLoadingSpinner}
-            >
-              {isFetchingManually ? (
-                <Loader className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="mr-2 h-4 w-4" />
-              )}
-              {isFetchingManually ? 'Syncing...' : 'Sync Odds'}
-            </Button>
+             <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleManualFetch}
+                  disabled={isFetchingManually || showLoadingSpinner}
+                >
+                  {isFetchingManually ? (
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  {isFetchingManually ? 'Syncing...' : 'Sync Odds'}
+                </Button>
+                <Button 
+                    onClick={runDebug} 
+                    variant="destructive"
+                    disabled={isFetchingManually || showLoadingSpinner}
+                >
+                    🐞 Debug Pending Tickets
+                </Button>
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {loadingSports ? (
