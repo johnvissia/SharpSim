@@ -86,87 +86,6 @@ interface EspnScoreboard {
     events: EspnEvent[];
 }
 
-const mapEspnEventToGame = (event: EspnEvent, sport: SportName, sportSlug: string): Game | null => {
-    const competition = event.competitions[0];
-    if (!competition) return null;
-
-    const homeCompetitor = competition.competitors.find(c => c.homeAway === 'home');
-    const awayCompetitor = competition.competitors.find(c => c.homeAway === 'away');
-
-    if (!homeCompetitor || !awayCompetitor) return null;
-
-    const getLeadingScorer = (competitor: EspnCompetitor) => {
-        if (!competitor.leaders) return undefined;
-
-        const pointsLeaderData = competitor.leaders.find(l => l.name === 'points');
-        if (pointsLeaderData && pointsLeaderData.leaders && pointsLeaderData.leaders.length > 0) {
-            const leader = pointsLeaderData.leaders[0];
-            if (leader.athlete) {
-                return {
-                    name: leader.athlete.shortName || leader.athlete.fullName,
-                    value: leader.displayValue,
-                };
-            }
-        }
-        return undefined;
-    };
-
-    const getLogo = (competitor: EspnCompetitor) => {
-        // The primary `logo` field is often the best one if it exists.
-        if (competitor.team.logo) {
-            return competitor.team.logo;
-        }
-        // If not, check the `logos` array.
-        if (competitor.team.logos && competitor.team.logos.length > 0) {
-            // Prefer the logo marked as 'default'.
-            const defaultLogo = competitor.team.logos.find(l => l.rel?.includes('default'));
-            if (defaultLogo) {
-                return defaultLogo.href;
-            }
-            // Otherwise, fall back to the very first logo in the array.
-            return competitor.team.logos[0].href;
-        }
-        // If no logo can be found, return an empty string.
-        return '';
-    }
-
-    const homeTeam: Team = {
-        id: homeCompetitor.team.id,
-        name: homeCompetitor.team.displayName,
-        logo: getLogo(homeCompetitor),
-        players: [], // Not available from scoreboard
-        rank: undefined, // Not directly available
-        conference: undefined, // Not available
-        leadingScorer: getLeadingScorer(homeCompetitor),
-    };
-
-    const awayTeam: Team = {
-        id: awayCompetitor.team.id,
-        name: awayCompetitor.team.displayName,
-        logo: getLogo(awayCompetitor),
-        players: [],
-        rank: undefined,
-        conference: undefined,
-        leadingScorer: getLeadingScorer(awayCompetitor),
-    };
-
-    return {
-        id: event.id,
-        sport: sport,
-        sportSlug: sportSlug,
-        startTime: event.date,
-        homeTeam,
-        awayTeam,
-        liveScore: {
-            home: parseInt(homeCompetitor.score, 10) || 0,
-            away: parseInt(awayCompetitor.score, 10) || 0,
-        },
-        statusDetail: competition.status.type.detail,
-        statusState: competition.status.type.state,
-        // Odds data will be merged in later
-    };
-};
-
 export async function fetchEspnSchedule(): Promise<Game[]> {
     const endpoints = [
         { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', sport: 'NBA' as SportName, slug: 'nba' },
@@ -184,10 +103,85 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
         const allGames: Game[] = [];
 
         responses.forEach((scoreboard, index) => {
-            const { sport, slug } = endpoints[index];
+            const endpointInfo = endpoints[index];
             if (scoreboard.events) {
                 const games = scoreboard.events
-                    .map(event => mapEspnEventToGame(event, sport, slug))
+                    .map(event => {
+                        const competition = event.competitions[0];
+                        if (!competition) return null;
+
+                        const homeCompetitor = competition.competitors.find(c => c.homeAway === 'home');
+                        const awayCompetitor = competition.competitors.find(c => c.homeAway === 'away');
+
+                        if (!homeCompetitor || !awayCompetitor) return null;
+
+                        const getLeadingScorer = (competitor: EspnCompetitor) => {
+                            if (!competitor.leaders) return undefined;
+                            const pointsLeaderData = competitor.leaders.find(l => l.name === 'points');
+                            if (pointsLeaderData && pointsLeaderData.leaders && pointsLeaderData.leaders.length > 0) {
+                                const leader = pointsLeaderData.leaders[0];
+                                if (leader.athlete) {
+                                    return {
+                                        name: leader.athlete.shortName || leader.athlete.fullName,
+                                        value: leader.displayValue,
+                                    };
+                                }
+                            }
+                            return undefined;
+                        };
+
+                        const getLogo = (competitor: EspnCompetitor) => {
+                            if (competitor.team.logo) return competitor.team.logo;
+                            if (competitor.team.logos && competitor.team.logos.length > 0) {
+                                const defaultLogo = competitor.team.logos.find(l => l.rel?.includes('default'));
+                                if (defaultLogo) return defaultLogo.href;
+                                return competitor.team.logos[0].href;
+                            }
+                            return '';
+                        }
+                        
+                        let finalSlug = endpointInfo.slug;
+                        if (!finalSlug && scoreboard.leagues?.[0]?.slug) {
+                            finalSlug = scoreboard.leagues[0].slug;
+                        }
+
+                        const homeTeam: Team = {
+                            id: homeCompetitor.team.id,
+                            name: homeCompetitor.team.displayName,
+                            logo: getLogo(homeCompetitor),
+                            players: [],
+                            rank: undefined,
+                            conference: undefined,
+                            leadingScorer: getLeadingScorer(homeCompetitor),
+                        };
+
+                        const awayTeam: Team = {
+                            id: awayCompetitor.team.id,
+                            name: awayCompetitor.team.displayName,
+                            logo: getLogo(awayCompetitor),
+                            players: [],
+                            rank: undefined,
+                            conference: undefined,
+                            leadingScorer: getLeadingScorer(awayCompetitor),
+                        };
+
+                        const game: Game = {
+                            id: event.id,
+                            sport: endpointInfo.sport,
+                            sportSlug: finalSlug,
+                            startTime: event.date,
+                            homeTeam,
+                            awayTeam,
+                            liveScore: {
+                                home: parseInt(homeCompetitor.score, 10) || 0,
+                                away: parseInt(awayCompetitor.score, 10) || 0,
+                            },
+                            statusDetail: competition.status.type.detail,
+                            statusState: competition.status.type.state,
+                        };
+                        return game;
+
+                    })
                     .filter((g): g is Game => g !== null);
                 allGames.push(...games);
             }
