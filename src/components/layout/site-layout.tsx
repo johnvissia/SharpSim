@@ -43,7 +43,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-       <div className="max-w-4xl mx-auto">
+       <div className="max-w-5xl mx-auto">
         <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 py-3 mb-4">
             <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full px-2">
               {navItems.map((tab) => (

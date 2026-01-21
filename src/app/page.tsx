@@ -119,10 +119,39 @@ export default function DashboardPage() {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [espnGames, setEspnGames] = useState<Game[]>([]);
   const [isLoadingEspn, setIsLoadingEspn] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
+
+  const handleSyncData = async () => {
+    if (!firestore) {
+      toast({
+        title: 'Error',
+        description: 'Firestore is not initialized.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      await fetchAndSaveDailyData(firestore);
+      toast({
+        title: 'Sync Complete',
+        description: 'Game odds and scores have been updated.',
+      });
+    } catch (error: any) {
+      console.error('Failed to sync data:', error);
+      toast({
+        title: 'Sync Failed',
+        description: error.message || 'Could not sync game data.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const userProfileRef = useMemoFirebase(
     () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
@@ -363,21 +392,43 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-4 w-full">
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-            {['All', 'Favorites', 'NBA', 'NCAAM', 'NHL', 'NFL'].map(sport => (
-                <button
-                key={sport}
-                onClick={() => setSelectedCategory(sport)}
-                className={`
-                    px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all border
-                    ${selectedCategory === sport
-                    ? 'bg-white text-slate-950 border-white shadow-lg' // Active: Bright White
-                    : 'bg-slate-900/50 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'}
-                `}
-                >
-                {sport}
-                </button>
-            ))}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900/50 p-3 rounded-xl border border-slate-800 backdrop-blur-sm">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar w-full md:w-auto">
+                    {['All', 'Favorites', 'NBA', 'NCAAM', 'NHL', 'NFL'].map(sport => (
+                        <button
+                        key={sport}
+                        onClick={() => setSelectedCategory(sport)}
+                        className={`
+                            px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all
+                            ${selectedCategory === sport
+                            ? 'bg-white text-slate-950 shadow-lg'
+                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}
+                        `}
+                        >
+                        {sport}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={handleSyncData}
+                        disabled={isSyncing}
+                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isSyncing ? (
+                            <span className="animate-spin">↻</span> 
+                        ) : (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        )}
+                        {isSyncing ? 'Syncing...' : 'Sync Odds'}
+                    </button>
+                    <button 
+                        onClick={() => console.log("Debug Triggered")} 
+                        className="bg-red-500/10 text-red-400 border border-red-500/50 hover:bg-red-500/20 px-3 py-2 rounded-lg text-xs font-mono"
+                    >
+                        🐞 Debug
+                    </button>
+                </div>
             </div>
 
             <div className="flex flex-col gap-3">
