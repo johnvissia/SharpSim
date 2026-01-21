@@ -210,7 +210,7 @@ export default function DashboardPage() {
       }
 
       const completedGamesMap = new Map(completedGames.map(g => [g.id, g]));
-      const { updates, totalPayout } = gradeUserBets(pendingBets, completedGamesMap);
+      const { updates, totalPayout } = gradeUserBets(pendingBets, completedGamesMap, completedGames);
 
       if (updates.length > 0) {
         console.log(`Auto-settlement: Found ${updates.length} bets to update.`);
@@ -358,11 +358,21 @@ export default function DashboardPage() {
         return true;
     })
     .sort((a, b) => {
-        const isFavA = favoriteTeams.includes(a.homeTeam.name) || favoriteTeams.includes(a.awayTeam.name);
-        const isFavB = favoriteTeams.includes(b.homeTeam.name) || favoriteTeams.includes(b.awayTeam.name);
+        const isGameToday = (gameDateStr: string) => {
+            const gameDate = new Date(gameDateStr);
+            return gameDate.getDate() === now.getDate() &&
+                   gameDate.getMonth() === now.getMonth() &&
+                   gameDate.getFullYear() === now.getFullYear();
+        };
 
-        if (isFavA !== isFavB) {
-            return isFavA ? -1 : 1;
+        const isFavA = favoriteTeams.includes(a.homeTeam.name) || favoriteTeams.includes(a.awayTeam.name);
+        const isPriorityFavA = isFavA && isGameToday(a.startTime);
+        
+        const isFavB = favoriteTeams.includes(b.homeTeam.name) || favoriteTeams.includes(b.awayTeam.name);
+        const isPriorityFavB = isFavB && isGameToday(b.startTime);
+
+        if (isPriorityFavA !== isPriorityFavB) {
+            return isPriorityFavA ? -1 : 1;
         }
 
         const aHasBet = !!a.oddsApiId && activeBetGameIds.has(a.oddsApiId);
