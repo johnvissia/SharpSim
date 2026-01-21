@@ -123,8 +123,8 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
 
     console.log("Total Raw Completed Games Fetched:", allCompletedGames.length);
 
-    const finishedGames = allCompletedGames.filter((game: any) => game.completed === true && game.scores);
-    console.log("Finished Games with Scores:", finishedGames.length);
+    const finishedGames = allCompletedGames.filter((game: any) => game.scores); // Fetch all games with scores, even if not marked "completed" yet
+    console.log("Games with Scores:", finishedGames.length);
 
     if (finishedGames.length > 0) {
       const scoresBatch = writeBatch(firestore);
@@ -143,6 +143,7 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
             awayTeam: game.away_team,
             homeScore: parseInt(homeScoreStr, 10),
             awayScore: parseInt(awayScoreStr, 10),
+            completed: game.completed,
           };
           const gameRef = doc(completedGamesRef, completedGameData.id);
           scoresBatch.set(gameRef, completedGameData, { merge: true });
@@ -150,7 +151,7 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
       });
 
       await scoresBatch.commit();
-      console.log(`${finishedGames.length} completed games with scores saved/updated in Firestore.`);
+      console.log(`${finishedGames.length} games with scores saved/updated in Firestore.`);
     }
   } catch (error) {
     console.error('An unexpected error occurred during the Firestore scores saving process:', error);

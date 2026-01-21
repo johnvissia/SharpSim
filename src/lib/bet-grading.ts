@@ -20,12 +20,15 @@ export function gradeUserBets(
 
   const updates: { betId: string, payload: Partial<UserBet> }[] = [];
   let totalPayout = 0;
-
+  
+  // Helper to extract number from text (e.g. "Indiana +15.5" -> 15.5)
   const extractNumber = (str: string | undefined): number | null => {
     if (!str) return null;
     const match = str.match(/[-+]?\d*\.?\d+/);
     return match ? parseFloat(match[0]) : null;
   };
+
+  const completedGamesArray = Array.from(completedGamesMap.values());
 
   for (const bet of pendingBets) {
     // Only process bets that are actually pending
@@ -46,7 +49,7 @@ export function gradeUserBets(
         }
     ];
 
-    let isFinalized = true;
+    let isFinalized = true; // Assume the whole ticket can be finalized
     let hasLostLeg = false;
     let pushCount = 0;
     let betChanged = false;
@@ -58,33 +61,38 @@ export function gradeUserBets(
             return leg;
         }
 
-        // --- 1. ROBUST GAME FINDER ---
+        // --- 1. GAME FINDER ---
         let game: CompletedGame | undefined = completedGamesMap.get(leg.gameId);
         
         if (!game) {
-            // Fallback: Search by matching both team names within the matchup string.
-            const completedGamesArray = Array.from(completedGamesMap.values());
             game = completedGamesArray.find(g => 
                (leg.matchup && g.homeTeam && leg.matchup.includes(g.homeTeam)) && 
                (leg.matchup && g.awayTeam && leg.matchup.includes(g.awayTeam))
             );
         }
         
-        if (!game) {
+        // --- GATEKEEPER RULE ---
+        if (!game || !game.completed) {
             isFinalized = false;
             return leg;
         }
         
+        // --- SAFETY CHECK ---
+        if (game.homeScore === 0 && game.awayScore === 0) {
+            isFinalized = false;
+            return leg;
+        }
+
+        // --- 2. GRADING LOGIC ---
         const homeScore = game.homeScore;
         const awayScore = game.awayScore;
         let isWin = false;
         let isPush = false;
         
         if (leg.betType === 'spread') {
-            const line = extractNumber(leg.pick);
+            let line = extractNumber(leg.pick);
 
             if (line === null) {
-                console.warn(`Could not parse spread line from pick: "${leg.pick}". Skipping leg.`);
                 isFinalized = false;
                 return leg;
             }
@@ -102,13 +110,11 @@ export function gradeUserBets(
             } else if (isAwayPick) {
                 scoreDiff = awayScore - homeScore;
             } else {
-                console.warn(`Could not confidently match picked team "${teamName}" in game ${game.id}. Skipping leg.`);
                 isFinalized = false;
                 return leg;
             }
-
-            const finalMargin = scoreDiff + line;
             
+            const finalMargin = scoreDiff + line;
             if (finalMargin > 0) {
                 isWin = true;
             } else if (finalMargin < 0) {
@@ -120,7 +126,6 @@ export function gradeUserBets(
         } else if (leg.betType === 'total') {
             const line = extractNumber(leg.pick);
             if (line === null) {
-              console.warn(`Could not parse total line from pick: "${leg.pick}". Skipping leg.`);
               isFinalized = false;
               return leg;
             }

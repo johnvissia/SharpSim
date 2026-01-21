@@ -104,6 +104,7 @@ export interface CompletedGame {
   awayTeam: string;
   homeScore: number;
   awayScore: number;
+  completed?: boolean;
 }
 
 export interface SystemStatus {
