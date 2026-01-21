@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { GameFeed } from '@/components/dashboard/game-feed';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -350,79 +348,26 @@ export default function DashboardPage() {
 
   const showLoadingSpinner = isUserLoading || (isLoadingGames && !dailyGames);
 
-  const navItems = [
-    { href: '/', id: 'dashboard', label: '🔥 Dashboard' },
-    { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
-    { href: '/stats', id: 'stats', label: '📊 Stats' },
-    { href: '/store', id: 'store', label: '🛒 Store' },
-    { href: '/coaching', id: 'coaching', label: '🎓 Coaching' },
-    { href: '/admin', id: 'admin', label: '🛡️ Admin' }
-  ];
-
-  const pathname = usePathname();
-  
-  const getActiveTabId = () => {
-    if (pathname === '/') return 'dashboard';
-    if (pathname.startsWith('/my-picks')) return 'picks';
-    if (pathname.startsWith('/stats')) return 'stats';
-    if (pathname.startsWith('/store')) return 'store';
-    if (pathname.startsWith('/coaching')) return 'coaching';
-    if (pathname.startsWith('/admin')) return 'admin';
-    return '';
-  }
-  const activeTab = getActiveTabId();
-
-
   return (
     <>
-      <div className="max-w-4xl mx-auto">
-        <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 py-3 mb-4">
-            <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full px-2">
-              {[
-                { href: '/', id: 'dashboard', label: '🔥 Dashboard' },
-                { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
-                { href: '/stats', id: 'stats', label: '📊 Stats' },
-                { href: '/store', id: 'store', label: '🛒 Store' },
-                { href: '/coaching', id: 'coaching', label: '🎓 Coaching' },
-                { href: '/admin', id: 'admin', label: '🛡️ Admin' }
-              ].map((tab) => (
-                <Link
-                  key={tab.id}
-                  href={tab.href}
-                  className={`
-                    px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all flex-shrink-0
-                    ${activeTab === tab.id 
-                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'}
-                  `}
-                >
-                  {tab.label}
-                </Link>
-              ))}
-            </nav>
-        </div>
-
-        <div className="px-4 pb-8">
-            {showLoadingSpinner ? (
-            <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
-                <Loader className="h-12 w-12 animate-spin text-primary" />
-                <h2 className="text-xl font-semibold text-foreground">
-                {isUserLoading ? 'Authenticating...' : 'Loading Daily Lines...'}
-                </h2>
-                <p className="text-muted-foreground">
-                {isUserLoading ? 'Preparing your session...' : 'Getting the latest game information.'}
-                </p>
-            </div>
-            ) : (
-            <GameFeed
-                games={filteredAndSortedGames}
-                isLoading={isLoadingGames || isLoadingEspn}
-                onGameClick={setSelectedGame}
-                activeBetGameIds={activeBetGameIds}
-            />
-            )}
-        </div>
+      {showLoadingSpinner ? (
+      <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
+          <Loader className="h-12 w-12 animate-spin text-primary" />
+          <h2 className="text-xl font-semibold text-foreground">
+          {isUserLoading ? 'Authenticating...' : 'Loading Daily Lines...'}
+          </h2>
+          <p className="text-muted-foreground">
+          {isUserLoading ? 'Preparing your session...' : 'Getting the latest game information.'}
+          </p>
       </div>
+      ) : (
+      <GameFeed
+          games={filteredAndSortedGames}
+          isLoading={isLoadingGames || isLoadingEspn}
+          onGameClick={setSelectedGame}
+          activeBetGameIds={activeBetGameIds}
+      />
+      )}
       <BetSlip />
       <GameDetailModal game={selectedGame} isOpen={!!selectedGame} onClose={() => setSelectedGame(null)} />
     </>
