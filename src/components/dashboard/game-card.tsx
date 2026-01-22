@@ -27,7 +27,7 @@ const OddsButton = ({
 }) => (
   <Button
     variant={isSelected ? "secondary" : "outline"}
-    className="w-full h-auto flex items-center justify-between p-2 text-xs md:text-sm"
+    className="w-full h-auto min-h-[3.5rem] flex flex-col items-center justify-center p-1 text-sm leading-tight"
     onClick={onClick}
     disabled={disabled}
   >
@@ -35,31 +35,36 @@ const OddsButton = ({
   </Button>
 );
 
-const TeamDisplay = ({ team, sportSlug }: { team: Team, sportSlug: string | undefined }) => {
+const TeamDisplay = ({ team, sportSlug, score }: { team: Team, sportSlug: string | undefined, score?: number | null }) => {
     return (
-        <div className="flex items-center gap-2 text-sm font-semibold">
-            <div className="w-8 h-8 mr-2 flex-shrink-0 flex items-center justify-center">
-                <img
-                    src={`https://a.espncdn.com/i/teamlogos/${sportSlug}/500/${team.id}.png`}
-                    alt={team.name}
-                    className="w-8 h-8 object-contain"
-                    onError={(e) => {
-                        // STOP FLICKERING: Only retry once, then give up.
-                        const target = e.currentTarget;
-                        if (target.src.includes('default')) return; // Already failed, do nothing.
-                        
-                        // Fallback: Try the generic NCAA folder if it's college
-                        if (sportSlug === 'mens-college-basketball' && !target.src.includes('ncaa')) {
-                            target.src = `https://a.espncdn.com/i/teamlogos/ncaa/500/${team.id}.png`;
-                        } else {
-                            // Final Fallback: The Globe
-                            target.src = "https://a.espncdn.com/i/teamlogos/default.png";
-                        }
-                    }}
-                />
+        <div className="flex justify-between items-center w-full">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+                <div className="w-8 h-8 mr-2 flex-shrink-0 flex items-center justify-center">
+                    <img
+                        src={`https://a.espncdn.com/i/teamlogos/${sportSlug}/500/${team.id}.png`}
+                        alt={team.name}
+                        className="w-8 h-8 object-contain"
+                        onError={(e) => {
+                            // STOP FLICKERING: Only retry once, then give up.
+                            const target = e.currentTarget;
+                            if (target.src.includes('default')) return; // Already failed, do nothing.
+                            
+                            // Fallback: Try the generic NCAA folder if it's college
+                            if (sportSlug === 'mens-college-basketball' && !target.src.includes('ncaa')) {
+                                target.src = `https://a.espncdn.com/i/teamlogos/ncaa/500/${team.id}.png`;
+                            } else {
+                                // Final Fallback: The Globe
+                                target.src = "https://a.espncdn.com/i/teamlogos/default.png";
+                            }
+                        }}
+                    />
+                </div>
+                <span className="truncate">{team.name}</span>
+                {team.rank && <span className="font-bold text-muted-foreground ml-1">#{team.rank}</span>}
             </div>
-            <span className="truncate">{team.name}</span>
-            {team.rank && <span className="font-bold text-muted-foreground ml-1">#{team.rank}</span>}
+             {score !== undefined && score !== null && (
+                <span className="text-3xl font-bold tracking-tight">{score}</span>
+            )}
         </div>
     );
 };
@@ -116,10 +121,10 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
         onClick={() => onGameClick(game)}
       >
         <div className="flex items-center gap-4">
-          {/* Left Side: Teams & Status */}
-          <div className="flex-grow space-y-3 w-2/5">
-              <TeamDisplay team={game.awayTeam} sportSlug={game.sportSlug} />
-              <TeamDisplay team={game.homeTeam} sportSlug={game.sportSlug} />
+          {/* Left Side: Teams, Scores & Status */}
+          <div className="flex-grow space-y-3">
+              <TeamDisplay team={game.awayTeam} sportSlug={game.sportSlug} score={(isLive || isFinal) ? liveScore?.away : undefined} />
+              <TeamDisplay team={game.homeTeam} sportSlug={game.sportSlug} score={(isLive || isFinal) ? liveScore?.home : undefined} />
               <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
                   <div className="flex items-center gap-2">
                       <span>{gameTimeOrStatus}</span>
@@ -144,9 +149,9 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
               </div>
           </div>
 
-          {/* Right Side: Odds OR Score */}
-          {canBet && odds ? (
-            <div className="flex-1 grid grid-cols-3 gap-2 text-xs md:text-sm">
+          {/* Right Side: Odds */}
+          {canBet && odds && (
+            <div className="flex-none grid grid-cols-3 gap-2 text-xs md:text-sm w-1/2 lg:w-2/5">
                 {/* Spread Column */}
                 <div className="flex flex-col gap-2">
                     <div className="text-center font-semibold text-xs text-muted-foreground">Spread</div>
@@ -156,7 +161,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                         isSelected={isPickInSlip('spread', `${game.awayTeam.name} ${awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}`)}
                     >
                         <span className="font-semibold text-primary">{awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}</span>
-                        <span className="font-bold text-muted-foreground">{odds.spread.away > 0 ? `+${odds.spread.away}` : odds.spread.away}</span>
+                        <span className="text-xs text-muted-foreground">{odds.spread.away > 0 ? `+${odds.spread.away}` : odds.spread.away}</span>
                     </OddsButton>
                     <OddsButton 
                         onClick={(e) => handleBetSelection(e, `${game.homeTeam.name} ${homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}`, odds.spread.home, 'spread')} 
@@ -164,7 +169,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                         isSelected={isPickInSlip('spread', `${game.homeTeam.name} ${homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}`)}
                     >
                         <span className="font-semibold text-primary">{homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}</span>
-                        <span className="font-bold text-muted-foreground">{odds.spread.home > 0 ? `+${odds.spread.home}` : odds.spread.home}</span>
+                        <span className="text-xs text-muted-foreground">{odds.spread.home > 0 ? `+${odds.spread.home}` : odds.spread.home}</span>
                     </OddsButton>
                 </div>
 
@@ -176,8 +181,8 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                         disabled={!canBet}
                         isSelected={isPickInSlip('total', `Over ${odds.total.points}`)}
                     >
-                        <span className="font-semibold text-primary">O {odds.total.points}</span>
-                        <span className="font-bold text-muted-foreground">{odds.total.over > 0 ? `+${odds.total.over}` : odds.total.over}</span>
+                       <span className="font-semibold text-primary">O {odds.total.points}</span>
+                       <span className="text-xs text-muted-foreground">{odds.total.over > 0 ? `+${odds.total.over}` : odds.total.over}</span>
                     </OddsButton>
                     <OddsButton 
                         onClick={(e) => handleBetSelection(e, `Under ${odds.total.points}`, odds.total.under, 'total')} 
@@ -185,7 +190,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                         isSelected={isPickInSlip('total', `Under ${odds.total.points}`)}
                     >
                         <span className="font-semibold text-primary">U {odds.total.points}</span>
-                        <span className="font-bold text-muted-foreground">{odds.total.under > 0 ? `+${odds.total.under}` : odds.total.under}</span>
+                        <span className="text-xs text-muted-foreground">{odds.total.under > 0 ? `+${odds.total.under}` : odds.total.under}</span>
                     </OddsButton>
                 </div>
 
@@ -197,27 +202,17 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                         disabled={!canBet}
                         isSelected={isPickInSlip('moneyline', game.awayTeam.name)}
                     >
-                        <span className="font-semibold text-primary w-full text-center">{odds.moneyline.away > 0 ? `+${odds.moneyline.away}` : odds.moneyline.away}</span>
+                        <span className="font-semibold text-primary">{odds.moneyline.away > 0 ? `+${odds.moneyline.away}` : odds.moneyline.away}</span>
                     </OddsButton>
                     <OddsButton 
                         onClick={(e) => handleBetSelection(e, game.homeTeam.name, odds.moneyline.home, 'moneyline')} 
                         disabled={!canBet}
                         isSelected={isPickInSlip('moneyline', game.homeTeam.name)}
                     >
-                        <span className="font-semibold text-primary w-full text-center">{odds.moneyline.home > 0 ? `+${odds.moneyline.home}` : odds.moneyline.home}</span>
+                        <span className="font-semibold text-primary">{odds.moneyline.home > 0 ? `+${odds.moneyline.home}` : odds.moneyline.home}</span>
                     </OddsButton>
                 </div>
             </div>
-            ) : (isLive || isFinal) && liveScore ? (
-            <div className="flex-1 flex items-center justify-center gap-6">
-                <span className="text-5xl font-bold tracking-tight">{liveScore?.away}</span>
-                <span className="text-2xl font-light text-muted-foreground">-</span>
-                <span className="text-5xl font-bold tracking-tight">{liveScore?.home}</span>
-            </div>
-            ) : (
-                <div className="flex-1 flex items-center justify-center">
-                    <p className="text-muted-foreground text-sm">Odds not available</p>
-                </div>
             )}
         </div>
       </Card>
