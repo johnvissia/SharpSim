@@ -7,7 +7,6 @@ import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@
 import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
 import { syncGameLinesAndScores, syncPlayerPropsAndStats } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
-import { gradeUserBets } from '@/lib/bet-grading';
 import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile, PlayerProp } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader, RefreshCw, Users } from 'lucide-react';
@@ -203,12 +202,6 @@ export default function DashboardPage() {
   }, [firestore]);
   const { data: rankings, isLoading: isLoadingRankings } = useCollection<TeamRanking>(rankingsQuery);
 
-  const completedGamesQuery = useMemoFirebase(() => {
-      if (!firestore) return null;
-      return collection(firestore, 'completed_games');
-  }, [firestore]);
-  const { data: completedGames } = useCollection<CompletedGame>(completedGamesQuery);
-
   const pendingBetsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'users', user.uid, 'bets'), where('status', '==', 'pending'));
@@ -231,45 +224,6 @@ export default function DashboardPage() {
     });
     return gameIds;
   }, [pendingBets]);
-
-  useEffect(() => {
-    const runAutoSettlement = async () => {
-      if (!firestore || !user || !pendingBets || !completedGames || pendingBets.length === 0 || completedGames.length === 0) {
-        return;
-      }
-
-      const completedGamesMap = new Map(completedGames.map(g => [g.id, g]));
-      const { updates, totalPayout } = gradeUserBets(pendingBets, completedGamesMap);
-
-      if (updates.length > 0) {
-        console.log(`Auto-settlement: Found ${updates.length} bets to update.`);
-        const batch = writeBatch(firestore);
-        
-        updates.forEach(update => {
-          const betRef = doc(firestore, 'users', user.uid, 'bets', update.betId);
-          batch.update(betRef, update.payload);
-        });
-
-        if (totalPayout > 0) {
-          const userRef = doc(firestore, 'users', user.uid);
-          batch.update(userRef, { balance: increment(totalPayout) });
-        }
-        
-        try {
-          await batch.commit();
-          toast({
-              title: "Bets Settled",
-              description: `${updates.length} of your bets have been automatically graded.`
-          });
-        } catch (error) {
-          console.error("Auto-settlement failed:", error);
-        }
-      }
-    };
-
-    runAutoSettlement();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [completedGames, pendingBets, firestore, user]);
 
   useEffect(() => {
     const getEspnData = async () => {
