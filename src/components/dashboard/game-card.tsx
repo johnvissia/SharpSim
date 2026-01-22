@@ -117,15 +117,9 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
       >
         <div className="flex items-center gap-4">
           {/* Left Side: Teams & Status */}
-          <div className="flex-grow space-y-2 w-2/5">
-              <div className="flex justify-between items-center">
-                  <TeamDisplay team={game.awayTeam} sportSlug={game.sportSlug} />
-                  {(isLive || isFinal) && <span className="font-bold text-lg">{liveScore?.away}</span>}
-              </div>
-              <div className="flex justify-between items-center">
-                  <TeamDisplay team={game.homeTeam} sportSlug={game.sportSlug} />
-                  {(isLive || isFinal) && <span className="font-bold text-lg">{liveScore?.home}</span>}
-              </div>
+          <div className="flex-grow space-y-3 w-2/5">
+              <TeamDisplay team={game.awayTeam} sportSlug={game.sportSlug} />
+              <TeamDisplay team={game.homeTeam} sportSlug={game.sportSlug} />
               <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
                   <div className="flex items-center gap-2">
                       <span>{gameTimeOrStatus}</span>
@@ -150,8 +144,8 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
               </div>
           </div>
 
-          {/* Right Side: Odds */}
-          {odds && (
+          {/* Right Side: Odds OR Score */}
+          {canBet && odds ? (
             <div className="flex-1 grid grid-cols-3 gap-2 text-xs md:text-sm">
                 {/* Spread Column */}
                 <div className="flex flex-col gap-2">
@@ -214,7 +208,17 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                     </OddsButton>
                 </div>
             </div>
-          )}
+            ) : (isLive || isFinal) && liveScore ? (
+            <div className="flex-1 flex items-center justify-center gap-6">
+                <span className="text-5xl font-bold tracking-tight">{liveScore?.away}</span>
+                <span className="text-2xl font-light text-muted-foreground">-</span>
+                <span className="text-5xl font-bold tracking-tight">{liveScore?.home}</span>
+            </div>
+            ) : (
+                <div className="flex-1 flex items-center justify-center">
+                    <p className="text-muted-foreground text-sm">Odds not available</p>
+                </div>
+            )}
         </div>
       </Card>
   );
