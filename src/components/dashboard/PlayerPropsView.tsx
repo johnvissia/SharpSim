@@ -63,21 +63,32 @@ const mockPlayerProps: PlayerPropMarket[] = [
 ];
 
 function parsePlayerProps(data: any): PlayerPropMarket[] {
-    const bookmaker = data?.bookmakers?.[0];
+    const playerMarketKeys = ['player_points', 'player_rebounds', 'player_assists', 'player_threes', 'player_blocks', 'player_steals'];
+    
+    // Find the first bookmaker that has at least one of the desired player prop markets.
+    const bookmaker = data?.bookmakers?.find((b: any) => 
+        b.markets.some((m: any) => playerMarketKeys.includes(m.key))
+    );
+
     if (!bookmaker) return [];
 
     const markets: PlayerPropMarket[] = [];
 
-    bookmaker.markets.forEach((market: any) => {
+    // Filter to only the markets we care about from the selected bookmaker
+    const relevantMarkets = bookmaker.markets.filter((market: any) => playerMarketKeys.includes(market.key));
+
+    relevantMarkets.forEach((market: any) => {
         const outcomes = market.outcomes;
         if (!outcomes) return;
 
         // Group outcomes by player name and point value
         const propsMap = new Map<string, Partial<PlayerProp> & { playerName: string; point: number }>();
         outcomes.forEach((outcome: any) => {
-            const key = `${outcome.name}_${outcome.point}`;
+            // Player props for some sports (like hockey) might not have 'point', handle this gracefully
+            const point = outcome.point ?? 0; 
+            const key = `${outcome.name}_${point}`;
             if (!propsMap.has(key)) {
-                propsMap.set(key, { playerName: outcome.name, point: outcome.point });
+                propsMap.set(key, { playerName: outcome.name, point: point });
             }
             const prop = propsMap.get(key)!;
             if (outcome.description.toLowerCase() === 'over') {
@@ -99,7 +110,7 @@ function parsePlayerProps(data: any): PlayerPropMarket[] {
         }
     });
 
-    return markets;
+    return markets.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 
@@ -146,7 +157,7 @@ export function PlayerPropsView({ game }: { game: Game }) {
             }
             
             try {
-                const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/events/${oddsApiGameId}/odds?apiKey=${API_KEY}&regions=us&markets=player_points,player_rebounds,player_assists&oddsFormat=american`;
+                const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/events/${oddsApiGameId}/odds?apiKey=${API_KEY}&regions=us&markets=player_points,player_rebounds,player_assists,player_threes,player_blocks,player_steals&oddsFormat=american`;
                 const response = await fetch(url);
 
                 if (!response.ok) {

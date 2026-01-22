@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Game, UserProfile } from '@/lib/types';
-import { Dialog, DialogContent, DialogHeader, DialogClose, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { X, Heart } from 'lucide-react';
 import Image from 'next/image';
@@ -124,12 +124,6 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                  <DialogDescription className="sr-only">
                     View betting lines, player props, and game information for this matchup.
                  </DialogDescription>
-                 <DialogClose asChild>
-                    <Button variant="ghost" size="icon" className="absolute top-4 right-4">
-                        <X className="h-5 w-5" />
-                        <span className="sr-only">Close</span>
-                    </Button>
-                </DialogClose>
                 <div className="flex items-start justify-around pt-8">
                     <TeamHeader 
                         team={game.awayTeam} 
