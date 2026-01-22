@@ -260,7 +260,7 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
                 <TableBody>
                     {trends.map((game, index) => (
                         <TableRow key={index} className={cn(game.result === 'Upcoming' && 'bg-blue-500/10')}>
-                            <TableCell className="text-muted-foreground">{game.date}</TableCell>
+                            <TableCell className="text-muted-foreground">{new Date(game.fullDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</TableCell>
                             <TableCell>
                                 <span>{game.opponent.at} </span>
                                 <span className="font-semibold">{game.opponent.name}</span>
