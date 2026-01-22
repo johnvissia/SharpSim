@@ -271,9 +271,9 @@ export default function CoachingPage() {
             </CardHeader>
             <CardContent>
               {isLoadingBets ? (
-                <Skeleton className="h-64 w-full" />
+                <Skeleton className="h-[500px] w-full" />
               ) : chartData.length > 0 ? (
-                <ChartContainer config={chartConfig} className="h-64 w-full">
+                <ChartContainer config={chartConfig} className="h-[500px] w-full">
                   <RechartsBarChart accessibilityLayer data={chartData}>
                     <XAxis
                       dataKey="sport"
@@ -296,7 +296,7 @@ export default function CoachingPage() {
                   </RechartsBarChart>
                 </ChartContainer>
               ) : (
-                <div className="h-64 flex items-center justify-center">
+                <div className="h-[500px] flex items-center justify-center">
                     <p className="text-muted-foreground text-center">No settled bets to display.</p>
                 </div>
               )}
