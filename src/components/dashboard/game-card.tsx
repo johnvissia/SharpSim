@@ -13,6 +13,7 @@ import {
 import { Ticket } from 'lucide-react';
 import { useBetSlip, type BetSlipPick } from '@/context/BetSlipContext';
 import { sportIconMap } from '@/lib/team-logos';
+import Image from 'next/image';
 
 
 const OddsButton = ({
@@ -43,9 +44,11 @@ const TeamDisplay = ({ team, sport, score }: { team: Team, sport: SportName, sco
             <div className="flex items-center gap-2 text-sm font-semibold">
                 <div className="w-8 h-8 mr-2 flex-shrink-0 flex items-center justify-center">
                     {team.logo ? (
-                        <img
+                        <Image
                             src={team.logo}
                             alt={team.name}
+                            width={32}
+                            height={32}
                             className="w-8 h-8 object-contain"
                         />
                     ) : (

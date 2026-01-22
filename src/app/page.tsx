@@ -19,7 +19,8 @@ import { power4TeamNames } from '@/lib/power-4-teams';
 
 const transformDailyGamesToGames = (
     dailyGames: DailyGame[] | null,
-    rankingsMap: Map<string, { rank: number; conference: string }>
+    rankingsMap: Map<string, { rank: number; conference: string }>,
+    logoMap: Map<string, string>
 ): Game[] => {
     if (!dailyGames) return [];
     
@@ -77,7 +78,7 @@ const transformDailyGamesToGames = (
         const homeTeam: Team = {
             id: dg.homeTeam,
             name: dg.homeTeam,
-            logo: '', // Will be populated by ESPN data
+            logo: logoMap.get(dg.homeTeam) || '',
             players: [],
             rank: homeRankingInfo?.rank,
             conference: homeConference,
@@ -89,7 +90,7 @@ const transformDailyGamesToGames = (
         const awayTeam: Team = {
             id: dg.awayTeam,
             name: dg.awayTeam,
-            logo: '', // Will be populated by ESPN data
+            logo: logoMap.get(dg.awayTeam) || '',
             players: [],
             rank: awayRankingInfo?.rank,
             conference: awayConference,
@@ -122,10 +123,37 @@ export default function DashboardPage() {
   const [isLoadingEspn, setIsLoadingEspn] = useState(true);
   const [isSyncingLines, setIsSyncingLines] = useState(false);
   const [isSyncingProps, setIsSyncingProps] = useState(false);
+  const [teamLogos, setTeamLogos] = useState<Map<string, string>>(new Map());
 
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchTeamLogos = async () => {
+        const sports = ['basketball/nba', 'football/nfl', 'hockey/nhl', 'football/college-football', 'basketball/mens-college-basketball'];
+        const newLogoMap = new Map<string, string>();
+        const promises = sports.map(async (sport) => {
+            try {
+                const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/teams?limit=1000`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const teams = data?.sports?.[0]?.leagues?.[0]?.teams;
+                teams?.forEach((t: any) => {
+                    const teamData = t.team;
+                    if (teamData.displayName && teamData.logos && teamData.logos.length > 0) {
+                        newLogoMap.set(teamData.displayName, teamData.logos[0].href);
+                    }
+                });
+            } catch (e) {
+                console.error(`Failed to fetch teams for ${sport}`, e);
+            }
+        });
+        await Promise.all(promises);
+        setTeamLogos(newLogoMap);
+    };
+    fetchTeamLogos();
+  }, []);
 
   const handleSyncLines = async () => {
     if (!firestore) {
@@ -242,7 +270,7 @@ export default function DashboardPage() {
     const normalizeTeamName = (name: string) => teamNameNormalizationMap[name] || name;
 
     const rankingsMap = new Map(rankings?.map(r => [r.teamName, { rank: r.rank, conference: r.conference }]) || []);
-    const oddsGames = transformDailyGamesToGames(dailyGames, rankingsMap);
+    const oddsGames = transformDailyGamesToGames(dailyGames, rankingsMap, teamLogos);
 
     const finalGames = new Map<string, Game>();
 
@@ -309,7 +337,7 @@ export default function DashboardPage() {
 
     return power4Filtered;
 
-  }, [dailyGames, rankings, espnGames, isLoadingEspn]);
+  }, [dailyGames, rankings, espnGames, isLoadingEspn, teamLogos]);
 
   const filteredAndSortedGames = useMemo(() => {
     const now = new Date();
