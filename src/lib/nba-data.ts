@@ -1,5 +1,3 @@
-'use server';
-
 export const nbaTeamAbbreviationToName: Record<string, string> = {
   'ATL': 'Atlanta Hawks',
   'BOS': 'Boston Celtics',
