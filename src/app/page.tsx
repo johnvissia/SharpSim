@@ -407,6 +407,17 @@ export default function DashboardPage() {
     });
   }, [mergedGames, selectedCategory, selectedConference, activeBetGameIds, favoriteTeams]);
 
+  // Effect to keep the selected game in sync with the master list
+  useEffect(() => {
+    if (selectedGame) {
+      const refreshedGame = filteredAndSortedGames.find(g => g.id === selectedGame.id);
+      // Update the state only if the refreshed game data is different
+      if (refreshedGame && JSON.stringify(refreshedGame) !== JSON.stringify(selectedGame)) {
+        setSelectedGame(refreshedGame);
+      }
+    }
+  }, [filteredAndSortedGames, selectedGame]);
+
 
   const showLoadingSpinner = isUserLoading || (isLoadingGames && !dailyGames);
   const isLoading = isLoadingGames || isLoadingEspn;
