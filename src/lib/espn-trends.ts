@@ -1,7 +1,6 @@
 'use server';
 
 import type { TeamTrend } from './types';
-import { differenceInCalendarDays } from 'date-fns';
 
 // Minimal types for ESPN Schedule API response
 interface EspnScheduleCompetitor {
@@ -135,7 +134,13 @@ export async function fetchTeamTrends(teamId: string, sport: string): Promise<Te
         if (previousGame) {
             const currentGameDate = new Date(event.date);
             const previousGameDate = new Date(previousGame.date);
-            restDays = differenceInCalendarDays(currentGameDate, previousGameDate) - 1;
+
+            const utcCurrent = Date.UTC(currentGameDate.getUTCFullYear(), currentGameDate.getUTCMonth(), currentGameDate.getUTCDate());
+            const utcPrevious = Date.UTC(previousGameDate.getUTCFullYear(), previousGameDate.getUTCMonth(), previousGameDate.getUTCDate());
+            
+            const dayDifference = (utcCurrent - utcPrevious) / (1000 * 60 * 60 * 24);
+
+            restDays = dayDifference - 1;
         }
 
 
@@ -169,7 +174,13 @@ export async function fetchTeamTrends(teamId: string, sport: string): Promise<Te
         if (mostRecentCompletedGame) {
             const nextGameDate = new Date(nextGame.date);
             const lastGameDate = new Date(mostRecentCompletedGame.date);
-            restDays = differenceInCalendarDays(nextGameDate, lastGameDate) - 1;
+
+            const utcNext = Date.UTC(nextGameDate.getUTCFullYear(), nextGameDate.getUTCMonth(), nextGameDate.getUTCDate());
+            const utcLast = Date.UTC(lastGameDate.getUTCFullYear(), lastGameDate.getUTCMonth(), lastGameDate.getUTCDate());
+
+            const dayDifference = (utcNext - utcLast) / (1000 * 60 * 60 * 24);
+
+            restDays = dayDifference - 1;
         }
 
         const competition = nextGame.competitions[0];
