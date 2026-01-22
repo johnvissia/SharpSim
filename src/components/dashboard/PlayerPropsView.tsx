@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Game, PlayerProp, PlayerPropMarket } from '@/lib/types';
 import { sportKeyMapping } from '@/lib/sports';
 import { useBetSlip } from '@/context/BetSlipContext';
@@ -114,16 +114,35 @@ function parsePlayerProps(data: any): PlayerPropMarket[] {
 }
 
 
-export function PlayerPropsView({ game }: { game: Game }) {
+export function PlayerPropsView({ game, isActive }: { game: Game; isActive: boolean }) {
     const { addPick } = useBetSlip();
     const { toast } = useToast();
     const [markets, setMarkets] = useState<PlayerPropMarket[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const canBet = game.statusState === 'pre';
 
+    const hasFetched = useRef(false);
+    const currentGameId = useRef<string | null>(null);
+
+
     useEffect(() => {
+        // If the game has changed, reset the fetch status and clear old data.
+        if (game.id !== currentGameId.current) {
+            hasFetched.current = false;
+            currentGameId.current = game.id;
+            setMarkets([]);
+            setError(null);
+            setIsLoading(false);
+        }
+
+        // Only fetch if the tab is active and we haven't fetched for this game yet.
+        if (!isActive || hasFetched.current) {
+            return;
+        }
+
         const fetchPlayerProps = async () => {
+            hasFetched.current = true; // Mark that we've initiated a fetch for this game
             setIsLoading(true);
             setError(null);
             setMarkets([]);
@@ -189,7 +208,7 @@ export function PlayerPropsView({ game }: { game: Game }) {
         };
 
         fetchPlayerProps();
-    }, [game, toast]);
+    }, [game, toast, isActive]);
     
     const handlePick = (
         playerName: string,
@@ -221,6 +240,27 @@ export function PlayerPropsView({ game }: { game: Game }) {
                 <ShieldAlert className="h-10 w-10 text-accent" />
                 <p className="font-semibold">Player Props Unavailable</p>
                 <p className="text-sm">{error}</p>
+            </div>
+        );
+    }
+
+    // This condition handles the case where fetching is complete, but no markets were found.
+    if (markets.length === 0 && hasFetched.current) {
+        return (
+             <div className="text-center text-muted-foreground py-8 flex flex-col items-center gap-4">
+                <ShieldAlert className="h-10 w-10 text-accent" />
+                <p className="font-semibold">Player Props Unavailable</p>
+                <p className="text-sm">No player props are available for this game at the moment.</p>
+            </div>
+        )
+    }
+
+    // Initial state before fetching has started for an active tab
+    if (markets.length === 0 && !hasFetched.current) {
+        return (
+            <div className="space-y-4 py-4">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
             </div>
         );
     }

@@ -157,11 +157,11 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                         <TabsTrigger value="main-lines">Main Lines</TabsTrigger>
                         <TabsTrigger value="player-props">Player Props</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="main-lines" className="mt-4">
+                    <TabsContent value="main-lines" className="mt-4" forceMount>
                         <MainLinesView game={game} />
                     </TabsContent>
-                    <TabsContent value="player-props" className="mt-4">
-                        <PlayerPropsView game={game} />
+                    <TabsContent value="player-props" className="mt-4" forceMount>
+                        <PlayerPropsView game={game} isActive={activeTab === 'player-props'} />
                     </TabsContent>
                 </Tabs>
             </div>
