@@ -15,6 +15,7 @@ import { PlayerPropsView } from './PlayerPropsView';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
+import { InjuriesView } from './InjuriesView';
 
 interface GameDetailModalProps {
   game: Game | null;
@@ -153,9 +154,10 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
 
             <div className="px-6 pb-6 overflow-y-auto">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className={cn("grid w-full", game.sport === 'NBA' ? 'grid-cols-3' : 'grid-cols-2')}>
                         <TabsTrigger value="main-lines">Main Lines</TabsTrigger>
                         <TabsTrigger value="player-props">Player Props</TabsTrigger>
+                        {game.sport === 'NBA' && <TabsTrigger value="injuries">Injuries</TabsTrigger>}
                     </TabsList>
                     <TabsContent value="main-lines" className="mt-4" forceMount>
                         <MainLinesView game={game} />
@@ -163,6 +165,11 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                     <TabsContent value="player-props" className="mt-4" forceMount>
                         <PlayerPropsView game={game} />
                     </TabsContent>
+                     {game.sport === 'NBA' && (
+                        <TabsContent value="injuries" className="mt-4" forceMount>
+                            <InjuriesView game={game} />
+                        </TabsContent>
+                    )}
                 </Tabs>
             </div>
         </DialogContent>

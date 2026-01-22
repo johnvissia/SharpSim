@@ -154,3 +154,10 @@ export interface TeamTrend {
   margin: number;
   restDays?: number;
 }
+
+export interface Injury {
+  name: string;
+  position: string;
+  status: string; // e.g., "Out", "Day-to-Day"
+  date: string;
+}
