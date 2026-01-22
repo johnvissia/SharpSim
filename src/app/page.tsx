@@ -266,6 +266,9 @@ export default function DashboardPage() {
   const mergedGames = useMemo(() => {
     const teamNameNormalizationMap: Record<string, string> = {
       'LA Clippers': 'Los Angeles Clippers',
+      'Montréal Canadiens': 'Montreal Canadiens',
+      'St Louis Blues': 'St. Louis Blues',
+      'Miami (FL) Hurricanes': 'Miami Hurricanes',
     };
     const normalizeTeamName = (name: string) => teamNameNormalizationMap[name] || name;
 
