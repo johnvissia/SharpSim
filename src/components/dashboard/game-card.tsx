@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import type { Game, Team } from '@/lib/types';
+import type { Game, Team, SportName } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Ticket } from 'lucide-react';
 import { useBetSlip, type BetSlipPick } from '@/context/BetSlipContext';
+import { sportIconMap } from '@/lib/team-logos';
 
 
 const OddsButton = ({
@@ -35,29 +36,21 @@ const OddsButton = ({
   </Button>
 );
 
-const TeamDisplay = ({ team, sportSlug, score }: { team: Team, sportSlug: string | undefined, score?: number | null }) => {
+const TeamDisplay = ({ team, sport, score }: { team: Team, sport: SportName, score?: number | null }) => {
+    const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
     return (
         <div className="flex justify-between items-center w-full">
             <div className="flex items-center gap-2 text-sm font-semibold">
                 <div className="w-8 h-8 mr-2 flex-shrink-0 flex items-center justify-center">
-                    <img
-                        src={`https://a.espncdn.com/i/teamlogos/${sportSlug}/500/${team.id}.png`}
-                        alt={team.name}
-                        className="w-8 h-8 object-contain"
-                        onError={(e) => {
-                            // STOP FLICKERING: Only retry once, then give up.
-                            const target = e.currentTarget;
-                            if (target.src.includes('default')) return; // Already failed, do nothing.
-                            
-                            // Fallback: Try the generic NCAA folder if it's college
-                            if (sportSlug === 'mens-college-basketball' && !target.src.includes('ncaa')) {
-                                target.src = `https://a.espncdn.com/i/teamlogos/ncaa/500/${team.id}.png`;
-                            } else {
-                                // Final Fallback: The Globe
-                                target.src = "https://a.espncdn.com/i/teamlogos/default.png";
-                            }
-                        }}
-                    />
+                    {team.logo ? (
+                        <img
+                            src={team.logo}
+                            alt={team.name}
+                            className="w-8 h-8 object-contain"
+                        />
+                    ) : (
+                        <FallbackIcon className="w-6 h-6 text-muted-foreground" />
+                    )}
                 </div>
                 <span className="truncate">{team.name}</span>
                 {team.rank && <span className="font-bold text-muted-foreground ml-1">#{team.rank}</span>}
@@ -123,8 +116,8 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
         <div className="flex items-center gap-4">
           {/* Left Side: Teams, Scores & Status */}
           <div className="flex-grow space-y-3">
-              <TeamDisplay team={game.awayTeam} sportSlug={game.sportSlug} score={(isLive || isFinal) ? liveScore?.away : undefined} />
-              <TeamDisplay team={game.homeTeam} sportSlug={game.sportSlug} score={(isLive || isFinal) ? liveScore?.home : undefined} />
+              <TeamDisplay team={game.awayTeam} sport={game.sport} score={(isLive || isFinal) ? liveScore?.away : undefined} />
+              <TeamDisplay team={game.homeTeam} sport={game.sport} score={(isLive || isFinal) ? liveScore?.home : undefined} />
               <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
                   <div className="flex items-center gap-2">
                       <span>{gameTimeOrStatus}</span>
