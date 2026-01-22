@@ -344,7 +344,8 @@ export default function DashboardPage() {
 
   const filteredAndSortedGames = useMemo(() => {
     const now = new Date();
-    const finishedGameCutoff = 4 * 60 * 60 * 1000; 
+    // Keep games for 4 hours after they start, unless they are marked as 'in' (live).
+    const staleCutoff = now.getTime() - (4 * 60 * 60 * 1000); 
 
     return mergedGames.filter(game => {
         if (selectedCategory === 'Favorites') {
@@ -362,12 +363,17 @@ export default function DashboardPage() {
                 return false;
             }
         }
+        
+        const gameTime = new Date(game.startTime).getTime();
 
-        if (game.statusState === 'post') {
-            const gameTime = new Date(game.startTime).getTime();
-            if (now.getTime() - gameTime > finishedGameCutoff) {
-                return false;
-            }
+        // Always show live games.
+        if (game.statusState === 'in') {
+            return true;
+        }
+        
+        // Hide games that started more than 4 hours ago and are not live.
+        if (gameTime < staleCutoff) {
+            return false;
         }
 
         return true;
