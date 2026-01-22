@@ -15,6 +15,7 @@ const normalizeName = (name: string): string => {
 
 /**
  * Extracts a number (integer or float, positive or negative) from a string.
+ * Used for total lines.
  * @param str The string to parse.
  * @returns The extracted number, or null if not found.
  */
@@ -107,19 +108,27 @@ export function gradeUserBets(
                     isBetFinalized = false;
                     return leg;
                 }
-                const line = extractNumber(leg.pick);
-                if (line === null) {
+                
+                // Robustly parse the team name and spread value from the pick string
+                const lastSpaceIndex = leg.pick.lastIndexOf(' ');
+                if (lastSpaceIndex === -1) {
                     isBetFinalized = false;
-                    return leg;
+                    return leg; // Invalid spread pick format
                 }
-                const teamNameFromPick = leg.pick.replace(/[-+0-9\.]/g, '').trim();
+                const teamNameFromPick = leg.pick.substring(0, lastSpaceIndex).trim();
+                const lineStr = leg.pick.substring(lastSpaceIndex + 1);
+                const line = parseFloat(lineStr);
+
+                if (isNaN(line)) {
+                    isBetFinalized = false;
+                    return leg; // Could not parse line number
+                }
                 
                 const isHomePick = normalizeName(game.homeTeam) === normalizeName(teamNameFromPick);
                 const isAwayPick = normalizeName(game.awayTeam) === normalizeName(teamNameFromPick);
 
                 if (!isHomePick && !isAwayPick) {
                      isBetFinalized = false;
-                     // For debugging: console.log(`Could not match spread pick: '${teamNameFromPick}' to '${game.homeTeam}' or '${game.awayTeam}'`);
                      return leg;
                 }
 
