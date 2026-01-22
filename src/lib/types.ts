@@ -35,17 +35,6 @@ export type SportsbookOdds = {
 
 export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'Soccer' | 'WNBA' | 'NCAAF' | 'NCAAM';
 
-export interface PlayerProp {
-  propId: string;
-  playerId: string;
-  playerName: string;
-  market: string; // e.g., 'pts', 'reb', 'ast'
-  line: number;
-  overOdds: number;
-  underOdds: number;
-  sportsbook: string;
-}
-
 export type Game = {
   id: string;
   oddsApiId?: string;
@@ -56,7 +45,6 @@ export type Game = {
   awayTeam: Team;
   odds?: Odds; // This will be the "best" line for display
   allOdds?: SportsbookOdds[];
-  playerProps?: PlayerProp[];
   liveScore?: { home: number; away: number };
   statusDetail?: string; // e.g., "Final", "Q3 10:00" from ESPN
   statusState?: 'pre' | 'in' | 'post';
@@ -74,14 +62,10 @@ export interface ParlayLeg {
   matchup: string;
   commenceTime: string;
   pick: string; // The specific selection, e.g., "Los Angeles Lakers"
-  betType: 'moneyline' | 'spread' | 'total' | 'player_prop';
+  betType: 'moneyline' | 'spread' | 'total';
   odds: number;
   status: 'pending' | 'won' | 'lost' | 'push'; // Individual leg status
   sport: SportName;
-  // Player Prop specific fields
-  playerId?: string;
-  market?: string;
-  line?: number;
 }
 
 export interface UserProfile {
@@ -98,7 +82,7 @@ export interface UserBet {
   gameId: string;
   userId: string;
   sport: SportName;
-  betType: 'moneyline' | 'spread' | 'total' | 'parlay' | 'player_prop';
+  betType: 'moneyline' | 'spread' | 'total' | 'parlay';
   pick: string; // e.g., "Golden State Warriors", "Over 220.5", or "4-Leg Parlay"
   matchup?: string; // e.g. "Team A @ Team B"
   stake: number;
@@ -108,10 +92,6 @@ export interface UserBet {
   placedAt: string; // ISO 8601 string
   commenceTime?: string; // ISO 8601 string
   legs?: ParlayLeg[];
-  // Player Prop specific fields
-  playerId?: string;
-  market?: string;
-  line?: number;
 };
 
 export interface DailyGame {
@@ -121,21 +101,6 @@ export interface DailyGame {
   homeTeam: string;
   awayTeam: string;
   bookmakerOdds: string[];
-  playerProps?: PlayerProp[];
-}
-
-export interface PlayerGameStats {
-  playerId: string;
-  playerName: string;
-  stats: {
-    points: number;
-    rebounds: number;
-    assists: number;
-    steals: number;
-    blocks: number;
-    turnovers: number;
-    threePointersMade: number;
-  };
 }
 
 export interface CompletedGame {
@@ -147,7 +112,6 @@ export interface CompletedGame {
   homeScore: number;
   awayScore: number;
   completed?: boolean;
-  playerStats?: PlayerGameStats[];
 }
 
 export interface SystemStatus {
@@ -181,4 +145,28 @@ export interface Injury {
   position: string;
   status: string; // e.g., "Out", "Day-to-Day"
   date: string;
+}
+
+// Prop Hub Page Types
+export interface Tank01PlayerProp {
+    propId: string;
+    market: string;
+    line: number;
+    overOdds: number;
+    underOdds: number;
+}
+
+export interface Tank01Player {
+    playerId: string;
+    playerName: string;
+    props: Tank01PlayerProp[];
+}
+
+export interface Tank01Game {
+    gameId: string;
+    homeTeam: string;
+    awayTeam: string;
+    matchup: string;
+    gameTime: string;
+    players: Tank01Player[];
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import type { CompletedGame, UserBet, ParlayLeg, PlayerGameStats } from './types';
+import type { CompletedGame, UserBet, ParlayLeg } from './types';
 
 /**
  * Normalizes a team name by converting to lowercase and removing spaces, periods, and parentheses.
@@ -61,9 +61,6 @@ export function gradeUserBets(
             odds: bet.odds,
             status: bet.status,
             sport: bet.sport,
-            playerId: bet.playerId,
-            market: bet.market,
-            line: bet.line,
         }
     ];
 
@@ -163,55 +160,6 @@ export function gradeUserBets(
                     legResult = totalScore > line ? 'won' : 'lost';
                 } else {
                     legResult = totalScore < line ? 'won' : 'lost';
-                }
-                break;
-            }
-
-            case 'player_prop': {
-                if (!game.playerStats || !leg.playerId || !leg.market || leg.line === undefined) {
-                    isBetFinalized = false;
-                    return leg; // Not enough info to grade
-                }
-
-                const playerStat = game.playerStats.find(p => p.playerId === leg.playerId);
-                if (!playerStat) {
-                    isBetFinalized = false; // Player didn't play or stats not found
-                    return leg;
-                }
-
-                const marketToStatKey: Record<string, keyof PlayerGameStats['stats']> = {
-                    'pts': 'points',
-                    'reb': 'rebounds',
-                    'ast': 'assists',
-                    'stl': 'steals',
-                    'blk': 'blocks',
-                    '3pt': 'threePointersMade',
-                };
-                
-                let actualStatValue: number | undefined;
-                const statKey = marketToStatKey[leg.market];
-                
-                if (statKey) {
-                    actualStatValue = playerStat.stats[statKey];
-                } else if (leg.market === 'pts+reb+ast') {
-                    actualStatValue = playerStat.stats.points + playerStat.stats.rebounds + playerStat.stats.assists;
-                } else if (leg.market === 'blk+stl') {
-                    actualStatValue = playerStat.stats.blocks + playerStat.stats.steals;
-                }
-
-                if (actualStatValue === undefined) {
-                    isBetFinalized = false; // Market not supported for grading
-                    return leg;
-                }
-
-                const isOver = leg.pick.toLowerCase().includes('over');
-                
-                if (actualStatValue > leg.line) {
-                    legResult = isOver ? 'won' : 'lost';
-                } else if (actualStatValue < leg.line) {
-                    legResult = isOver ? 'lost' : 'won';
-                } else { // actualStatValue === leg.line
-                    legResult = 'push';
                 }
                 break;
             }

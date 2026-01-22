@@ -178,7 +178,7 @@ export function BetSlip() {
 
       if (picks.length === 1) {
         const pick = picks[0];
-        const baseBet: Omit<UserBet, 'id'> = {
+        newBet = {
           gameId: pick.game.oddsApiId!,
           userId: user.uid,
           sport: pick.game.sport,
@@ -192,18 +192,6 @@ export function BetSlip() {
           status: 'pending',
           placedAt: new Date().toISOString(),
         };
-
-        if (pick.betType === 'player_prop') {
-          newBet = {
-            ...baseBet,
-            playerId: pick.playerId,
-            market: pick.market,
-            line: pick.line,
-          };
-        } else {
-          newBet = baseBet;
-        }
-
       } else { // Parlay
         const parlayLegs: ParlayLeg[] = picks.map(p => {
           const leg: ParlayLeg = {
@@ -216,13 +204,6 @@ export function BetSlip() {
             status: 'pending',
             sport: p.game.sport,
           };
-
-          // Conditionally add player prop fields to the leg
-          if (p.betType === 'player_prop') {
-            leg.playerId = p.playerId;
-            leg.market = p.market;
-            leg.line = p.line;
-          }
           return leg;
         });
 

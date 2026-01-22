@@ -5,9 +5,9 @@ import { GameCard } from '@/components/dashboard/game-card';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
-import { syncGameLinesAndScores, syncPlayerPropsAndStats } from '@/lib/api';
+import { syncGameLinesAndScores } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
-import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile, PlayerProp } from '@/lib/types';
+import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader, RefreshCw, Users } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -102,7 +102,6 @@ const transformDailyGamesToGames = (
             startTime: dg.commenceTime,
             homeTeam,
             awayTeam,
-            playerProps: dg.playerProps || [],
         };
         
         if (allOdds.length > 0) {
@@ -122,7 +121,6 @@ export default function DashboardPage() {
   const [espnGames, setEspnGames] = useState<Game[]>([]);
   const [isLoadingEspn, setIsLoadingEspn] = useState(true);
   const [isSyncingLines, setIsSyncingLines] = useState(false);
-  const [isSyncingProps, setIsSyncingProps] = useState(false);
   const [teamLogos, setTeamLogos] = useState<Map<string, string>>(new Map());
 
   const firestore = useFirestore();
@@ -180,34 +178,6 @@ export default function DashboardPage() {
       });
     } finally {
       setIsSyncingLines(false);
-    }
-  };
-
-  const handleSyncProps = async () => {
-    if (!firestore) {
-      toast({
-        title: 'Error',
-        description: 'Firestore is not initialized.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    setIsSyncingProps(true);
-    try {
-      await syncPlayerPropsAndStats(firestore);
-      toast({
-        title: 'Sync Complete',
-        description: 'Player props and stats have been updated.',
-      });
-    } catch (error: any) {
-      console.error('Failed to sync player props:', error);
-      toast({
-        title: 'Sync Failed',
-        description: error.message || 'Could not sync player prop data.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSyncingProps(false);
     }
   };
 
@@ -311,7 +281,6 @@ export default function DashboardPage() {
                 ...existingGame,
                 odds: oddsGame.odds,
                 allOdds: oddsGame.allOdds,
-                playerProps: oddsGame.playerProps,
                 id: existingGame.id,
                 oddsApiId: oddsGame.id,
             });
@@ -476,19 +445,11 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-2">
                     <button 
                         onClick={handleSyncLines}
-                        disabled={isSyncingLines || isSyncingProps}
+                        disabled={isSyncingLines}
                         className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <RefreshCw className={`w-4 h-4 ${isSyncingLines ? 'animate-spin' : ''}`} />
                         {isSyncingLines ? 'Syncing...' : 'Sync Game Lines'}
-                    </button>
-                     <button 
-                        onClick={handleSyncProps}
-                        disabled={isSyncingLines || isSyncingProps}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Users className={`w-4 h-4 ${isSyncingProps ? 'animate-spin' : ''}`} />
-                        {isSyncingProps ? 'Syncing...' : 'Sync Player Props'}
                     </button>
                 </div>
             </div>
