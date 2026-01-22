@@ -13,7 +13,7 @@ const areDatesOnSameDay = (date1: Date, date2: Date) =>
     date1.getDate() === date2.getDate();
 
 
-async function fetchAndAttachPlayerStats(firestore: Firestore, oddsApiGames: CompletedGame[]) {
+async function fetchAndAttachPlayerStats(firestore: Firestore) {
     console.log("Starting to fetch and attach player box scores...");
     const rapidApiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
     const rapidApiHost = process.env.NEXT_PUBLIC_RAPIDAPI_HOST;
@@ -24,6 +24,25 @@ async function fetchAndAttachPlayerStats(firestore: Firestore, oddsApiGames: Com
     }
 
     const today = new Date();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const completedGamesRef = collection(firestore, 'completed_games');
+    const q = query(
+        completedGamesRef,
+        where('sportKey', '==', 'basketball_nba'),
+        where('completed', '==', true),
+        where('commenceTime', '>=', todayStart.toISOString())
+    );
+    
+    const completedGamesSnapshot = await getDocs(q);
+    const oddsApiGames = completedGamesSnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as CompletedGame) }));
+
+    if (oddsApiGames.length === 0) {
+        console.log("No completed NBA games found in Firestore for today to attach stats to.");
+        return;
+    }
+
     const year = today.getFullYear();
     const month = (today.getMonth() + 1).toString().padStart(2, '0');
     const day = today.getDate().toString().padStart(2, '0');
@@ -212,12 +231,11 @@ async function fetchAndSavePlayerProps(firestore: Firestore) {
   }
 }
 
-
 /**
  * Fetches daily game odds and completed game scores from The Odds API and saves them to Firestore.
- * @param firestore The Firestore instance from `useFirestore()`.
+ * @param firestore The Firestore instance.
  */
-export async function fetchAndSaveDailyData(firestore: Firestore) {
+export async function syncGameLinesAndScores(firestore: Firestore) {
   const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
 
   if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') {
@@ -226,7 +244,7 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
     throw new Error(message);
   }
 
-  console.log("Starting Sequential Fetch...");
+  console.log("Starting Sequential Fetch for Game Lines...");
 
   const sportsMap = [
     { key: 'americanfootball_nfl', label: 'NFL' },
@@ -297,10 +315,6 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
     console.error('An unexpected error occurred during the Firestore daily games saving process:', error);
     throw error;
   }
-  
-  // After saving main game lines, fetch player props for NBA
-  await fetchAndSavePlayerProps(firestore);
-
 
   // Fetch Completed Game Scores Sequentially
   const allCompletedGames: CompletedGame[] = [];
@@ -354,15 +368,24 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
 
       await scoresBatch.commit();
       console.log(`${allCompletedGames.length} games with scores saved/updated in Firestore.`);
-
-      // After saving base scores, try to attach detailed player stats for NBA
-      const nbaGames = allCompletedGames.filter(g => g.sportKey === 'basketball_nba');
-      if (nbaGames.length > 0) {
-        await fetchAndAttachPlayerStats(firestore, nbaGames);
-      }
-
     }
   } catch (error) {
     console.error('An unexpected error occurred during the Firestore scores saving process:', error);
+  }
+}
+
+/**
+ * Fetches player prop odds and stats from the Tank01 API and saves them to Firestore.
+ * @param firestore The Firestore instance.
+ */
+export async function syncPlayerPropsAndStats(firestore: Firestore) {
+  console.log("Starting Player Props and Stats sync...");
+  try {
+    await fetchAndSavePlayerProps(firestore);
+    await fetchAndAttachPlayerStats(firestore);
+    console.log("Player props and stats sync complete.");
+  } catch (error) {
+    console.error('An error occurred during the player props and stats sync:', error);
+    throw error;
   }
 }
