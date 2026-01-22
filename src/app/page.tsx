@@ -7,8 +7,8 @@ import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@
 import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
 import { fetchAndSaveDailyData } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
-import { gradeUserBets, calculateLegResult } from '@/lib/bet-grading';
-import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile } from '@/lib/types';
+import { gradeUserBets } from '@/lib/bet-grading';
+import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile, PlayerProp } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -18,7 +18,6 @@ import { sportNameMapping } from '@/lib/sports';
 import { getConference } from '@/lib/ncaa-conferences';
 import { power4TeamNames } from '@/lib/power-4-teams';
 
-// This function is now being moved from game-feed.tsx to page.tsx
 const transformDailyGamesToGames = (
     dailyGames: DailyGame[] | null,
     rankingsMap: Map<string, { rank: number; conference: string }>
@@ -103,6 +102,7 @@ const transformDailyGamesToGames = (
             startTime: dg.commenceTime,
             homeTeam,
             awayTeam,
+            playerProps: dg.playerProps || [],
         };
         
         if (allOdds.length > 0) {
@@ -210,7 +210,7 @@ export default function DashboardPage() {
       }
 
       const completedGamesMap = new Map(completedGames.map(g => [g.id, g]));
-      const { updates, totalPayout } = gradeUserBets(pendingBets, completedGamesMap, completedGames);
+      const { updates, totalPayout } = gradeUserBets(pendingBets, completedGamesMap);
 
       if (updates.length > 0) {
         console.log(`Auto-settlement: Found ${updates.length} bets to update.`);
@@ -297,6 +297,7 @@ export default function DashboardPage() {
                 ...existingGame,
                 odds: oddsGame.odds,
                 allOdds: oddsGame.allOdds,
+                playerProps: oddsGame.playerProps,
                 id: existingGame.id,
                 oddsApiId: oddsGame.id,
             });

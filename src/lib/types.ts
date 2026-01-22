@@ -3,6 +3,11 @@ export type Player = {
   name: string;
   position: string;
   injuryStatus: 'Healthy' | 'Questionable' | 'Out';
+  stats?: {
+    leadingScorer?: string;
+    leadingRebounder?: string;
+    leadingAssister?: string;
+  }
 };
 
 export type Team = {
@@ -12,6 +17,9 @@ export type Team = {
   players: Player[];
   rank?: number;
   conference?: string;
+  leadingScorer?: string;
+  leadingRebounder?: string;
+  leadingAssister?: string;
 };
 
 export type Odds = {
@@ -27,6 +35,17 @@ export type SportsbookOdds = {
 
 export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'Soccer' | 'WNBA' | 'NCAAF' | 'NCAAM';
 
+export interface PlayerProp {
+  propId: string;
+  playerId: string;
+  playerName: string;
+  market: string; // e.g., 'pts', 'reb', 'ast'
+  line: number;
+  overOdds: number;
+  underOdds: number;
+  sportsbook: string;
+}
+
 export type Game = {
   id: string;
   oddsApiId?: string;
@@ -37,6 +56,7 @@ export type Game = {
   awayTeam: Team;
   odds?: Odds; // This will be the "best" line for display
   allOdds?: SportsbookOdds[];
+  playerProps?: PlayerProp[];
   liveScore?: { home: number; away: number };
   statusDetail?: string; // e.g., "Final", "Q3 10:00" from ESPN
   statusState?: 'pre' | 'in' | 'post';
@@ -54,7 +74,7 @@ export interface ParlayLeg {
   matchup: string;
   commenceTime: string;
   pick: string; // The specific selection, e.g., "Los Angeles Lakers"
-  betType: 'moneyline' | 'spread' | 'total';
+  betType: 'moneyline' | 'spread' | 'total' | 'player_prop';
   odds: number;
   status: 'pending' | 'won' | 'lost' | 'push'; // Individual leg status
   sport: SportName;
@@ -74,7 +94,7 @@ export interface UserBet {
   gameId: string;
   userId: string;
   sport: SportName;
-  betType: 'moneyline' | 'spread' | 'total' | 'parlay';
+  betType: 'moneyline' | 'spread' | 'total' | 'parlay' | 'player_prop';
   pick: string; // e.g., "Golden State Warriors", "Over 220.5", or "4-Leg Parlay"
   matchup?: string; // e.g. "Team A @ Team B"
   stake: number;
@@ -93,6 +113,7 @@ export interface DailyGame {
   homeTeam: string;
   awayTeam: string;
   bookmakerOdds: string[];
+  playerProps?: PlayerProp[];
 }
 
 export interface CompletedGame {

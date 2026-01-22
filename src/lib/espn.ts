@@ -26,6 +26,22 @@ interface EspnCompetitor {
     score: string;
     linescores: { value: number }[];
     record: { name: string; abbreviation: string; summary: string }[];
+    leaders?: {
+        name: string; // e.g., 'points', 'rebounds', 'assists'
+        displayName: string;
+        shortDisplayName: string;
+        abbreviation: string;
+        leaders: {
+            displayValue: string; // "25.4 PPG"
+            value: number;
+            athlete: {
+                id: string;
+                fullName: string;
+                displayName: string;
+                shortName: string;
+            };
+        }[];
+    }[];
 }
 
 interface EspnCompetition {
@@ -80,7 +96,6 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
     return d.toISOString().split('T')[0].replace(/-/g, '');
   };
 
-  // 1. Explicit Sources (To ensure correct slugs AND sport names)
   const sources = [
     { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', slug: 'nba', sport: 'NBA' as SportName },
     { url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard', slug: 'nfl', sport: 'NFL' as SportName },
@@ -91,7 +106,6 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
 
   try {
     const promises: Promise<{ data: any, slug: string, sport: SportName }>[] = [];
-    // Fetch Today and Yesterday
     sources.forEach(src => {
       promises.push(fetch(`${src.url}?dates=${getDateStr(0)}&limit=100`).then(r => r.json()).then(d => ({ data: d, slug: src.slug, sport: src.sport })));
       promises.push(fetch(`${src.url}?dates=${getDateStr(-1)}&limit=100`).then(r => r.json()).then(d => ({ data: d, slug: src.slug, sport: src.sport })));
@@ -110,13 +124,9 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
         const away = comp.competitors.find(c => c.homeAway === 'away');
         if (!home || !away) return null;
 
-        // --- THE FIX: Priority ID Search ---
-        // ESPN puts the ID in 'home.id' OR 'home.team.id'. We check both.
-        // We also verify it looks like a number.
         const getSafeId = (competitor: EspnCompetitor) => {
             const id1 = competitor.id; 
             const id2 = competitor.team?.id;
-            // If id1 is a valid number string, use it. Otherwise use id2.
             return (id1 && !isNaN(parseInt(id1))) ? id1 : id2;
         };
         
@@ -130,11 +140,19 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
             return '';
         };
 
+        const getLeader = (competitor: EspnCompetitor, stat: 'points' | 'rebounds' | 'assists') => {
+            const leaderData = competitor.leaders?.find(l => l.name.toLowerCase() === stat);
+            return leaderData?.leaders[0]?.displayValue;
+        }
+
         const homeTeam: Team = {
             id: String(getSafeId(home)),
             name: home.team.displayName,
             logo: getLogo(home),
             players: [],
+            leadingScorer: getLeader(home, 'points'),
+            leadingRebounder: getLeader(home, 'rebounds'),
+            leadingAssister: getLeader(home, 'assists'),
         };
 
         const awayTeam: Team = {
@@ -142,11 +160,14 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
             name: away.team.displayName,
             logo: getLogo(away),
             players: [],
+            leadingScorer: getLeader(away, 'points'),
+            leadingRebounder: getLeader(away, 'rebounds'),
+            leadingAssister: getLeader(away, 'assists'),
         };
 
         return {
             id: event.id,
-            sport: sport, // Ensure sport name is passed
+            sport: sport,
             sportSlug: slug, 
             startTime: event.date,
             homeTeam,
@@ -163,7 +184,6 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
       cleanGames = [...cleanGames, ...mapped];
     });
 
-    // Deduplicate
     const unique = Array.from(new Map(cleanGames.map(g => [g.id, g])).values());
     console.log(`✅ Refreshed ${unique.length} games. Sample ID: ${unique[0]?.homeTeam.id}`);
 

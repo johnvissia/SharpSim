@@ -4,11 +4,12 @@ import React, { createContext, useContext, useState, ReactNode, useMemo } from '
 import type { Game } from '@/lib/types';
 
 export interface BetSlipPick {
-  id: string; // A unique identifier for this pick, e.g., `${game.id}-${betType}-${pick}`
+  id: string;
   game: Game;
   pick: string;
   odds: number;
-  betType: 'moneyline' | 'spread' | 'total';
+  betType: 'moneyline' | 'spread' | 'total' | 'player_prop';
+  marketId: string;
 }
 
 interface BetSlipContextType {
@@ -25,24 +26,15 @@ export const BetSlipProvider = ({ children }: { children: ReactNode }) => {
 
   const addPick = (newPick: Omit<BetSlipPick, 'id'>) => {
     setPicks(currentPicks => {
-      // Create a unique ID for the pick
-      const pickId = `${newPick.game.id}-${newPick.betType}-${newPick.pick.replace(/\s/g, '')}`;
+      const pickId = `${newPick.marketId}-${newPick.pick.replace(/\s/g, '')}`;
 
-      // Prevent adding the exact same pick twice
       if (currentPicks.some(p => p.id === pickId)) {
-        return currentPicks;
-      }
-      
-      // Prevent adding conflicting picks from the same game (e.g., both sides of a moneyline)
-      const picksForSameGame = currentPicks.filter(p => p.game.id === newPick.game.id);
-      if(picksForSameGame.length > 0) {
-        // Simple rule for now: only one pick per game in a parlay.
-        // Replace the existing pick for this game.
-        const otherPicks = currentPicks.filter(p => p.game.id !== newPick.game.id);
-        return [...otherPicks, { ...newPick, id: pickId }];
+        return currentPicks.filter(p => p.id !== pickId);
       }
 
-      return [...currentPicks, { ...newPick, id: pickId }];
+      const filteredPicks = currentPicks.filter(p => p.marketId !== newPick.marketId);
+
+      return [...filteredPicks, { ...newPick, id: pickId }];
     });
   };
 

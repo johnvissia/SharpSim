@@ -9,7 +9,6 @@ import type { CompletedGame, UserBet, ParlayLeg } from './types';
  */
 const extractNumber = (str: string | undefined): number | null => {
     if (!str) return null;
-    // This regex finds the last number in the string, which is usually the line.
     const match = str.match(/[-+]?\d*\.?\d+/g);
     if (!match) return null;
     return parseFloat(match[match.length - 1]);
@@ -36,32 +35,34 @@ export function gradeUserBets(
   let totalPayout = 0;
   
   for (const bet of pendingBets) {
-    // We only process pending bets from the query, but as a safeguard:
     if (bet.status !== 'pending') {
         continue;
     }
 
+    // Skip grading for player props in this function for now
+    if (bet.betType === 'player_prop') {
+        continue;
+    }
+
     const legsToProcess: ParlayLeg[] = bet.legs ? bet.legs : [
-        // Create a synthetic leg for single bets for unified processing
         {
             gameId: bet.gameId,
             matchup: bet.matchup || 'N/A',
             commenceTime: bet.commenceTime || new Date(0).toISOString(),
             pick: bet.pick,
-            betType: bet.betType as Exclude<UserBet['betType'], 'parlay'>,
+            betType: bet.betType as Exclude<UserBet['betType'], 'parlay' | 'player_prop'>,
             odds: bet.odds,
             status: bet.status,
             sport: bet.sport,
         }
     ];
 
-    let isBetFinalized = true; // Assume the bet can be settled unless a leg is still pending.
+    let isBetFinalized = true;
     let hasAnyLegLost = false;
     let pushCount = 0;
     let haveLegsChanged = false;
 
     const updatedLegs = legsToProcess.map(leg => {
-        // If leg is already settled, just update finalization state and skip.
         if (leg.status !== 'pending') {
             if (leg.status === 'lost') hasAnyLegLost = true;
             if (leg.status === 'push') pushCount++;
@@ -70,15 +71,11 @@ export function gradeUserBets(
 
         const game = completedGamesMap.get(leg.gameId);
         
-        // --- GATEKEEPER RULE ---
-        // Only grade if the game is found, marked completed, AND its start time is in the past.
         if (!game || !game.completed || new Date(game.commenceTime) > new Date()) {
-            isBetFinalized = false; // Cannot settle the bet yet.
+            isBetFinalized = false;
             return leg;
         }
         
-        // --- SAFETY CHECK ---
-        // Failsafe to prevent grading games with 0-0 scores that might be incomplete data.
         if (game.homeScore === 0 && game.awayScore === 0) {
             isBetFinalized = false;
             return leg;
@@ -94,7 +91,6 @@ export function gradeUserBets(
                 if (winner === null) {
                   legResult = 'push';
                 } else {
-                  // Check if the leg's pick (team name) is included in the winner's name
                   legResult = winner.includes(leg.pick) ? 'won' : 'lost';
                 }
                 break;
@@ -103,21 +99,19 @@ export function gradeUserBets(
             case 'spread': {
                 const line = extractNumber(leg.pick);
                 if (line === null) {
-                    isBetFinalized = false; // Cannot parse line, leave pending
+                    isBetFinalized = false;
                     return leg;
                 }
-                // The team is the part of the pick that isn't the number
                 const teamNameFromPick = leg.pick.replace(/[-+0-9\.]/g, '').trim();
                 
                 const isHomePick = game.homeTeam.includes(teamNameFromPick);
                 const isAwayPick = game.awayTeam.includes(teamNameFromPick);
 
                 if (!isHomePick && !isAwayPick) {
-                     isBetFinalized = false; // Team not found, can't grade
+                     isBetFinalized = false;
                      return leg;
                 }
 
-                // Margin is from the perspective of the team picked
                 const margin = isHomePick ? (homeScore - awayScore) : (awayScore - homeScore);
                 const finalMargin = margin + line;
 
@@ -134,7 +128,7 @@ export function gradeUserBets(
             case 'total': {
                 const line = extractNumber(leg.pick);
                 if (line === null) {
-                    isBetFinalized = false; // Cannot parse line, leave pending
+                    isBetFinalized = false;
                     return leg;
                 }
                 const totalScore = homeScore + awayScore;
@@ -143,19 +137,17 @@ export function gradeUserBets(
                   legResult = 'push';
                 } else if (leg.pick.toLowerCase().includes('over')) {
                     legResult = totalScore > line ? 'won' : 'lost';
-                } else { // Assumes 'under'
+                } else {
                     legResult = totalScore < line ? 'won' : 'lost';
                 }
                 break;
             }
 
-            // Player props or other types are not graded here.
             default:
                 isBetFinalized = false;
                 return leg;
         }
 
-        // If we reached here, the leg has been graded.
         if (legResult !== 'pending') haveLegsChanged = true;
         if (legResult === 'lost') hasAnyLegLost = true;
         if (legResult === 'push') pushCount++;
@@ -163,9 +155,7 @@ export function gradeUserBets(
         return { ...leg, status: legResult };
     });
 
-    // Don't update the overall bet status if any leg is still pending.
     if (!isBetFinalized) {
-        // However, if some legs were updated, we should save their partial progress.
         if (bet.betType === 'parlay' && haveLegsChanged) {
             updates.push({
                 betId: bet.id,
@@ -175,7 +165,6 @@ export function gradeUserBets(
         continue;
     }
 
-    // Determine the final status of the bet ticket.
     let finalBetStatus: UserBet['status'];
     if (hasAnyLegLost) {
         finalBetStatus = 'lost';
@@ -185,7 +174,6 @@ export function gradeUserBets(
         finalBetStatus = 'won';
     }
 
-    // If the final status is different from the original, we need to update.
     if (bet.status !== finalBetStatus || haveLegsChanged) {
       const payload: Partial<UserBet> = { status: finalBetStatus };
       if (bet.betType === 'parlay') {
@@ -193,12 +181,9 @@ export function gradeUserBets(
       }
       updates.push({ betId: bet.id, payload });
 
-      // Calculate payout only if the bet is newly settled
       if (finalBetStatus === 'won') {
           totalPayout += bet.potentialWinnings;
       } else if (finalBetStatus === 'push') {
-          // If the whole parlay pushes, refund stake.
-          // For a single bet push, this is also correct.
           totalPayout += bet.stake;
       }
     }
