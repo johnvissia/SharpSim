@@ -145,12 +145,27 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
             return '';
         };
         
-        const getLeadingScorer = (competitor: EspnCompetitor) => {
-            const pointsLeader = competitor.leaders?.find(l => l.name === 'points')?.leaders[0];
+        const getLeaders = (competitor: EspnCompetitor) => {
+            if (!competitor.leaders) return undefined;
+
+            const leaders: Team['leaders'] = {};
+
+            const pointsLeader = competitor.leaders.find(l => l.name === 'points')?.leaders[0];
             if (pointsLeader) {
-                return { name: pointsLeader.athlete.shortName, value: pointsLeader.displayValue };
+                leaders.points = { name: pointsLeader.athlete.shortName, value: pointsLeader.displayValue };
             }
-            return undefined;
+
+            const reboundsLeader = competitor.leaders.find(l => l.name === 'rebounds')?.leaders[0];
+            if (reboundsLeader) {
+                leaders.rebounds = { name: reboundsLeader.athlete.shortName, value: reboundsLeader.displayValue };
+            }
+
+            const assistsLeader = competitor.leaders.find(l => l.name === 'assists')?.leaders[0];
+            if (assistsLeader) {
+                leaders.assists = { name: assistsLeader.athlete.shortName, value: assistsLeader.displayValue };
+            }
+
+            return Object.keys(leaders).length > 0 ? leaders : undefined;
         };
 
         const homeTeam: Team = {
@@ -158,7 +173,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
             name: home.team.displayName,
             logo: getLogo(home),
             players: [],
-            leadingScorer: getLeadingScorer(home),
+            leaders: getLeaders(home),
         };
 
         const awayTeam: Team = {
@@ -166,7 +181,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
             name: away.team.displayName,
             logo: getLogo(away),
             players: [],
-            leadingScorer: getLeadingScorer(away),
+            leaders: getLeaders(away),
         };
 
         return {

@@ -5,6 +5,11 @@ export type Player = {
   injuryStatus: 'Healthy' | 'Questionable' | 'Out';
 };
 
+export interface PlayerStat {
+  name: string;
+  value: string;
+}
+
 export type Team = {
   id:string;
   name: string;
@@ -12,7 +17,11 @@ export type Team = {
   players: Player[];
   rank?: number;
   conference?: string;
-  leadingScorer?: { name: string; value: string };
+  leaders?: {
+    points?: PlayerStat;
+    rebounds?: PlayerStat;
+    assists?: PlayerStat;
+  }
 };
 
 export type Odds = {
