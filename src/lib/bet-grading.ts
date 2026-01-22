@@ -48,7 +48,7 @@ export function gradeUserBets(
             matchup: bet.matchup || 'N/A',
             commenceTime: bet.commenceTime || new Date(0).toISOString(),
             pick: bet.pick,
-            betType: bet.betType as Exclude<UserBet['betType'], 'parlay' | 'player_prop'>,
+            betType: bet.betType as Exclude<UserBet['betType'], 'parlay'>,
             odds: bet.odds,
             status: bet.status,
             sport: bet.sport,

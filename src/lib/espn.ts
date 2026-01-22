@@ -3,20 +3,6 @@
 import type { Game, SportName, Team } from './types';
 
 // Minimal types for ESPN Scoreboard API response
-interface EspnLeaderAthlete {
-    id: string;
-    fullName: string;
-    shortName: string;
-}
-interface EspnPointsLeader {
-    displayValue: string;
-    athlete: EspnLeaderAthlete;
-}
-interface EspnLeaderCategory {
-    name: 'points' | 'rebounds' | 'assists';
-    displayName: string;
-    leaders: EspnPointsLeader[];
-}
 interface EspnCompetitor {
     id: string;
     uid: string;
@@ -40,7 +26,6 @@ interface EspnCompetitor {
     score: string;
     linescores: { value: number }[];
     record: { name: string; abbreviation: string; summary: string }[];
-    leaders?: EspnLeaderCategory[];
 }
 
 interface EspnCompetition {
@@ -144,36 +129,12 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
             }
             return '';
         };
-        
-        const getLeaders = (competitor: EspnCompetitor) => {
-            if (!competitor.leaders) return undefined;
-
-            const leaders: Team['leaders'] = {};
-
-            const pointsLeader = competitor.leaders.find(l => l.name === 'points')?.leaders[0];
-            if (pointsLeader) {
-                leaders.points = { name: pointsLeader.athlete.shortName, value: pointsLeader.displayValue };
-            }
-
-            const reboundsLeader = competitor.leaders.find(l => l.name === 'rebounds')?.leaders[0];
-            if (reboundsLeader) {
-                leaders.rebounds = { name: reboundsLeader.athlete.shortName, value: reboundsLeader.displayValue };
-            }
-
-            const assistsLeader = competitor.leaders.find(l => l.name === 'assists')?.leaders[0];
-            if (assistsLeader) {
-                leaders.assists = { name: assistsLeader.athlete.shortName, value: assistsLeader.displayValue };
-            }
-
-            return Object.keys(leaders).length > 0 ? leaders : undefined;
-        };
 
         const homeTeam: Team = {
             id: String(getSafeId(home)),
             name: home.team.displayName,
             logo: getLogo(home),
             players: [],
-            leaders: getLeaders(home),
         };
 
         const awayTeam: Team = {
@@ -181,7 +142,6 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
             name: away.team.displayName,
             logo: getLogo(away),
             players: [],
-            leaders: getLeaders(away),
         };
 
         return {

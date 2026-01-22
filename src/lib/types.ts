@@ -5,11 +5,6 @@ export type Player = {
   injuryStatus: 'Healthy' | 'Questionable' | 'Out';
 };
 
-export interface PlayerStat {
-  name: string;
-  value: string;
-}
-
 export type Team = {
   id:string;
   name: string;
@@ -17,11 +12,6 @@ export type Team = {
   players: Player[];
   rank?: number;
   conference?: string;
-  leaders?: {
-    points?: PlayerStat;
-    rebounds?: PlayerStat;
-    assists?: PlayerStat;
-  }
 };
 
 export type Odds = {
@@ -64,7 +54,7 @@ export interface ParlayLeg {
   matchup: string;
   commenceTime: string;
   pick: string; // The specific selection, e.g., "Los Angeles Lakers"
-  betType: 'moneyline' | 'spread' | 'total' | 'player_prop';
+  betType: 'moneyline' | 'spread' | 'total';
   odds: number;
   status: 'pending' | 'won' | 'lost' | 'push'; // Individual leg status
   sport: SportName;
@@ -84,7 +74,7 @@ export interface UserBet {
   gameId: string;
   userId: string;
   sport: SportName;
-  betType: 'moneyline' | 'spread' | 'total' | 'parlay' | 'player_prop';
+  betType: 'moneyline' | 'spread' | 'total' | 'parlay';
   pick: string; // e.g., "Golden State Warriors", "Over 220.5", or "4-Leg Parlay"
   matchup?: string; // e.g. "Team A @ Team B"
   stake: number;
@@ -124,19 +114,6 @@ export interface TeamRanking {
   teamName: string;
   rank: number;
   conference: string;
-}
-
-export interface PlayerProp {
-  playerName: string;
-  point: number;
-  overOdds: number;
-  underOdds: number;
-}
-
-export interface PlayerPropMarket {
-  key: string;
-  name: string; // e.g. "Player Points"
-  props: PlayerProp[];
 }
 
 export interface TeamTrend {
