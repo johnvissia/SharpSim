@@ -4,11 +4,11 @@ import type { Tank01Game, Tank01Player, Tank01PlayerProp } from "@/lib/types";
 import { nbaTeamAbbreviationToName, mapTank01MarketToApp } from "@/lib/nba-data";
 
 export async function getPlayerProps(): Promise<Tank01Game[]> {
-    const rapidApiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
-    const rapidApiHost = process.env.NEXT_PUBLIC_RAPIDAPI_HOST;
+    const rapidApiKey = process.env.RAPIDAPI_KEY;
+    const rapidApiHost = process.env.RAPIDAPI_HOST;
 
     if (!rapidApiKey || !rapidApiHost) {
-        console.error("RapidAPI key or host is not configured.");
+        console.error("RapidAPI key or host is not configured on the server.");
         throw new Error("API credentials are not configured on the server.");
     }
 
@@ -38,6 +38,13 @@ export async function getPlayerProps(): Promise<Tank01Game[]> {
         }
         
         const propsData = await response.json();
+
+        // New check for API errors masquerading as 200 OK
+        if (propsData.message) {
+            console.error("Tank01 API returned a message:", propsData.message);
+            throw new Error(`Player Prop API Error: ${propsData.message}`);
+        }
+
         const apiGames = propsData.body?.game;
 
         if (!apiGames || apiGames.length === 0) {
@@ -91,6 +98,7 @@ export async function getPlayerProps(): Promise<Tank01Game[]> {
 
     } catch (error) {
         console.error("An error occurred during the player prop fetching process:", error);
-        throw new Error("Failed to fetch data from the props API.");
+        // Re-throw the original error to be caught by the client component
+        throw error;
     }
 }
