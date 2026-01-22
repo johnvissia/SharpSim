@@ -95,7 +95,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
     return d.toISOString().split('T')[0].replace(/-/g, '');
   };
 
-  // 1. Explicit Sources (To ensure correct slugs)
+  // 1. Explicit Sources (To ensure correct slugs AND sport names)
   const sources = [
     { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', slug: 'nba', sport: 'NBA' as SportName },
     { url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard', slug: 'nfl', sport: 'NFL' as SportName },
@@ -161,8 +161,8 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
 
         return {
             id: event.id,
-            sport: sport,
-            sportSlug: slug, // Hardcoded from source
+            sport: sport, // Ensure sport name is passed
+            sportSlug: slug, 
             startTime: event.date,
             homeTeam,
             awayTeam,
