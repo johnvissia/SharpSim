@@ -46,6 +46,7 @@ import {
   useMemoFirebase,
 } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
+import { sportKeyMapping } from '@/lib/sports';
 
 const chartConfig = {
   wins: {
@@ -57,6 +58,9 @@ const chartConfig = {
     color: 'hsl(var(--destructive))',
   },
 } satisfies ChartConfig;
+
+// The sports available for betting in the app. This will be the basis for the chart.
+const AVAILABLE_SPORTS = Object.keys(sportKeyMapping) as SportName[];
 
 export default function CoachingPage() {
   const { toast } = useToast();
@@ -80,41 +84,44 @@ export default function CoachingPage() {
     useCollection<UserBet>(betsQuery);
 
   const chartData = useMemo(() => {
-    if (!userBets) return [];
-
-    const statsBySport: { [key: string]: { wins: number; losses: number } } =
-      {};
-
-    userBets.forEach((bet) => {
-        // We only want to include settled bets in the chart
-        if (bet.status !== 'won' && bet.status !== 'lost') {
-            return;
-        }
-
-      const sports: SportName[] = [];
-      if (bet.betType === 'parlay' && bet.legs) {
-        const sportSet = new Set(bet.legs.map((leg) => leg.sport));
-        sports.push(...sportSet);
-      } else {
-        sports.push(bet.sport);
-      }
-
-      for (const sport of sports) {
-        if (!statsBySport[sport]) {
-          statsBySport[sport] = { wins: 0, losses: 0 };
-        }
-        if (bet.status === 'won') {
-          statsBySport[sport].wins++;
-        } else if (bet.status === 'lost') {
-          statsBySport[sport].losses++;
-        }
-      }
+    // Initialize stats for all available sports
+    const statsBySport: { [key in SportName]?: { wins: number; losses: number } } = {};
+    AVAILABLE_SPORTS.forEach(sport => {
+        statsBySport[sport] = { wins: 0, losses: 0 };
     });
 
-    return Object.entries(statsBySport).map(([sport, { wins, losses }]) => ({
+    if (userBets) {
+        userBets.forEach((bet) => {
+            // We only want to include settled bets in the chart
+            if (bet.status !== 'won' && bet.status !== 'lost') {
+                return;
+            }
+    
+          const sports: SportName[] = [];
+          if (bet.betType === 'parlay' && bet.legs) {
+            const sportSet = new Set(bet.legs.map((leg) => leg.sport));
+            sports.push(...Array.from(sportSet));
+          } else {
+            sports.push(bet.sport);
+          }
+    
+          for (const sport of sports) {
+              // Only update if the sport from the bet exists in our initialized map
+            if (statsBySport[sport]) {
+              if (bet.status === 'won') {
+                statsBySport[sport]!.wins++;
+              } else if (bet.status === 'lost') {
+                statsBySport[sport]!.losses++;
+              }
+            }
+          }
+        });
+    }
+
+    return Object.entries(statsBySport).map(([sport, stats]) => ({
       sport,
-      wins,
-      losses,
+      wins: stats!.wins,
+      losses: stats!.losses,
     }));
   }, [userBets]);
 
