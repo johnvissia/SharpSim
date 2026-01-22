@@ -66,21 +66,32 @@ export function BetTicket({ bet }: { bet: UserBet }) {
   const ticketLabel = isParlay ? bet.pick : 'Single Bet';
   
   const toWinLabel = useMemo(() => {
-    if (bet.status === 'won') {
-      return 'Payout';
+    switch (bet.status) {
+      case 'won':
+        return 'Payout';
+      case 'lost':
+        return 'Payout';
+      case 'push':
+        return 'Refund';
+      case 'pending':
+      default:
+        return 'To Win';
     }
-    return 'To Win';
   }, [bet.status]);
 
   const toWinAmount = useMemo(() => {
-    if (bet.status === 'won') {
+    switch (bet.status) {
+      case 'won':
         return bet.potentialWinnings;
-    }
-    if (bet.status === 'lost' || bet.status === 'push') {
+      case 'lost':
+        return 0;
+      case 'push':
+        return bet.stake;
+      case 'pending':
+        return bet.potentialWinnings;
+      default:
         return 0;
     }
-    // for pending bets, show potential profit
-    return bet.potentialWinnings - bet.stake;
   }, [bet.status, bet.potentialWinnings, bet.stake]);
 
   return (
