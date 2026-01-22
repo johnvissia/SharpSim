@@ -9,7 +9,12 @@ export interface BetSlipPick {
   pick: string;
   odds: number;
   betType: 'moneyline' | 'spread' | 'total' | 'player_prop';
-  marketId: string;
+  marketId: string; // Unique ID for the market (e.g., gameId-moneyline or propId)
+  
+  // Player Prop specific fields
+  playerId?: string;
+  market?: string;
+  line?: number;
 }
 
 interface BetSlipContextType {

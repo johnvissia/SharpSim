@@ -191,6 +191,10 @@ export function BetSlip() {
           potentialWinnings: potentialPayout,
           status: 'pending',
           placedAt: new Date().toISOString(),
+          // Player prop fields
+          playerId: pick.playerId,
+          market: pick.market,
+          line: pick.line,
         };
       } else {
         const parlayLegs: ParlayLeg[] = picks.map(p => ({
@@ -202,6 +206,10 @@ export function BetSlip() {
             odds: p.odds,
             status: 'pending',
             sport: p.game.sport,
+            // Player prop fields
+            playerId: p.playerId,
+            market: p.market,
+            line: p.line,
         }));
 
         newBet = {

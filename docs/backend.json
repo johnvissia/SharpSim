@@ -29,7 +29,7 @@
         "gameId": { "type": "string", "description": "The ID of the game the bet is on. For parlays, this is a comma-separated list of game IDs." },
         "userId": { "type": "string", "description": "The ID of the user who placed the bet." },
         "sport": { "type": "string", "description": "The sport of the game." },
-        "betType": { "type": "string", "enum": ["moneyline", "spread", "total", "parlay"]},
+        "betType": { "type": "string", "enum": ["moneyline", "spread", "total", "parlay", "player_prop"]},
         "pick": { "type": "string", "description": "The user's selection. For parlays, this is a summary like '4-Leg Parlay'." },
         "matchup": { "type": "string", "description": "The matchup string for single bets, e.g., 'Team A @ Team B'." },
         "stake": { "type": "number", "description": "The amount of coins staked." },
@@ -51,11 +51,17 @@
                     "betType": { "type": "string" },
                     "odds": { "type": "number" },
                     "status": { "type": "string", "enum": ["pending", "won", "lost", "push"] },
-                    "sport": { "type": "string" }
+                    "sport": { "type": "string" },
+                    "playerId": { "type": "string" },
+                    "market": { "type": "string" },
+                    "line": { "type": "number" }
                 },
                 "required": ["gameId", "matchup", "commenceTime", "pick", "betType", "odds", "status", "sport"]
             }
-        }
+        },
+        "playerId": { "type": "string" },
+        "market": { "type": "string" },
+        "line": { "type": "number" }
       },
       "required": ["id", "gameId", "userId", "sport", "betType", "pick", "stake", "odds", "potentialWinnings", "status", "placedAt"]
     },
@@ -134,6 +140,29 @@
         "awayScore": {
           "type": "number",
           "description": "Final score of the away team."
+        },
+        "playerStats": {
+          "type": "array",
+          "description": "Detailed stats for each player in the game.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "playerId": { "type": "string" },
+              "playerName": { "type": "string" },
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "points": { "type": "number" },
+                  "rebounds": { "type": "number" },
+                  "assists": { "type": "number" },
+                  "steals": { "type": "number" },
+                  "blocks": { "type": "number" },
+                  "turnovers": { "type": "number" },
+                  "threePointersMade": { "type": "number" }
+                }
+              }
+            }
+          }
         }
       },
       "required": [

@@ -1,6 +1,6 @@
 'use client';
 
-import type { CompletedGame, UserBet, ParlayLeg } from './types';
+import type { CompletedGame, UserBet, ParlayLeg, PlayerGameStats } from './types';
 
 /**
  * Extracts a number (integer or float, positive or negative) from a string.
@@ -39,21 +39,19 @@ export function gradeUserBets(
         continue;
     }
 
-    // Skip grading for player props in this function for now
-    if (bet.betType === 'player_prop') {
-        continue;
-    }
-
     const legsToProcess: ParlayLeg[] = bet.legs ? bet.legs : [
         {
             gameId: bet.gameId,
             matchup: bet.matchup || 'N/A',
             commenceTime: bet.commenceTime || new Date(0).toISOString(),
             pick: bet.pick,
-            betType: bet.betType as Exclude<UserBet['betType'], 'parlay' | 'player_prop'>,
+            betType: bet.betType as Exclude<UserBet['betType'], 'parlay'>,
             odds: bet.odds,
             status: bet.status,
             sport: bet.sport,
+            playerId: bet.playerId,
+            market: bet.market,
+            line: bet.line,
         }
     ];
 
@@ -76,18 +74,15 @@ export function gradeUserBets(
             return leg;
         }
         
-        if (game.homeScore === 0 && game.awayScore === 0) {
-            isBetFinalized = false;
-            return leg;
-        }
-
-        const homeScore = game.homeScore;
-        const awayScore = game.awayScore;
         let legResult: 'won' | 'lost' | 'push' | 'pending' = 'pending';
         
         switch (leg.betType) {
             case 'moneyline': {
-                const winner = homeScore > awayScore ? game.homeTeam : homeScore < awayScore ? game.awayTeam : null;
+                if (game.homeScore === undefined || game.awayScore === undefined) {
+                    isBetFinalized = false;
+                    return leg;
+                }
+                const winner = game.homeScore > game.awayScore ? game.homeTeam : game.homeScore < game.awayScore ? game.awayTeam : null;
                 if (winner === null) {
                   legResult = 'push';
                 } else {
@@ -97,6 +92,10 @@ export function gradeUserBets(
             }
             
             case 'spread': {
+                if (game.homeScore === undefined || game.awayScore === undefined) {
+                    isBetFinalized = false;
+                    return leg;
+                }
                 const line = extractNumber(leg.pick);
                 if (line === null) {
                     isBetFinalized = false;
@@ -112,7 +111,7 @@ export function gradeUserBets(
                      return leg;
                 }
 
-                const margin = isHomePick ? (homeScore - awayScore) : (awayScore - homeScore);
+                const margin = isHomePick ? (game.homeScore - game.awayScore) : (game.awayScore - game.homeScore);
                 const finalMargin = margin + line;
 
                 if (finalMargin > 0) {
@@ -126,12 +125,16 @@ export function gradeUserBets(
             }
             
             case 'total': {
+                if (game.homeScore === undefined || game.awayScore === undefined) {
+                    isBetFinalized = false;
+                    return leg;
+                }
                 const line = extractNumber(leg.pick);
                 if (line === null) {
                     isBetFinalized = false;
                     return leg;
                 }
-                const totalScore = homeScore + awayScore;
+                const totalScore = game.homeScore + game.awayScore;
                 
                 if (totalScore === line) {
                   legResult = 'push';
@@ -139,6 +142,55 @@ export function gradeUserBets(
                     legResult = totalScore > line ? 'won' : 'lost';
                 } else {
                     legResult = totalScore < line ? 'won' : 'lost';
+                }
+                break;
+            }
+
+            case 'player_prop': {
+                if (!game.playerStats || !leg.playerId || !leg.market || leg.line === undefined) {
+                    isBetFinalized = false;
+                    return leg; // Not enough info to grade
+                }
+
+                const playerStat = game.playerStats.find(p => p.playerId === leg.playerId);
+                if (!playerStat) {
+                    isBetFinalized = false; // Player didn't play or stats not found
+                    return leg;
+                }
+
+                const marketToStatKey: Record<string, keyof PlayerGameStats['stats']> = {
+                    'pts': 'points',
+                    'reb': 'rebounds',
+                    'ast': 'assists',
+                    'stl': 'steals',
+                    'blk': 'blocks',
+                    '3pt': 'threePointersMade',
+                };
+                
+                let actualStatValue: number | undefined;
+                const statKey = marketToStatKey[leg.market];
+                
+                if (statKey) {
+                    actualStatValue = playerStat.stats[statKey];
+                } else if (leg.market === 'pts+reb+ast') {
+                    actualStatValue = playerStat.stats.points + playerStat.stats.rebounds + playerStat.stats.assists;
+                } else if (leg.market === 'blk+stl') {
+                    actualStatValue = playerStat.stats.blocks + playerStat.stats.steals;
+                }
+
+                if (actualStatValue === undefined) {
+                    isBetFinalized = false; // Market not supported for grading
+                    return leg;
+                }
+
+                const isOver = leg.pick.toLowerCase().includes('over');
+                
+                if (actualStatValue > leg.line) {
+                    legResult = isOver ? 'won' : 'lost';
+                } else if (actualStatValue < leg.line) {
+                    legResult = isOver ? 'lost' : 'won';
+                } else { // actualStatValue === leg.line
+                    legResult = 'push';
                 }
                 break;
             }

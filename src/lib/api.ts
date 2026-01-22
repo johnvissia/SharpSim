@@ -1,11 +1,111 @@
 'use client';
 
 import { doc, Firestore, writeBatch, collection, getDocs, query, where, updateDoc } from 'firebase/firestore';
-import type { DailyGame, CompletedGame, PlayerProp } from '@/lib/types';
+import type { DailyGame, CompletedGame, PlayerProp, PlayerGameStats } from '@/lib/types';
 import { nbaTeamAbbreviationToName, mapTank01MarketToApp } from '@/lib/nba-teams';
 
 // Helper function to introduce a delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const areDatesOnSameDay = (date1: Date, date2: Date) =>
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate();
+
+
+async function fetchAndAttachPlayerStats(firestore: Firestore, oddsApiGames: CompletedGame[]) {
+    console.log("Starting to fetch and attach player box scores...");
+    const rapidApiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
+    const rapidApiHost = process.env.NEXT_PUBLIC_RAPIDAPI_HOST;
+
+    if (!rapidApiKey || !rapidApiHost) {
+        console.warn("RapidAPI key or host is not configured. Skipping player stats fetch.");
+        return;
+    }
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = (today.getMonth() + 1).toString().padStart(2, '0');
+    const day = today.getDate().toString().padStart(2, '0');
+    const gameDate = `${year}${month}${day}`;
+
+    const url = `https://tank01-fantasy-stats.p.rapidapi.com/getNBAGames?gameDate=${gameDate}&includePlayerStats=true&itemFormat=json`;
+    const options = {
+        method: 'GET',
+        headers: {
+            'X-RapidAPI-Key': rapidApiKey,
+            'X-RapidAPI-Host': rapidApiHost,
+        },
+    };
+
+    try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            console.error(`Failed to fetch box scores from Tank01: ${response.statusText}`);
+            return;
+        }
+        const data = await response.json();
+        const tank01Games = data.body?.games;
+
+        if (!tank01Games || tank01Games.length === 0) {
+            console.log("No box scores available from Tank01 for today.");
+            return;
+        }
+
+        const batch = writeBatch(firestore);
+        let updatesCount = 0;
+
+        for (const tankGame of tank01Games) {
+            if (tankGame.gameStatus !== 'Final') continue;
+
+            const homeTeamFullName = nbaTeamAbbreviationToName[tankGame.HomeTeam];
+            const awayTeamFullName = nbaTeamAbbreviationToName[tankGame.AwayTeam];
+
+            const matchingOddsGame = oddsApiGames.find(g => {
+                const gameDay = new Date(g.commenceTime);
+                return areDatesOnSameDay(gameDay, today) && g.homeTeam === homeTeamFullName && g.awayTeam === awayTeamFullName;
+            });
+            
+            if (matchingOddsGame) {
+                const playerStats: PlayerGameStats[] = [];
+                const allPlayers = [...(tankGame.playerStats.Away ?? []), ...(tankGame.playerStats.Home ?? [])];
+
+                allPlayers.forEach((player: any) => {
+                    if (player.played === "Y") {
+                        playerStats.push({
+                            playerId: player.PlayerID.toString(),
+                            playerName: player.PlayerName,
+                            stats: {
+                                points: player.points,
+                                rebounds: player.rebounds,
+                                assists: player.assists,
+                                steals: player.steals,
+                                blocks: player.blocks,
+                                turnovers: player.turnovers,
+                                threePointersMade: player.threePointersMade,
+                            }
+                        });
+                    }
+                });
+
+                if (playerStats.length > 0) {
+                    const gameDocRef = doc(firestore, 'completed_games', matchingOddsGame.id);
+                    batch.update(gameDocRef, { playerStats: playerStats });
+                    updatesCount++;
+                }
+            }
+        }
+
+        if (updatesCount > 0) {
+            await batch.commit();
+            console.log(`Successfully attached player stats to ${updatesCount} completed games.`);
+        } else {
+            console.log("No matching completed games found to attach player stats to.");
+        }
+    } catch (error) {
+        console.error("An error occurred during the player stats fetching process:", error);
+    }
+}
 
 
 /**
@@ -87,7 +187,7 @@ async function fetchAndSavePlayerProps(firestore: Firestore) {
 
                 return {
                     propId: `${matchingGame.id}-${prop.PlayerID}-${market}`, // A unique ID for the market
-                    playerId: prop.PlayerID,
+                    playerId: prop.PlayerID.toString(),
                     playerName: prop.PlayerName,
                     market: market,
                     line: prop.StatValue,
@@ -198,12 +298,12 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
     throw error;
   }
   
-  // After saving main game lines, fetch player props
+  // After saving main game lines, fetch player props for NBA
   await fetchAndSavePlayerProps(firestore);
 
 
   // Fetch Completed Game Scores Sequentially
-  const allCompletedGames = [];
+  const allCompletedGames: CompletedGame[] = [];
   try {
     console.log("Fetching completed game scores...");
     for (const sport of sportsMap) {
@@ -215,7 +315,26 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
             throw new Error(`HTTP error ${res.status} for ${sport.label} scores: ${text}`);
         }
         const data = await res.json();
-        allCompletedGames.push(...data);
+        const gamesWithScores = data.filter((game: any) => game.scores);
+        
+        gamesWithScores.forEach((game: any) => {
+            const homeScoreStr = game.scores.find((s: any) => s.name === game.home_team)?.score;
+            const awayScoreStr = game.scores.find((s: any) => s.name === game.away_team)?.score;
+    
+            if (homeScoreStr !== undefined && awayScoreStr !== undefined && homeScoreStr !== null && awayScoreStr !== null) {
+              allCompletedGames.push({
+                id: game.id,
+                sportKey: game.sport_key,
+                commenceTime: game.commence_time,
+                homeTeam: game.home_team,
+                awayTeam: game.away_team,
+                homeScore: parseInt(homeScoreStr, 10),
+                awayScore: parseInt(awayScoreStr, 10),
+                completed: game.completed,
+              });
+            }
+        });
+
       } catch (err) {
         console.error(`Error fetching scores for ${sport.label}:`, err);
       }
@@ -224,35 +343,24 @@ export async function fetchAndSaveDailyData(firestore: Firestore) {
 
     console.log("Total Raw Completed Games Fetched:", allCompletedGames.length);
 
-    const finishedGames = allCompletedGames.filter((game: any) => game.scores);
-    console.log("Games with Scores:", finishedGames.length);
-
-    if (finishedGames.length > 0) {
+    if (allCompletedGames.length > 0) {
       const scoresBatch = writeBatch(firestore);
       const completedGamesRef = collection(firestore, 'completed_games');
 
-      finishedGames.forEach((game: any) => {
-        const homeScoreStr = game.scores.find((s: any) => s.name === game.home_team)?.score;
-        const awayScoreStr = game.scores.find((s: any) => s.name === game.away_team)?.score;
-
-        if (homeScoreStr !== undefined && awayScoreStr !== undefined && homeScoreStr !== null && awayScoreStr !== null) {
-          const completedGameData: CompletedGame = {
-            id: game.id,
-            sportKey: game.sport_key,
-            commenceTime: game.commence_time,
-            homeTeam: game.home_team,
-            awayTeam: game.away_team,
-            homeScore: parseInt(homeScoreStr, 10),
-            awayScore: parseInt(awayScoreStr, 10),
-            completed: game.completed,
-          };
-          const gameRef = doc(completedGamesRef, completedGameData.id);
-          scoresBatch.set(gameRef, completedGameData, { merge: true });
-        }
+      allCompletedGames.forEach((game) => {
+          const gameRef = doc(completedGamesRef, game.id);
+          scoresBatch.set(gameRef, game, { merge: true });
       });
 
       await scoresBatch.commit();
-      console.log(`${finishedGames.length} games with scores saved/updated in Firestore.`);
+      console.log(`${allCompletedGames.length} games with scores saved/updated in Firestore.`);
+
+      // After saving base scores, try to attach detailed player stats for NBA
+      const nbaGames = allCompletedGames.filter(g => g.sportKey === 'basketball_nba');
+      if (nbaGames.length > 0) {
+        await fetchAndAttachPlayerStats(firestore, nbaGames);
+      }
+
     }
   } catch (error) {
     console.error('An unexpected error occurred during the Firestore scores saving process:', error);

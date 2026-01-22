@@ -49,7 +49,6 @@ export function PlayerPropsView({ game }: { game: Game }) {
         const odds = overUnder === 'Over' ? prop.overOdds : prop.underOdds;
         const pickString = `${prop.playerName} ${overUnder} ${prop.line} ${prop.market.toUpperCase()}`;
         
-        // The marketId is the same for both over and under of a single prop
         const marketId = prop.propId; 
         
         addPick({
@@ -57,7 +56,11 @@ export function PlayerPropsView({ game }: { game: Game }) {
             pick: pickString,
             odds,
             betType: 'player_prop',
-            marketId: marketId
+            marketId: marketId,
+            // Add the new fields for grading
+            playerId: prop.playerId,
+            market: prop.market,
+            line: prop.line,
         });
     };
 

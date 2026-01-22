@@ -78,6 +78,10 @@ export interface ParlayLeg {
   odds: number;
   status: 'pending' | 'won' | 'lost' | 'push'; // Individual leg status
   sport: SportName;
+  // Player Prop specific fields
+  playerId?: string;
+  market?: string;
+  line?: number;
 }
 
 export interface UserProfile {
@@ -104,6 +108,10 @@ export interface UserBet {
   placedAt: string; // ISO 8601 string
   commenceTime?: string; // ISO 8601 string
   legs?: ParlayLeg[];
+  // Player Prop specific fields
+  playerId?: string;
+  market?: string;
+  line?: number;
 };
 
 export interface DailyGame {
@@ -116,6 +124,20 @@ export interface DailyGame {
   playerProps?: PlayerProp[];
 }
 
+export interface PlayerGameStats {
+  playerId: string;
+  playerName: string;
+  stats: {
+    points: number;
+    rebounds: number;
+    assists: number;
+    steals: number;
+    blocks: number;
+    turnovers: number;
+    threePointersMade: number;
+  };
+}
+
 export interface CompletedGame {
   id: string;
   sportKey: string;
@@ -125,6 +147,7 @@ export interface CompletedGame {
   homeScore: number;
   awayScore: number;
   completed?: boolean;
+  playerStats?: PlayerGameStats[];
 }
 
 export interface SystemStatus {
