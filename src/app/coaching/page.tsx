@@ -169,7 +169,7 @@ export default function CoachingPage() {
       </header>
 
       <div className="grid gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-1 space-y-8">
           <Card>
             <CardHeader>
               <CardTitle>Performance Analysis</CardTitle>
@@ -261,7 +261,7 @@ export default function CoachingPage() {
           )}
         </div>
 
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Wins vs. Losses by Sport</CardTitle>
