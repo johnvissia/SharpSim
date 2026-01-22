@@ -144,12 +144,21 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
             }
             return '';
         };
+        
+        const getLeadingScorer = (competitor: EspnCompetitor) => {
+            const pointsLeader = competitor.leaders?.find(l => l.name === 'points')?.leaders[0];
+            if (pointsLeader) {
+                return { name: pointsLeader.athlete.shortName, value: pointsLeader.displayValue };
+            }
+            return undefined;
+        };
 
         const homeTeam: Team = {
             id: String(getSafeId(home)),
             name: home.team.displayName,
             logo: getLogo(home),
             players: [],
+            leadingScorer: getLeadingScorer(home),
         };
 
         const awayTeam: Team = {
@@ -157,6 +166,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
             name: away.team.displayName,
             logo: getLogo(away),
             players: [],
+            leadingScorer: getLeadingScorer(away),
         };
 
         return {

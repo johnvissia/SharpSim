@@ -161,7 +161,7 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                         <MainLinesView game={game} />
                     </TabsContent>
                     <TabsContent value="player-props" className="mt-4" forceMount>
-                        <PlayerPropsView game={game} isActive={activeTab === 'player-props'} />
+                        <PlayerPropsView game={game} />
                     </TabsContent>
                 </Tabs>
             </div>
