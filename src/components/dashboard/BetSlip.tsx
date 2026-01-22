@@ -160,7 +160,7 @@ export function BetSlip() {
       return;
     }
     
-    if (picks.some(p => !p.game.oddsApiId)) {
+    if (picks.some(p => p.game.oddsApiId === undefined)) {
         toast({
             variant: 'destructive',
             title: 'Bet Incomplete',
@@ -178,8 +178,8 @@ export function BetSlip() {
 
       if (picks.length === 1) {
         const pick = picks[0];
-        newBet = {
-          gameId: pick.game.oddsApiId!, // Use Odds API ID for grading
+        const baseBet: Omit<UserBet, 'id'> = {
+          gameId: pick.game.oddsApiId!,
           userId: user.uid,
           sport: pick.game.sport,
           betType: pick.betType,
@@ -191,14 +191,23 @@ export function BetSlip() {
           potentialWinnings: potentialPayout,
           status: 'pending',
           placedAt: new Date().toISOString(),
-          // Player prop fields
-          playerId: pick.playerId,
-          market: pick.market,
-          line: pick.line,
         };
-      } else {
-        const parlayLegs: ParlayLeg[] = picks.map(p => ({
-            gameId: p.game.oddsApiId!, // Use Odds API ID for grading
+
+        if (pick.betType === 'player_prop') {
+          newBet = {
+            ...baseBet,
+            playerId: pick.playerId,
+            market: pick.market,
+            line: pick.line,
+          };
+        } else {
+          newBet = baseBet;
+        }
+
+      } else { // Parlay
+        const parlayLegs: ParlayLeg[] = picks.map(p => {
+          const leg: ParlayLeg = {
+            gameId: p.game.oddsApiId!,
             matchup: `${p.game.awayTeam.name} @ ${p.game.homeTeam.name}`,
             commenceTime: p.game.startTime,
             pick: p.pick,
@@ -206,16 +215,21 @@ export function BetSlip() {
             odds: p.odds,
             status: 'pending',
             sport: p.game.sport,
-            // Player prop fields
-            playerId: p.playerId,
-            market: p.market,
-            line: p.line,
-        }));
+          };
+
+          // Conditionally add player prop fields to the leg
+          if (p.betType === 'player_prop') {
+            leg.playerId = p.playerId;
+            leg.market = p.market;
+            leg.line = p.line;
+          }
+          return leg;
+        });
 
         newBet = {
-          gameId: picks.map(p => p.game.oddsApiId!).join(','), // Use Odds API IDs
+          gameId: picks.map(p => p.game.oddsApiId!).join(','),
           userId: user.uid,
-          sport: picks[0].game.sport, // Use first pick's sport for parlay
+          sport: picks[0].game.sport,
           betType: 'parlay',
           pick: `${picks.length}-Leg Parlay`,
           stake: stakeNum,
@@ -248,6 +262,7 @@ export function BetSlip() {
         });
     }
   };
+
 
   if (picks.length === 0) {
     return null; // Don't show the bet slip if it's empty
