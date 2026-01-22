@@ -147,7 +147,7 @@ export interface TeamTrend {
     logo: string;
     at: '@' | 'vs';
   };
-  result: 'W' | 'L';
+  result: 'W' | 'L' | 'Upcoming';
   score: string; // e.g., "112-105"
   ats: 'Cover' | 'No Cover' | 'Push' | 'N/A';
   ou: 'Over' | 'Under' | 'Push' | 'N/A';

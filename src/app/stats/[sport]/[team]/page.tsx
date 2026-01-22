@@ -53,9 +53,9 @@ export default function TeamStatsPage() {
                 <h1 className="text-3xl font-bold tracking-tight text-destructive">Error</h1>
                 <p className="text-muted-foreground">Team information is missing or invalid.</p>
                  <Button asChild variant="outline" size="sm" className="w-fit mt-4">
-                    <Link href="/stats">
+                    <Link href="/">
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to All Stats
+                        Back to Dashboard
                     </Link>
                 </Button>
             </div>
@@ -66,9 +66,9 @@ export default function TeamStatsPage() {
         <div className="p-4 md:p-8">
             <header className="mb-8 space-y-4">
                 <Button asChild variant="outline" size="sm" className="w-fit">
-                     <Link href={`/stats/${sportName}`}>
+                     <Link href="/">
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to {sportName} Stats
+                        Back to Dashboard
                     </Link>
                 </Button>
                 <div className="flex items-center gap-4">
@@ -86,7 +86,7 @@ export default function TeamStatsPage() {
             <div>
                  <Card>
                     <CardHeader>
-                        <CardTitle className="text-lg font-semibold">Last 10 Games Trend</CardTitle>
+                        <CardTitle className="text-lg font-semibold">Game Log</CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         <TeamTrendsView teamId={teamId} teamName={teamName} sport={sportName} />

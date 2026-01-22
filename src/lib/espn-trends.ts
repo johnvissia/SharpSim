@@ -74,10 +74,11 @@ export async function fetchTeamTrends(teamId: string, sport: string): Promise<Te
     }
 
     const scheduleData: EspnTeamSchedule = await response.json();
+    
+    // Sort all events by date, descending (most recent first)
+    const allEvents = scheduleData.events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    const completedGames = scheduleData.events
-        .filter(event => event.competitions[0]?.status?.type.completed)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const completedGames = allEvents.filter(event => event.competitions[0]?.status?.type.completed);
 
     const trends: TeamTrend[] = completedGames.map((event, index, allCompleted) => {
         const competition = event.competitions[0];
@@ -134,7 +135,7 @@ export async function fetchTeamTrends(teamId: string, sport: string): Promise<Te
         if (previousGame) {
             const currentGameDate = new Date(event.date);
             const previousGameDate = new Date(previousGame.date);
-            restDays = differenceInCalendarDays(currentGameDate, previousGameDate);
+            restDays = differenceInCalendarDays(currentGameDate, previousGameDate) - 1;
         }
 
 
@@ -155,5 +156,45 @@ export async function fetchTeamTrends(teamId: string, sport: string): Promise<Te
         };
     }).slice(0, 10);
 
+    // Now find the next upcoming game
+    const upcomingGames = allEvents
+      .filter(event => !event.competitions[0]?.status?.type.completed)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // sort ascending to find the soonest
+    const nextGame = upcomingGames[0];
+    
+    if (nextGame) {
+        const mostRecentCompletedGame = completedGames[0];
+        let restDays: number | undefined = undefined;
+        
+        if (mostRecentCompletedGame) {
+            const nextGameDate = new Date(nextGame.date);
+            const lastGameDate = new Date(mostRecentCompletedGame.date);
+            restDays = differenceInCalendarDays(nextGameDate, lastGameDate) - 1;
+        }
+
+        const competition = nextGame.competitions[0];
+        const opponent = competition.competitors.find(c => c.id !== teamId)!;
+        const myTeam = competition.competitors.find(c => c.id === teamId)!;
+        const opponentLogo = opponent.team?.logo || '';
+
+        const upcomingTrend: TeamTrend = {
+            date: new Date(nextGame.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            fullDate: nextGame.date,
+            opponent: {
+                name: opponent.team.displayName,
+                logo: opponentLogo,
+                at: myTeam.homeAway === 'home' ? 'vs' : '@',
+            },
+            result: 'Upcoming', // Special status for UI
+            score: 'TBD',
+            ats: 'N/A',
+            ou: 'N/A',
+            margin: 0,
+            restDays: restDays,
+        };
+        // Add to the beginning of the list, so it appears at the top of the table.
+        trends.unshift(upcomingTrend);
+    }
+    
     return trends;
 }

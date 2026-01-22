@@ -44,7 +44,7 @@ const renderMargin = (result: 'W' | 'L', margin: number) => {
 }
 
 const renderRest = (restDays?: number) => {
-    if (restDays === undefined) return <span className="text-muted-foreground">-</span>;
+    if (restDays === undefined || restDays < 0) return <span className="text-muted-foreground">-</span>;
     if (restDays === 0) return <Badge variant="destructive">B2B</Badge>;
     if (restDays >= 3) return <span className="text-green-600 font-medium">{restDays}d Rest</span>
     return <span className="text-muted-foreground">{restDays}d Rest</span>;
@@ -85,6 +85,10 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
             return null;
         }
 
+        const completed = trends.filter(t => t.result !== 'Upcoming');
+
+        if (completed.length === 0) return null;
+
         let homeWins = 0;
         let homeLosses = 0;
         let homeMarginSum = 0;
@@ -92,7 +96,7 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
         let awayLosses = 0;
         let awayMarginSum = 0;
 
-        trends.forEach(game => {
+        completed.forEach(game => {
             if (game.opponent.at === 'vs') { // Home game
                 homeMarginSum += game.margin;
                 if (game.result === 'W') {
@@ -255,17 +259,25 @@ export function TeamTrendsView({ teamId, teamName, sport }: { teamId: string, te
                 </TableHeader>
                 <TableBody>
                     {trends.map((game, index) => (
-                        <TableRow key={index}>
+                        <TableRow key={index} className={cn(game.result === 'Upcoming' && 'bg-blue-500/10')}>
                             <TableCell className="text-muted-foreground">{game.date}</TableCell>
                             <TableCell>
                                 <span>{game.opponent.at} </span>
                                 <span className="font-semibold">{game.opponent.name}</span>
                             </TableCell>
-                            <TableCell className={cn("font-semibold", game.result === 'W' ? 'text-green-600' : 'text-destructive')}>
-                                {game.result} {game.score}
+                            <TableCell className={cn(
+                                "font-semibold", 
+                                game.result === 'W' && 'text-green-600',
+                                game.result === 'L' && 'text-destructive',
+                                game.result === 'Upcoming' && 'text-blue-400'
+                            )}>
+                                {game.result} {game.result !== 'Upcoming' && game.score}
                             </TableCell>
                             <TableCell>
-                                {renderMargin(game.result, game.margin)}
+                                {game.result === 'W' || game.result === 'L' 
+                                    ? renderMargin(game.result, game.margin) 
+                                    : <span className="text-muted-foreground text-center">-</span>
+                                }
                             </TableCell>
                             <TableCell>
                                 {renderRest(game.restDays)}
