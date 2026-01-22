@@ -3,6 +3,17 @@
 import type { CompletedGame, UserBet, ParlayLeg, PlayerGameStats } from './types';
 
 /**
+ * Normalizes a team name by converting to lowercase and removing spaces, periods, and parentheses.
+ * This helps in matching team names from different API sources.
+ * @param name The team name string to normalize.
+ * @returns The normalized team name.
+ */
+const normalizeName = (name: string): string => {
+    return name.toLowerCase().replace(/[\s.&()']/g, '');
+};
+
+
+/**
  * Extracts a number (integer or float, positive or negative) from a string.
  * @param str The string to parse.
  * @returns The extracted number, or null if not found.
@@ -86,7 +97,7 @@ export function gradeUserBets(
                 if (winner === null) {
                   legResult = 'push';
                 } else {
-                  legResult = winner.includes(leg.pick) ? 'won' : 'lost';
+                  legResult = normalizeName(winner) === normalizeName(leg.pick) ? 'won' : 'lost';
                 }
                 break;
             }
@@ -103,11 +114,12 @@ export function gradeUserBets(
                 }
                 const teamNameFromPick = leg.pick.replace(/[-+0-9\.]/g, '').trim();
                 
-                const isHomePick = game.homeTeam.includes(teamNameFromPick);
-                const isAwayPick = game.awayTeam.includes(teamNameFromPick);
+                const isHomePick = normalizeName(game.homeTeam) === normalizeName(teamNameFromPick);
+                const isAwayPick = normalizeName(game.awayTeam) === normalizeName(teamNameFromPick);
 
                 if (!isHomePick && !isAwayPick) {
                      isBetFinalized = false;
+                     // For debugging: console.log(`Could not match spread pick: '${teamNameFromPick}' to '${game.homeTeam}' or '${game.awayTeam}'`);
                      return leg;
                 }
 
