@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import type { Game, UserProfile } from '@/lib/types';
+import { useState, useEffect } from 'react';
+import type { Game, UserProfile, Player } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { X, Heart } from 'lucide-react';
@@ -16,6 +16,7 @@ import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { InjuriesView } from './InjuriesView';
+import { getTeamRosters } from '@/lib/espn-roster';
 
 interface GameDetailModalProps {
   game: Game | null;
@@ -68,6 +69,24 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
   const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false);
   const { user } = useUser();
   const firestore = useFirestore();
+
+  const [rosters, setRosters] = useState<{ home: Player[], away: Player[] } | null>(null);
+  const [isLoadingRosters, setIsLoadingRosters] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && game?.sport === 'NBA') {
+        const fetchRosters = async () => {
+            if (!game.homeTeam.id || !game.awayTeam.id) return;
+            setIsLoadingRosters(true);
+            const rosterData = await getTeamRosters(game.homeTeam.id, game.awayTeam.id);
+            setRosters(rosterData);
+            setIsLoadingRosters(false);
+        };
+        fetchRosters();
+    } else {
+        setRosters(null);
+    }
+  }, [isOpen, game]);
 
   const userProfileRef = useMemoFirebase(
     () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
@@ -163,7 +182,7 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                         <MainLinesView game={game} />
                     </TabsContent>
                     <TabsContent value="player-props" className="mt-4">
-                        <PlayerPropsView game={game} />
+                        <PlayerPropsView game={game} rosters={rosters} isLoadingRosters={isLoadingRosters} />
                     </TabsContent>
                      {game.sport === 'NBA' && (
                         <TabsContent value="injuries" className="mt-4">
