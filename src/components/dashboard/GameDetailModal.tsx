@@ -159,14 +159,14 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                         <TabsTrigger value="player-props">Player Props</TabsTrigger>
                         {game.sport === 'NBA' && <TabsTrigger value="injuries">Injuries</TabsTrigger>}
                     </TabsList>
-                    <TabsContent value="main-lines" className="mt-4" forceMount>
+                    <TabsContent value="main-lines" className="mt-4">
                         <MainLinesView game={game} />
                     </TabsContent>
-                    <TabsContent value="player-props" className="mt-4" forceMount>
+                    <TabsContent value="player-props" className="mt-4">
                         <PlayerPropsView game={game} />
                     </TabsContent>
                      {game.sport === 'NBA' && (
-                        <TabsContent value="injuries" className="mt-4" forceMount>
+                        <TabsContent value="injuries" className="mt-4">
                             <InjuriesView game={game} />
                         </TabsContent>
                     )}
