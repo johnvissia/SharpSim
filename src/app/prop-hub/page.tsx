@@ -1,15 +1,39 @@
 'use client';
 
-import { useState } from 'react';
-import { getPlayerProps } from './actions';
-import type { Tank01Game, Tank01Player } from '@/lib/types';
+import { useState, useMemo } from 'react';
+import type { PlayerProp } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { User, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { useCollection, useMemoFirebase, useFirestore } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
 
-const PlayerAccordion = ({ player }: { player: Tank01Player }) => {
+interface UIAccordionProp {
+    propId: string;
+    market: string;
+    line: number;
+    overOdds: number;
+    underOdds: number;
+}
+
+interface UIPlayer {
+    playerId: string;
+    playerName: string;
+    props: UIAccordionProp[];
+}
+
+interface UIGame {
+    gameId: string;
+    matchup: string;
+    gameTime: string;
+    players: UIPlayer[];
+}
+
+
+const PlayerAccordion = ({ player }: { player: UIPlayer }) => {
     return (
         <Accordion type="single" collapsible className="w-full">
             <AccordionItem value={player.playerId} className="border-b-0">
@@ -46,7 +70,7 @@ const PlayerAccordion = ({ player }: { player: Tank01Player }) => {
     );
 }
 
-const GameCard = ({ game }: { game: Tank01Game }) => {
+const GameCard = ({ game }: { game: UIGame }) => {
     return (
         <Card className="bg-card">
             <CardHeader>
@@ -66,18 +90,72 @@ const GameCard = ({ game }: { game: Tank01Game }) => {
 
 
 export default function PropHubPage() {
-    const [games, setGames] = useState<Tank01Game[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [hasSynced, setHasSynced] = useState(false);
+    const { toast } = useToast();
+    const firestore = useFirestore();
+
+    const propsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'player_props'), orderBy('commenceTime'));
+    }, [firestore]);
+
+    const { data: playerProps, isLoading: isLoadingProps } = useCollection<PlayerProp>(propsQuery);
+
+    const games = useMemo(() => {
+        if (!playerProps) return [];
+        
+        const gamesMap = new Map<string, { gameId: string, matchup: string, gameTime: string, players: Map<string, UIPlayer> }>();
+
+        playerProps.forEach(prop => {
+            if (!gamesMap.has(prop.gameId)) {
+                gamesMap.set(prop.gameId, {
+                    gameId: prop.gameId,
+                    matchup: prop.matchup,
+                    gameTime: prop.commenceTime,
+                    players: new Map()
+                });
+            }
+            const game = gamesMap.get(prop.gameId)!;
+
+            if (!game.players.has(prop.playerId)) {
+                game.players.set(prop.playerId, {
+                    playerId: prop.playerId,
+                    playerName: prop.playerName,
+                    props: []
+                });
+            }
+            const player = game.players.get(prop.playerId)!;
+
+            player.props.push({
+                propId: prop.id, // The doc ID from firestore
+                market: prop.market,
+                line: prop.line,
+                overOdds: prop.overOdds,
+                underOdds: prop.underOdds
+            });
+        });
+
+        return Array.from(gamesMap.values()).map(game => ({
+            ...game,
+            players: Array.from(game.players.values())
+        }));
+
+    }, [playerProps]);
 
     const handleSyncProps = async () => {
         setLoading(true);
         setError(null);
-        setHasSynced(true);
         try {
-            const data = await getPlayerProps();
-            setGames(data);
+            const response = await fetch('/api/sync-player-props');
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.message || 'Failed to sync props from API.');
+            }
+            toast({
+                title: 'Sync Complete',
+                description: result.message,
+            });
         } catch (err: any) {
             setError(err.message || "Failed to fetch player props. The API might be unavailable.");
         } finally {
@@ -98,7 +176,7 @@ export default function PropHubPage() {
               </Button>
             </header>
 
-            {loading && (
+            {(loading || isLoadingProps) && (
                  <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
                     <h2 className="text-xl font-semibold text-foreground">Fetching Today's Props...</h2>
@@ -117,23 +195,15 @@ export default function PropHubPage() {
                 </Card>
             )}
             
-            {!loading && !error && !hasSynced && (
-                 <Card>
-                    <CardContent className="p-8 text-center">
-                        <p className="text-muted-foreground">Click "Sync Player Props" to fetch today's markets.</p>
-                    </CardContent>
-                </Card>
-            )}
-
-            {!loading && !error && hasSynced && games.length === 0 && (
+            {!isLoadingProps && !loading && !error && games.length === 0 && (
                 <Card>
                     <CardContent className="p-8 text-center">
-                        <p className="text-muted-foreground">No player props available for today's NBA games.</p>
+                        <p className="text-muted-foreground">No player props available for today. Click "Sync Player Props" to check again.</p>
                     </CardContent>
                 </Card>
             )}
 
-            {!loading && !error && games.length > 0 && (
+            {!isLoadingProps && !loading && !error && games.length > 0 && (
                 <div className="space-y-6">
                     {games.map(game => (
                         <GameCard key={game.gameId} game={game} />

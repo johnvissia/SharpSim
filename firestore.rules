@@ -1,8 +1,8 @@
 /**
  * Core Philosophy: This ruleset supports a client-side data caching model for public sports data and user-specific betting.
  *
- * Public Data (/daily_games, /completed_games, /system, /rankings):
- * - Public Read Access: All game, system, and ranking data is public and readable by anyone.
+ * Public Data (/daily_games, /completed_games, /system, /rankings, /player_props):
+ * - Public Read Access: All game, system, ranking, and prop data is public and readable by anyone.
  * - Authenticated Writes: To prevent anonymous abuse, only signed-in users can write to these collections, which is necessary for the client-side data fetching and admin features.
  *
  * User Data (/users):
@@ -47,6 +47,11 @@ service cloud.firestore {
     match /rankings/{teamName} {
       allow read: if true;
       allow write: if isSignedIn(); // Allow authenticated users (admins) to update rankings
+    }
+
+    match /player_props/{propId} {
+      allow read: if true;
+      allow write: if isSignedIn();
     }
     
     // ------------------------------------------------------------------------

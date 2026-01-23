@@ -29,7 +29,7 @@
         "gameId": { "type": "string", "description": "The ID of the game the bet is on. For parlays, this is a comma-separated list of game IDs." },
         "userId": { "type": "string", "description": "The ID of the user who placed the bet." },
         "sport": { "type": "string", "description": "The sport of the game." },
-        "betType": { "type": "string", "enum": ["moneyline", "spread", "total", "parlay"]},
+        "betType": { "type": "string", "enum": ["moneyline", "spread", "total", "parlay", "player_prop"]},
         "pick": { "type": "string", "description": "The user's selection. For parlays, this is a summary like '4-Leg Parlay'." },
         "matchup": { "type": "string", "description": "The matchup string for single bets, e.g., 'Team A @ Team B'." },
         "stake": { "type": "number", "description": "The amount of coins staked." },
@@ -55,7 +55,10 @@
                 },
                 "required": ["gameId", "matchup", "commenceTime", "pick", "betType", "odds", "status", "sport"]
             }
-        }
+        },
+        "playerId": { "type": "string" },
+        "market": { "type": "string" },
+        "line": { "type": "number" }
       },
       "required": ["id", "gameId", "userId", "sport", "betType", "pick", "stake", "odds", "potentialWinnings", "status", "placedAt"]
     },
@@ -170,6 +173,24 @@
         "conference": { "type": "string", "description": "The team's athletic conference." }
       },
       "required": ["teamName", "rank", "conference"]
+    },
+    "PlayerProp": {
+      "title": "PlayerProp",
+      "type": "object",
+      "description": "Represents a single, specific player prop bet market for a game.",
+      "properties": {
+        "gameId": { "type": "string" },
+        "playerId": { "type": "string" },
+        "playerName": { "type": "string" },
+        "teamName": { "type": "string" },
+        "matchup": { "type": "string" },
+        "commenceTime": { "type": "string", "format": "date-time" },
+        "market": { "type": "string" },
+        "line": { "type": "number" },
+        "overOdds": { "type": "number" },
+        "underOdds": { "type": "number" }
+      },
+      "required": ["gameId", "playerId", "playerName", "teamName", "matchup", "commenceTime", "market", "line", "overOdds", "underOdds"]
     }
   },
   "auth": {
@@ -210,6 +231,12 @@
         "$ref": "#/entities/TeamRanking"
       },
       "description": "Stores the weekly Top 25 rankings for teams. The document ID is the team's full name."
+    },
+    "/player_props/{propId}": {
+      "schema": {
+        "$ref": "#/entities/PlayerProp"
+      },
+      "description": "Stores individual player prop markets fetched from an external API."
     }
   }
 }

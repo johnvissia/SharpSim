@@ -62,10 +62,14 @@ export interface ParlayLeg {
   matchup: string;
   commenceTime: string;
   pick: string; // The specific selection, e.g., "Los Angeles Lakers"
-  betType: 'moneyline' | 'spread' | 'total';
+  betType: 'moneyline' | 'spread' | 'total' | 'player_prop';
   odds: number;
   status: 'pending' | 'won' | 'lost' | 'push'; // Individual leg status
   sport: SportName;
+  // Player prop specific fields
+  playerId?: string;
+  market?: string;
+  line?: number;
 }
 
 export interface UserProfile {
@@ -82,7 +86,7 @@ export interface UserBet {
   gameId: string;
   userId: string;
   sport: SportName;
-  betType: 'moneyline' | 'spread' | 'total' | 'parlay';
+  betType: 'moneyline' | 'spread' | 'total' | 'parlay' | 'player_prop';
   pick: string; // e.g., "Golden State Warriors", "Over 220.5", or "4-Leg Parlay"
   matchup?: string; // e.g. "Team A @ Team B"
   stake: number;
@@ -92,6 +96,10 @@ export interface UserBet {
   placedAt: string; // ISO 8601 string
   commenceTime?: string; // ISO 8601 string
   legs?: ParlayLeg[];
+  // Player prop specific fields
+  playerId?: string;
+  market?: string;
+  line?: number;
 };
 
 export interface DailyGame {
@@ -148,25 +156,16 @@ export interface Injury {
 }
 
 // Prop Hub Page Types
-export interface Tank01PlayerProp {
-    propId: string;
-    market: string;
-    line: number;
-    overOdds: number;
-    underOdds: number;
-}
-
-export interface Tank01Player {
-    playerId: string;
-    playerName: string;
-    props: Tank01PlayerProp[];
-}
-
-export interface Tank01Game {
-    gameId: string;
-    homeTeam: string;
-    awayTeam: string;
-    matchup: string;
-    gameTime: string;
-    players: Tank01Player[];
+export interface PlayerProp {
+  id: string; // The Firestore doc ID
+  gameId: string;
+  playerId: string;
+  playerName: string;
+  teamName: string;
+  matchup: string;
+  commenceTime: string;
+  market: string;
+  line: number;
+  overOdds: number;
+  underOdds: number;
 }
