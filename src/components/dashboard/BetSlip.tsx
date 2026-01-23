@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -160,7 +161,11 @@ export function BetSlip() {
       return;
     }
     
-    if (picks.some(p => p.game.oddsApiId === undefined)) {
+    const hasOddsApiId = (pick: typeof picks[0]) => {
+      return pick.betType === 'player_prop' || (pick.game.oddsApiId !== undefined);
+    }
+
+    if (picks.some(p => !hasOddsApiId(p))) {
         toast({
             variant: 'destructive',
             title: 'Bet Incomplete',
@@ -178,25 +183,37 @@ export function BetSlip() {
 
       if (picks.length === 1) {
         const pick = picks[0];
-        newBet = {
-          gameId: pick.game.oddsApiId!,
+        const baseBet = {
+          gameId: pick.game.id,
           userId: user.uid,
           sport: pick.game.sport,
           betType: pick.betType,
           pick: pick.pick,
-          matchup: `${pick.game.awayTeam.name} @ ${pick.game.homeTeam.name}`,
+          matchup: pick.game.homeTeam && pick.game.awayTeam ? `${pick.game.awayTeam.name} @ ${pick.game.homeTeam.name}` : pick.pick,
           commenceTime: pick.game.startTime,
           stake: stakeNum,
           odds: pick.odds,
           potentialWinnings: potentialPayout,
-          status: 'pending',
+          status: 'pending' as const,
           placedAt: new Date().toISOString(),
         };
+
+        if (pick.betType === 'player_prop') {
+            newBet = {
+                ...baseBet,
+                playerId: pick.playerId,
+                market: pick.market,
+                line: pick.line,
+            };
+        } else {
+            newBet = baseBet;
+        }
+
       } else { // Parlay
         const parlayLegs: ParlayLeg[] = picks.map(p => {
-          const leg: ParlayLeg = {
-            gameId: p.game.oddsApiId!,
-            matchup: `${p.game.awayTeam.name} @ ${p.game.homeTeam.name}`,
+          const leg: Partial<ParlayLeg> = {
+            gameId: p.game.id,
+            matchup: p.game.homeTeam && p.game.awayTeam ? `${p.game.awayTeam.name} @ ${p.game.homeTeam.name}` : p.pick,
             commenceTime: p.game.startTime,
             pick: p.pick,
             betType: p.betType,
@@ -204,13 +221,20 @@ export function BetSlip() {
             status: 'pending',
             sport: p.game.sport,
           };
-          return leg;
+
+          if (p.betType === 'player_prop') {
+              leg.playerId = p.playerId;
+              leg.market = p.market;
+              leg.line = p.line;
+          }
+
+          return leg as ParlayLeg;
         });
 
         newBet = {
-          gameId: picks.map(p => p.game.oddsApiId!).join(','),
+          gameId: picks.map(p => p.game.id).join(','),
           userId: user.uid,
-          sport: picks[0].game.sport,
+          sport: picks[0].game.sport!,
           betType: 'parlay',
           pick: `${picks.length}-Leg Parlay`,
           stake: stakeNum,
@@ -279,7 +303,7 @@ export function BetSlip() {
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="font-semibold">{pick.pick}</p>
-                            <p className="text-xs text-muted-foreground">{pick.game.awayTeam.name} @ {pick.game.homeTeam.name}</p>
+                            <p className="text-xs text-muted-foreground">{pick.game.awayTeam?.name} @ {pick.game.homeTeam?.name}</p>
                         </div>
                         <div className="flex items-center gap-2">
                              <p className="font-bold">{pick.odds > 0 ? `+${pick.odds}` : pick.odds}</p>

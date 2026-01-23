@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -10,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase, useFirestore } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
+import { useBetSlip } from '@/context/BetSlipContext';
 
 interface UIAccordionProp {
     propId: string;
@@ -17,6 +19,7 @@ interface UIAccordionProp {
     line: number;
     overOdds: number;
     underOdds: number;
+    pick: 'over' | 'under';
 }
 
 interface UIPlayer {
@@ -33,7 +36,37 @@ interface UIGame {
 }
 
 
-const PlayerAccordion = ({ player }: { player: UIPlayer }) => {
+const PlayerAccordion = ({ player, game }: { player: UIPlayer, game: UIGame }) => {
+    const { addPick, picks } = useBetSlip();
+
+    const handlePick = (prop: UIAccordionProp) => {
+        const gameForSlip = {
+            id: game.gameId,
+            sport: 'NBA' as const,
+            startTime: game.gameTime,
+            homeTeam: { id: '', name: game.matchup.split(' @ ')[1], logo: '', players: []},
+            awayTeam: { id: '', name: game.matchup.split(' @ ')[0], logo: '', players: []},
+        };
+
+        const pickString = `${prop.pick.charAt(0).toUpperCase() + prop.pick.slice(1)} ${prop.line}`;
+        const pickOdds = prop.pick === 'over' ? prop.overOdds : prop.underOdds;
+
+        addPick({
+            game: gameForSlip,
+            pick: `${player.playerName} - ${pickString}`,
+            odds: pickOdds,
+            betType: 'player_prop',
+            marketId: `${prop.propId}`, // Unique ID for this specific prop market
+            playerId: player.playerId,
+            market: prop.market,
+            line: prop.line,
+        });
+    };
+    
+    const isPickInSlip = (propId: string) => {
+        return picks.some(p => p.marketId === propId);
+    };
+
     return (
         <Accordion type="single" collapsible className="w-full">
             <AccordionItem value={player.playerId} className="border-b-0">
@@ -52,14 +85,22 @@ const PlayerAccordion = ({ player }: { player: UIPlayer }) => {
                                     <p className="text-primary font-semibold">{prop.line}</p>
                                 </div>
                                 <div className="col-span-2 grid grid-cols-2 gap-2">
-                                     <div className="flex justify-between items-center bg-slate-800 p-2 rounded">
+                                     <Button 
+                                        variant={isPickInSlip(prop.propId) && picks.find(p => p.marketId === prop.propId)?.pick.includes('Over') ? 'secondary' : 'outline'}
+                                        onClick={() => handlePick({...prop, pick: 'over'})}
+                                        className="flex justify-between items-center bg-slate-800 p-2 rounded h-auto"
+                                     >
                                         <span>Over</span>
                                         <span className="font-semibold">{prop.overOdds > 0 ? `+${prop.overOdds}` : prop.overOdds}</span>
-                                     </div>
-                                      <div className="flex justify-between items-center bg-slate-800 p-2 rounded">
+                                     </Button>
+                                      <Button
+                                        variant={isPickInSlip(prop.propId) && picks.find(p => p.marketId === prop.propId)?.pick.includes('Under') ? 'secondary' : 'outline'}
+                                        onClick={() => handlePick({...prop, pick: 'under'})}
+                                        className="flex justify-between items-center bg-slate-800 p-2 rounded h-auto"
+                                     >
                                         <span>Under</span>
                                         <span className="font-semibold">{prop.underOdds > 0 ? `+${prop.underOdds}` : prop.underOdds}</span>
-                                     </div>
+                                     </Button>
                                 </div>
                             </div>
                         ))}
@@ -81,7 +122,7 @@ const GameCard = ({ game }: { game: UIGame }) => {
             </CardHeader>
             <CardContent className="space-y-2">
                 {game.players.map(player => (
-                    <PlayerAccordion key={player.playerId} player={player} />
+                    <PlayerAccordion key={player.playerId} player={player} game={game} />
                 ))}
             </CardContent>
         </Card>
@@ -132,7 +173,8 @@ export default function PropHubPage() {
                 market: prop.market,
                 line: prop.line,
                 overOdds: prop.overOdds,
-                underOdds: prop.underOdds
+                underOdds: prop.underOdds,
+                pick: 'over' // dummy value, will be set on click
             });
         });
 
@@ -158,6 +200,11 @@ export default function PropHubPage() {
             });
         } catch (err: any) {
             setError(err.message || "Failed to fetch player props. The API might be unavailable.");
+             toast({
+                title: 'Sync Failed',
+                description: err.message,
+                variant: 'destructive'
+            });
         } finally {
             setLoading(false);
         }
@@ -176,7 +223,7 @@ export default function PropHubPage() {
               </Button>
             </header>
 
-            {(loading || isLoadingProps) && (
+            {(isLoadingProps) && (
                  <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
                     <h2 className="text-xl font-semibold text-foreground">Fetching Today's Props...</h2>
@@ -184,7 +231,7 @@ export default function PropHubPage() {
                 </div>
             )}
             
-            {error && (
+            {error && !loading &&(
                  <Card className="bg-destructive/20 border-destructive">
                     <CardHeader>
                         <CardTitle className="text-destructive">Error Fetching Props</CardTitle>
@@ -195,15 +242,15 @@ export default function PropHubPage() {
                 </Card>
             )}
             
-            {!isLoadingProps && !loading && !error && games.length === 0 && (
+            {!isLoadingProps && !loading && games.length === 0 && (
                 <Card>
                     <CardContent className="p-8 text-center">
-                        <p className="text-muted-foreground">No player props available for today. Click "Sync Player Props" to check again.</p>
+                        <p className="text-muted-foreground">No player props available. Click "Sync Player Props" to fetch tomorrow's lines.</p>
                     </CardContent>
                 </Card>
             )}
 
-            {!isLoadingProps && !loading && !error && games.length > 0 && (
+            {!isLoadingProps && !loading && games.length > 0 && (
                 <div className="space-y-6">
                     {games.map(game => (
                         <GameCard key={game.gameId} game={game} />

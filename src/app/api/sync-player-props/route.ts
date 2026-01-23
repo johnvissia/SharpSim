@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
 import { PlayerProp } from '@/lib/types';
@@ -97,7 +98,11 @@ export async function GET(request: Request) {
                         underOdds: prop.UnderPrice,
                     };
 
-                    batch.set(docRef, propDoc, { merge: true });
+                    batch.set(docRef, { 
+                        ...propDoc, 
+                        status: "Pending",
+                        fetchedAt: new Date(),
+                    }, { merge: true });
                     propCount++;
                 });
             }

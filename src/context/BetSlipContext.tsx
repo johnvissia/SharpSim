@@ -1,16 +1,22 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useMemo } from 'react';
 import type { Game } from '@/lib/types';
 
 export interface BetSlipPick {
-  id: string;
-  game: Game;
-  pick: string;
+  id: string; // A unique ID for the pick itself, combining market and selection
+  game: Partial<Game>; // Game can be partial for props
+  pick: string; // The user's selection text, e.g., "Over 22.5" or "Team A -5.5"
   odds: number;
-  betType: 'moneyline' | 'spread' | 'total';
-  marketId: string; // Unique ID for the market (e.g., gameId-moneyline)
+  betType: 'moneyline' | 'spread' | 'total' | 'player_prop';
+  marketId: string; // Unique ID for the market, to prevent multiple picks in same market
+  // Optional fields for player props
+  playerId?: string;
+  market?: string;
+  line?: number;
 }
+
 
 interface BetSlipContextType {
   picks: BetSlipPick[];
@@ -26,6 +32,7 @@ export const BetSlipProvider = ({ children }: { children: ReactNode }) => {
 
   const addPick = (newPick: Omit<BetSlipPick, 'id'>) => {
     setPicks(currentPicks => {
+      // The unique ID for a pick is its market plus the specific thing chosen
       const pickId = `${newPick.marketId}-${newPick.pick.replace(/\s/g, '')}`;
 
       // If the exact same pick is already in the slip, remove it (toggle off).
