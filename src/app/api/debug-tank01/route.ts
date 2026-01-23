@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -11,9 +12,9 @@ export async function GET(request: Request) {
 
     const gameDate = '20260123'; // Hardcoded date as requested
 
-    console.log(`[DEBUG] Fetching games for: ${gameDate}`);
+    console.log(`[DEBUG] Fetching schedule for: ${gameDate}`);
 
-    const url = `https://tank01-fantasy-stats.p.rapidapi.com/getNBAGames?gameDate=${gameDate}`;
+    const url = `https://tank01-fantasy-stats.p.rapidapi.com/getNBASchedule?gameDate=${gameDate}`;
     const options = {
         method: 'GET',
         headers: {
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
         const data = await response.json();
 
         if (!response.ok) {
-            console.error("[DEBUG] Failed to fetch games from Tank01 API:", response.status, data);
+            console.error("[DEBUG] Failed to fetch schedule from Tank01 API:", response.status, data);
             return NextResponse.json(data, { status: response.status });
         }
 
