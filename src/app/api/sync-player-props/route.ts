@@ -1,8 +1,6 @@
 
 import { NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
-import { PlayerProp } from '@/lib/types';
-import { nbaTeamAbbreviationToName, mapTank01MarketToApp } from '@/lib/nba-data';
 
 // Initialize Firebase Admin SDK if not already initialized
 if (!admin.apps.length) {
@@ -13,106 +11,103 @@ if (!admin.apps.length) {
         console.error('Firebase admin initialization error', e);
     }
 }
-
 const db = admin.firestore();
 
-export async function GET(request: Request) {
-    const rapidApiKey = process.env.RAPIDAPI_KEY;
-    const rapidApiHost = process.env.RAPIDAPI_HOST;
 
-    if (!rapidApiKey || !rapidApiHost) {
-        console.error("RapidAPI key or host is not configured on the server.");
-        return NextResponse.json({ message: "API credentials are not configured on the server." }, { status: 500 });
-    }
-
+export async function GET() {
+  try {
+    // 1. Get Today's Date (YYYYMMDD)
     const now = new Date();
-    const year = now.getFullYear();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const day = now.getDate().toString().padStart(2, '0');
-    const gameDate = `${year}${month}${day}`;
+    const dateString = now.toISOString().slice(0, 10).replace(/-/g, '');
+    
+    console.log(`🚀 STARTING SYNC: Fetching props for ${dateString} using BettingOdds endpoint...`);
 
-    console.log(`Fetching props for: ${gameDate}`);
-
-    const url = `https://tank01-fantasy-stats.p.rapidapi.com/getNBABettingOdds?gameDate=${gameDate}&itemFormat=json`;
+    // 2. Fetch from Tank01 (Using the "Odds" endpoint with playerProps=true)
+    const url = `https://${process.env.RAPIDAPI_HOST}/getNBABettingOdds?gameDate=${dateString}&playerProps=true`;
     const options = {
-        method: 'GET',
-        headers: {
-            'X-RapidAPI-Key': rapidApiKey,
-            'X-RapidAPI-Host': rapidApiHost,
-        }
+      method: 'GET',
+      headers: {
+        'x-rapidapi-key': process.env.RAPIDAPI_KEY!,
+        'x-rapidapi-host': process.env.RAPIDAPI_HOST!
+      }
     };
 
-    try {
-        const response = await fetch(url, options);
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Failed to fetch player props from Tank01 API:", response.status, errorText);
-            throw new Error(`Tank01 API Error: ${response.statusText}`);
-        }
-        
-        const propsData = await response.json();
-
-        if (propsData.message) {
-            console.error("Tank01 API returned a message:", propsData.message);
-            throw new Error(`Player Prop API Error: ${propsData.message}`);
-        }
-
-        const apiGames = propsData.body?.game;
-
-        if (!apiGames || apiGames.length === 0) {
-            return NextResponse.json({ message: `No player props available from Tank01 for ${gameDate}.` });
-        }
-
-        const batch = db.batch();
-        const propsCollection = db.collection('player_props');
-        let propCount = 0;
-
-        apiGames.forEach((apiGame: any) => {
-            const homeFullName = nbaTeamAbbreviationToName[apiGame.HomeTeam] || apiGame.HomeTeam;
-            const awayFullName = nbaTeamAbbreviationToName[apiGame.AwayTeam] || apiGame.AwayTeam;
-            const matchup = `${awayFullName} @ ${homeFullName}`;
-            
-            if (apiGame.PlayerProps) {
-                apiGame.PlayerProps.forEach((prop: any) => {
-                    const market = mapTank01MarketToApp(prop.PropType);
-                    if (!market) return; // Skip unknown prop types
-
-                    const teamName = nbaTeamAbbreviationToName[prop.Team] || prop.Team;
-                    const docId = `${apiGame.gameID}-${prop.PlayerID}-${market}`;
-                    const docRef = propsCollection.doc(docId);
-
-                    const propDoc: Omit<PlayerProp, 'id'> = {
-                        gameId: apiGame.gameID,
-                        playerId: prop.PlayerID.toString(),
-                        playerName: prop.PlayerName,
-                        teamName: teamName,
-                        matchup: matchup,
-                        commenceTime: apiGame.gameTime,
-                        market: market,
-                        line: prop.StatValue,
-                        overOdds: prop.OverPrice,
-                        underOdds: prop.UnderPrice,
-                    };
-
-                    batch.set(docRef, { 
-                        ...propDoc, 
-                        status: "Pending",
-                        fetchedAt: new Date(),
-                    }, { merge: true });
-                    propCount++;
-                });
-            }
-        });
-        
-        await batch.commit();
-
-        return NextResponse.json({ message: `Synced ${propCount} props successfully for ${gameDate}.` });
-
-    } catch (error) {
-        console.error("An error occurred during the player prop sync process:", error);
-        if (error instanceof Error) {
-            return NextResponse.json({ message: error.message }, { status: 500 });
-        }
-        return NextResponse.json({ message: 'An unknown error occurred' }, { status: 500 });
+    const response = await fetch(url, options);
+    if (!response.ok) {
+        const errorBody = await response.text();
+        console.error(`Tank01 API Error ${response.status}:`, errorBody);
+        throw new Error(`Tank01 API request failed with status ${response.status}`);
     }
+    const data = await response.json();
+    
+    // 3. Validation
+    const games = data.body || []; 
+    if (games.length === 0) {
+        console.log("⚠️ No games found in API response for today.");
+        return NextResponse.json({ message: "No games found in API response for today." }, { status: 200 });
+    }
+
+    console.log(`✅ FOUND: ${games.length} games. Unpacking player props...`);
+
+    // 4. Unpack and Save to Firebase
+    const batch = db.batch();
+    const playerPropsCollection = db.collection("player_props");
+    let count = 0;
+
+    // Loop through every Game
+    for (const game of games) {
+        const allPlayers = [
+            ...(game.team1?.playerProps || []),
+            ...(game.team2?.playerProps || []),
+            ...(game.playerProps || []) // Fallback
+        ];
+
+        for (const player of allPlayers) {
+            if (!player.propBets || !player.playerID) continue;
+
+            // "Unpack" the bundle: Create 1 card for Points, 1 for Rebounds, etc.
+            for (const [market, line] of Object.entries(player.propBets)) {
+                if (line === null || line === undefined) continue;
+                
+                const overOdds = player.odds?.[market]?.over;
+                const underOdds = player.odds?.[market]?.under;
+
+                if (overOdds === undefined || underOdds === undefined) continue;
+
+                // Construct a unique ID: GameID_PlayerID_Market
+                const docId = `${game.gameID}_${player.playerID}_${market}`;
+                const docRef = playerPropsCollection.doc(docId);
+                
+                batch.set(docRef, {
+                    gameId: game.gameID,
+                    playerId: player.playerID,
+                    playerName: player.playerName || "Unknown Player",
+                    teamName: player.team,
+                    matchup: `${game.team1.name} @ ${game.team2.name}`,
+                    commenceTime: game.gameDate, // Using gameDate from the game object
+                    market: market, // e.g., "pts", "reb", "threes"
+                    line: line,     // e.g., "12.5"
+                    overOdds: overOdds,
+                    underOdds: underOdds,
+                    status: "Pending",
+                    fetchedAt: new Date()
+                });
+                count++;
+            }
+        }
+    }
+
+    if (count > 0) {
+        await batch.commit();
+        console.log(`💾 SAVED: Successfully saved ${count} prop bets to database.`);
+        return NextResponse.json({ message: `Synced ${count} props` }, { status: 200 });
+    } else {
+        console.log("⚠️ Data found, but no player props extracted. Structure might vary.");
+        return NextResponse.json({ message: "No props extracted from games." }, { status: 200 });
+    }
+
+  } catch (error) {
+    console.error("❌ ERROR:", error);
+    return NextResponse.json({ error: "Failed to sync", details: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  }
 }
