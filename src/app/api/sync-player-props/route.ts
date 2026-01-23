@@ -1,17 +1,6 @@
 import { NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
+import { db } from '@/lib/firebase';
 import type { nbaTeamAbbreviationToName } from '@/lib/nba-data';
-
-// Initialize Firebase Admin SDK if not already initialized
-if (!admin.apps.length) {
-    try {
-        admin.initializeApp();
-    } catch (e) {
-        console.error('Firebase admin initialization error', e);
-    }
-}
-const db = admin.firestore();
-
 
 export async function GET() {
   try {
