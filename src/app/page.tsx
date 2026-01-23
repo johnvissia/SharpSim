@@ -225,12 +225,18 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const getEspnData = async () => {
-        setIsLoadingEspn(true);
-        const games = await fetchEspnSchedule();
-        setEspnGames(games);
-        setIsLoadingEspn(false);
+      const games = await fetchEspnSchedule();
+      setEspnGames(games);
+      setIsLoadingEspn(false);
     };
-    getEspnData();
+
+    getEspnData(); // Initial fetch
+
+    // Poll for live score updates every 30 seconds
+    const intervalId = setInterval(getEspnData, 30000);
+
+    // Clean up interval on unmount
+    return () => clearInterval(intervalId);
   }, []);
   
   const mergedGames = useMemo(() => {
