@@ -1,9 +1,22 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import * as admin from 'firebase-admin';
 import type { nbaTeamAbbreviationToName } from '@/lib/nba-data';
 
 export async function GET() {
   try {
+    // Self-contained Firebase Admin initialization
+    if (!admin.apps.length) {
+      try {
+        // This will use the GOOGLE_APPLICATION_CREDENTIALS environment variable
+        // automatically provided by Firebase App Hosting.
+        admin.initializeApp();
+      } catch (e) {
+        console.error('Firebase admin initialization error', e);
+        return NextResponse.json({ error: "Failed to initialize Firebase Admin SDK" }, { status: 500 });
+      }
+    }
+    const db = admin.firestore();
+
     // Smart Date Logic: Use today's date.
     const now = new Date();
     const dateString = now.toISOString().slice(0, 10).replace(/-/g, '');
@@ -72,6 +85,8 @@ export async function GET() {
                     line: line,
                     overOdds: over || 0,
                     underOdds: under || 0,
+                    status: "Pending",
+                    fetchedAt: new Date().toISOString(),
                 });
                 count++;
             }
