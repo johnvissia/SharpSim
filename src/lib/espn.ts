@@ -172,8 +172,8 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
             homeTeam,
             awayTeam,
             liveScore: {
-                home: parseInt(home.score, 10) || 0,
-                away: parseInt(away.score, 10) || 0,
+                home: parseInt(home.score, 10),
+                away: parseInt(away.score, 10),
             },
             statusDetail: comp.status.type.detail,
             statusState: comp.status.type.state,

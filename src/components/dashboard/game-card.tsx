@@ -58,7 +58,7 @@ const TeamDisplay = ({ team, sport, score }: { team: Team, sport: SportName, sco
                 <span className="truncate">{team.name}</span>
                 {team.rank && <span className="font-bold text-muted-foreground ml-1">#{team.rank}</span>}
             </div>
-             {score !== undefined && score !== null && (
+             {typeof score === 'number' && !isNaN(score) && (
                 <span className="text-3xl font-bold tracking-tight">{score}</span>
             )}
         </div>
