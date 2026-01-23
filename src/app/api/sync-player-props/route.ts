@@ -7,11 +7,9 @@ import { nbaTeamAbbreviationToName, mapTank01MarketToApp } from '@/lib/nba-data'
 // Initialize Firebase Admin SDK if not already initialized
 if (!admin.apps.length) {
     try {
-        // Use application default credentials in a GCP environment
-        admin.initializeApp({
-            credential: admin.credential.applicationDefault(),
-            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        });
+        // Use application default credentials in a GCP environment.
+        // initializeApp() will automatically use them.
+        admin.initializeApp();
     } catch (e) {
         console.error('Firebase admin initialization error', e);
     }

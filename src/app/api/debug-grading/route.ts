@@ -8,10 +8,9 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 // Initialize Firebase Admin SDK if not already initialized
 if (!admin.apps.length) {
     try {
-        admin.initializeApp({
-            credential: admin.credential.applicationDefault(),
-            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        });
+        // Use application default credentials in a GCP environment.
+        // initializeApp() will automatically use them.
+        admin.initializeApp();
     } catch (e) {
         console.error('Firebase admin initialization error', e);
     }
