@@ -4,9 +4,9 @@
 import { useState, useMemo } from 'react';
 import type { PlayerProp } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { User, Loader2, RefreshCw } from 'lucide-react';
+import { User, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase, useFirestore } from '@/firebase';
@@ -136,6 +136,9 @@ export default function PropHubPage() {
     const { toast } = useToast();
     const firestore = useFirestore();
 
+    const [debugLoading, setDebugLoading] = useState(false);
+    const [debugResponse, setDebugResponse] = useState<string | null>(null);
+
     const propsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'player_props'), orderBy('commenceTime'));
@@ -209,6 +212,21 @@ export default function PropHubPage() {
             setLoading(false);
         }
     };
+    
+    const handleDebug = async () => {
+        setDebugLoading(true);
+        setDebugResponse(null);
+        try {
+            const response = await fetch('/api/debug-tank01');
+            const result = await response.json();
+            setDebugResponse(JSON.stringify(result, null, 2));
+
+        } catch (err: any) {
+            setDebugResponse(`Error: ${err.message}`);
+        } finally {
+            setDebugLoading(false);
+        }
+    };
 
     return (
         <div className="p-4 md:p-8">
@@ -217,11 +235,36 @@ export default function PropHubPage() {
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">NBA Player Prop Hub</h1>
                 <p className="text-muted-foreground">Daily player prop markets from the Tank01 API.</p>
               </div>
-              <Button onClick={handleSyncProps} disabled={loading} size="lg">
-                  <RefreshCw className={`mr-2 h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-                  {loading ? 'Syncing...' : 'Sync Player Props'}
-              </Button>
+              <div className="flex items-center gap-4">
+                  <Button onClick={handleSyncProps} disabled={loading} size="lg">
+                      <RefreshCw className={`mr-2 h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                      {loading ? 'Syncing...' : 'Sync Player Props'}
+                  </Button>
+                  <Button onClick={handleDebug} disabled={debugLoading} variant="destructive">
+                     <span role="img" aria-label="tools" className="mr-2">🛠️</span>
+                     {debugLoading ? 'Testing...' : 'Test API Connection'}
+                  </Button>
+              </div>
             </header>
+
+            {debugResponse && (
+                <Card className="my-6 bg-slate-800 border-slate-700">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg text-amber-400">
+                            <AlertCircle className="h-5 w-5" />
+                            Raw API Debug Response
+                        </CardTitle>
+                        <CardDescription>
+                            This is the exact JSON returned from the `/api/debug-tank01` route.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <pre className="text-xs bg-slate-900 p-4 rounded-md overflow-x-auto text-white max-h-96">
+                            {debugResponse}
+                        </pre>
+                    </CardContent>
+                </Card>
+            )}
 
             {(isLoadingProps) && (
                  <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
