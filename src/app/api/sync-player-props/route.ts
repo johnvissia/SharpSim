@@ -4,16 +4,18 @@ import * as admin from 'firebase-admin';
 import { mapTank01MarketToApp } from '@/lib/nba-data';
 import type { PlayerProp } from '@/lib/types';
 
-// Initialize Firebase Admin SDK if not already initialized
+// Self-contained initialization:
+// This block ensures the Admin SDK is initialized only once.
+// In a server environment like Vercel or Firebase App Hosting,
+// initializeApp() will automatically use the project's service account credentials.
 if (!admin.apps.length) {
     try {
-        // Use application default credentials in a GCP environment.
         admin.initializeApp();
     } catch (e) {
         console.error('Firebase admin initialization error', e);
     }
 }
-const db = admin.firestore();
+const db = admin.firestore(); // Get the Firestore instance from the initialized admin app.
 
 export const dynamic = 'force-dynamic';
 
