@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
 import { mapTank01MarketToApp } from '@/lib/nba-data';
@@ -71,12 +72,10 @@ export async function GET() {
 
             if (!gameId) continue;
             
-            const allPlayers = [
-                ...(game.team1?.playerProps || []),
-                ...(game.team2?.playerProps || []),
-            ];
+            // FIX: Assumes playerProps is an array directly on the game object, not nested in teams.
+            const allPlayersWithProps = game.playerProps || [];
 
-            for (const player of allPlayers) {
+            for (const player of allPlayersWithProps) {
                 if (!player.propBets || !player.playerID) continue;
 
                 for (const [apiMarket, propData] of Object.entries(player.propBets as any)) {
