@@ -1,111 +1,124 @@
 import { NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
-import type { nbaTeamAbbreviationToName } from '@/lib/nba-data';
+import { mapTank01MarketToApp } from '@/lib/nba-data';
+import type { PlayerProp } from '@/lib/types';
+
+// Initialize Firebase Admin SDK if not already initialized
+if (!admin.apps.length) {
+    try {
+        // Use application default credentials in a GCP environment.
+        admin.initializeApp();
+    } catch (e) {
+        console.error('Firebase admin initialization error', e);
+    }
+}
+const db = admin.firestore();
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  try {
-    // Self-contained Firebase Admin initialization
-    if (!admin.apps.length) {
-      try {
-        // This will use the GOOGLE_APPLICATION_CREDENTIALS environment variable
-        // automatically provided by Firebase App Hosting.
-        admin.initializeApp();
-      } catch (e) {
-        console.error('Firebase admin initialization error', e);
-        return NextResponse.json({ error: "Failed to initialize Firebase Admin SDK" }, { status: 500 });
-      }
+    console.log("🟢 SYNC STARTED: Syncing NBA Player Props...");
+
+    const rapidApiKey = process.env.RAPIDAPI_KEY;
+    const rapidApiHost = process.env.RAPIDAPI_HOST;
+
+    if (!rapidApiKey || !rapidApiHost) {
+        const errorMsg = "API credentials (RAPIDAPI_KEY, RAPIDAPI_HOST) are not configured on the server.";
+        console.error(`🔴 ERROR: ${errorMsg}`);
+        return NextResponse.json({ message: errorMsg }, { status: 500 });
     }
-    const db = admin.firestore();
-
-    // Smart Date Logic: Use today's date.
-    const now = new Date();
-    const dateString = now.toISOString().slice(0, 10).replace(/-/g, '');
     
-    console.log(`🚀 STARTING SYNC: Fetching props for ${dateString}...`);
+    try {
+        const now = new Date();
+        const dateString = now.toISOString().slice(0, 10).replace(/-/g, '');
+        console.log(`🟢 API CALL: Fetching props for ${dateString}...`);
+        
+        const url = `https://${rapidApiHost}/getNBABettingOdds?gameDate=${dateString}&playerProps=true`;
+        
+        const options = {
+            method: 'GET',
+            headers: {
+                'x-rapidapi-key': rapidApiKey,
+                'x-rapidapi-host': rapidApiHost
+            }
+        };
 
-    // Fetch from Tank01 using the correct endpoint and parameter.
-    const url = `https://${process.env.RAPIDAPI_HOST}/getNBABettingOdds?gameDate=${dateString}&playerProps=true`;
-    
-    const options = {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-key': process.env.RAPIDAPI_KEY!,
-        'x-rapidapi-host': process.env.RAPIDAPI_HOST!
-      }
-    };
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Tank01 API Error ${response.status}: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        
+        const games = data.body || []; 
+        if (games.length === 0) {
+            console.log("⚠️ API returned 0 games. No props to sync.");
+            return NextResponse.json({ message: "No props found for today." }, { status: 200 });
+        }
 
-    const response = await fetch(url, options);
-    if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`Tank01 API Error ${response.status}: ${errorBody}`);
-    }
-    const data = await response.json();
-    
-    const games = data.body || []; 
-    if (games.length === 0) {
-        return NextResponse.json({ message: "No games with props found for today." }, { status: 200 });
-    }
+        console.log(`✅ FOUND: ${games.length} games with potential props. Processing...`);
 
-    console.log(`✅ FOUND: ${games.length} games. Unpacking player props...`);
+        const batch = db.batch();
+        let propsCount = 0;
 
-    const batch = db.batch();
-    let count = 0;
+        for (const game of games) {
+            const gameId = game.gameID;
+            const awayTeamName = game.team2?.teamCity ? `${game.team2.teamCity} ${game.team2.teamName}` : game.team2.teamName;
+            const homeTeamName = game.team1?.teamCity ? `${game.team1.teamCity} ${game.team1.teamName}` : game.team1.teamName;
+            const matchup = `${awayTeamName} @ ${homeTeamName}`;
+            const commenceTime = new Date(game.gameDate).toISOString();
 
-    for (const game of games) {
-        if (!game.gameID || !game.team1?.abbreviation || !game.team2?.abbreviation) continue;
+            if (!gameId) continue;
+            
+            const allPlayers = [
+                ...(game.team1?.playerProps || []),
+                ...(game.team2?.playerProps || []),
+            ];
 
-        const allPlayers = [
-            ...(game.team1?.playerProps || []),
-            ...(game.team2?.playerProps || []),
-            ...(game.playerProps || [])
-        ];
+            for (const player of allPlayers) {
+                if (!player.propBets || !player.playerID) continue;
 
-        for (const player of allPlayers) {
-            const playerId = player.playerID || player.player_id;
-            if (!player.propBets || !playerId) continue;
+                for (const [apiMarket, propData] of Object.entries(player.propBets as any)) {
+                    const market = mapTank01MarketToApp(apiMarket);
+                    if (!market || !propData.line || !propData.over || !propData.under) continue;
+                    
+                    const propId = `${gameId}_${player.playerID}_${market}`;
+                    const docRef = db.collection("player_props").doc(propId);
 
-            for (const [market, marketData] of Object.entries(player.propBets as any)) {
-                if (typeof marketData !== 'object' || marketData === null || !('line' in marketData)) {
-                    continue;
+                    const newProp: Omit<PlayerProp, 'id'> = {
+                        gameId: gameId,
+                        playerId: player.playerID,
+                        playerName: player.playerName || "Unknown Player",
+                        teamName: player.teamAbv || "Unknown Team",
+                        matchup: matchup,
+                        commenceTime: commenceTime,
+                        market: market,
+                        line: propData.line,
+                        overOdds: propData.over,
+                        underOdds: propData.under,
+                    };
+
+                    batch.set(docRef, newProp, { merge: true });
+                    propsCount++;
                 }
-                
-                const { line, over, under } = marketData as {line: number, over: number, under: number};
-
-                const docId = `${game.gameID}_${playerId}_${market}`;
-                const docRef = db.collection("player_props").doc(docId);
-                
-                batch.set(docRef, {
-                    gameId: game.gameID,
-                    playerId: String(playerId),
-                    playerName: player.playerName || "Unknown",
-                    teamName: player.teamName || (nbaTeamAbbreviationToName as any)[player.team] || player.team,
-                    matchup: `${game.team2.abbreviation} @ ${game.team1.abbreviation}`,
-                    commenceTime: new Date(game.gameTime).toISOString(),
-                    market: market,
-                    line: line,
-                    overOdds: over || 0,
-                    underOdds: under || 0,
-                    status: "Pending",
-                    fetchedAt: new Date().toISOString(),
-                });
-                count++;
             }
         }
-    }
 
-    if (count > 0) {
-        await batch.commit();
-        console.log(`💾 SAVED: Successfully saved ${count} props.`);
-        return NextResponse.json({ message: `Synced ${count} props` }, { status: 200 });
-    } else {
-        return NextResponse.json({ message: "No valid props extracted from API response." }, { status: 200 });
-    }
+        if (propsCount > 0) {
+            await batch.commit();
+            console.log(`💾 SUCCESS: Saved ${propsCount} player props to Firestore.`);
+            return NextResponse.json({ message: `Synced ${propsCount} props successfully.` }, { status: 200 });
+        } else {
+            console.log("🤷 No valid player props were extracted from the API response.");
+            return NextResponse.json({ message: "No player props were found to sync." }, { status: 200 });
+        }
 
-  } catch (error) {
-    console.error("❌ ERROR in sync-player-props:", error);
-    if (error instanceof Error) {
-        return NextResponse.json({ error: "Failed to sync player props", details: error.message }, { status: 500 });
+    } catch (error: any) {
+        console.error("🔴 CRASH in /api/sync-player-props:", error);
+        return NextResponse.json({ 
+            error: "Failed to sync player props.", 
+            details: error.message 
+        }, { status: 500 });
     }
-    return NextResponse.json({ error: "Failed to sync player props", details: "An unknown error occurred" }, { status: 500 });
-  }
 }
