@@ -27,11 +27,14 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: "API credentials are not configured on the server." }, { status: 500 });
     }
 
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = (today.getMonth() + 1).toString().padStart(2, '0');
-    const day = today.getDate().toString().padStart(2, '0');
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const year = tomorrow.getFullYear();
+    const month = (tomorrow.getMonth() + 1).toString().padStart(2, '0');
+    const day = tomorrow.getDate().toString().padStart(2, '0');
     const gameDate = `${year}${month}${day}`;
+
+    console.log(`Fetching props for: ${gameDate}`);
 
     const url = `https://tank01-fantasy-stats.p.rapidapi.com/getNBABettingOdds?gameDate=${gameDate}&itemFormat=json`;
     const options = {
@@ -60,7 +63,7 @@ export async function GET(request: Request) {
         const apiGames = propsData.body?.game;
 
         if (!apiGames || apiGames.length === 0) {
-            return NextResponse.json({ message: 'No player props available from Tank01 for today.' });
+            return NextResponse.json({ message: `No player props available from Tank01 for ${gameDate}.` });
         }
 
         const batch = db.batch();
@@ -102,7 +105,7 @@ export async function GET(request: Request) {
         
         await batch.commit();
 
-        return NextResponse.json({ message: `Synced ${propCount} props successfully.` });
+        return NextResponse.json({ message: `Synced ${propCount} props successfully for ${gameDate}.` });
 
     } catch (error) {
         console.error("An error occurred during the player prop sync process:", error);
