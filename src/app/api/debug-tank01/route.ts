@@ -10,11 +10,9 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: "API credentials are not configured on the server." }, { status: 500 });
     }
 
-    const gameDate = '20260123'; // Hardcoded date as requested
+    console.log(`[DEBUG] Fetching teams from getNBATeams`);
 
-    console.log(`[DEBUG] Fetching schedule for: ${gameDate}`);
-
-    const url = `https://tank01-fantasy-stats.p.rapidapi.com/getNBASchedule?gameDate=${gameDate}`;
+    const url = `https://tank01-fantasy-stats.p.rapidapi.com/getNBATeams`;
     const options = {
         method: 'GET',
         headers: {
@@ -28,7 +26,7 @@ export async function GET(request: Request) {
         const data = await response.json();
 
         if (!response.ok) {
-            console.error("[DEBUG] Failed to fetch schedule from Tank01 API:", response.status, data);
+            console.error("[DEBUG] Failed to fetch teams from Tank01 API:", response.status, data);
             return NextResponse.json(data, { status: response.status });
         }
 
