@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { collection, query, orderBy, writeBatch, getDocs, doc, increment } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { UserBet, CompletedGame } from '@/lib/types';
 import { Ticket, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
@@ -20,6 +20,9 @@ export default function MyPicksPage() {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [isSyncing, setIsSyncing] = useState(false);
   const { toast } = useToast();
+
+  const [isGradingDebugging, setIsGradingDebugging] = useState(false);
+  const [gradingDebugResponse, setGradingDebugResponse] = useState<string | null>(null);
 
   useEffect(() => {
     // Set the date only on the client-side to prevent hydration mismatch
@@ -46,6 +49,7 @@ export default function MyPicksPage() {
     }
 
     setIsSyncing(true);
+    setGradingDebugResponse(null);
     try {
         const pendingBets = bets.filter(b => b.status === 'pending');
         if (pendingBets.length === 0) {
@@ -53,6 +57,7 @@ export default function MyPicksPage() {
                 title: 'No Pending Bets',
                 description: 'All your bets are already settled.',
             });
+            setIsSyncing(false);
             return;
         }
 
@@ -68,6 +73,7 @@ export default function MyPicksPage() {
                 description: 'Could not fetch completed game results to grade bets. Try syncing game lines on the dashboard first.',
                 variant: 'destructive',
             });
+            setIsSyncing(false);
             return;
         }
 
@@ -78,6 +84,7 @@ export default function MyPicksPage() {
                 title: 'Bets are Up to Date',
                 description: 'No bets were ready to be settled at this time.',
             });
+            setIsSyncing(false);
             return;
         }
 
@@ -108,6 +115,32 @@ export default function MyPicksPage() {
         });
     } finally {
         setIsSyncing(false);
+    }
+  };
+
+  const handleDebugGrading = async () => {
+    setIsGradingDebugging(true);
+    setGradingDebugResponse(null);
+    try {
+        const response = await fetch('/api/debug-game-line-grading');
+        const result = await response.json();
+        setGradingDebugResponse(result.log);
+        if(!response.ok) {
+            toast({
+                title: "Debug Failed",
+                description: "The debug route returned an error.",
+                variant: 'destructive',
+            });
+        }
+    } catch (err: any) {
+        setGradingDebugResponse(`Error: ${err.message}`);
+        toast({
+            title: "Debug Error",
+            description: "Failed to fetch from the debug route.",
+            variant: 'destructive',
+        });
+    } finally {
+        setIsGradingDebugging(false);
     }
   };
 
@@ -151,11 +184,36 @@ export default function MyPicksPage() {
             Track your active and settled bets here.
           </p>
         </div>
-        <Button onClick={handleSyncBets} disabled={isSyncing} size="lg">
-            <RefreshCw className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Grading...' : 'Grade Bets'}
-        </Button>
+        <div className="flex items-center gap-2">
+            <Button onClick={handleSyncBets} disabled={isSyncing || isGradingDebugging} size="lg">
+                <RefreshCw className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                {isSyncing ? 'Grading...' : 'Grade Bets'}
+            </Button>
+            <Button onClick={handleDebugGrading} disabled={isGradingDebugging || isSyncing} variant="outline" size="lg" className="text-purple-400 border-purple-400/50 hover:bg-purple-400/10 hover:text-purple-300">
+                <span role="img" aria-label="ladybug" className="mr-2">🐞</span>
+                {isGradingDebugging ? 'Debugging...' : 'Debug Grading'}
+            </Button>
+        </div>
       </header>
+
+      {gradingDebugResponse && (
+        <Card className="my-6 bg-slate-800 border-purple-500/50">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg text-purple-400">
+                    <span role="img" aria-label="ladybug">🐞</span>
+                    Game Line Grading Debug Report
+                </CardTitle>
+                <CardDescription>
+                    This is a dry run report for a single pending game line bet. No data was actually changed.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <pre className="text-xs bg-slate-900 p-4 rounded-md overflow-x-auto text-white max-h-[500px]">
+                    {gradingDebugResponse}
+                </pre>
+            </CardContent>
+        </Card>
+      )}
 
        <div className="flex items-center justify-center gap-4 mb-8">
         <Button variant="outline" size="icon" onClick={() => setSelectedDate(subDays(selectedDate, 1))}>
