@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getPlayerProps } from './actions';
-import type { Tank01Game, Tank01Player, Tank01PlayerProp } from '@/lib/types';
+import type { Tank01Game, Tank01Player } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { User, Loader2 } from 'lucide-react';
+import { User, Loader2, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const PlayerAccordion = ({ player }: { player: Tank01Player }) => {
     return (
@@ -66,31 +67,35 @@ const GameCard = ({ game }: { game: Tank01Game }) => {
 
 export default function PropHubPage() {
     const [games, setGames] = useState<Tank01Game[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [hasSynced, setHasSynced] = useState(false);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const data = await getPlayerProps();
-                setGames(data);
-            } catch (err: any) {
-                setError(err.message || "Failed to fetch player props. The API might be unavailable.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, []);
+    const handleSyncProps = async () => {
+        setLoading(true);
+        setError(null);
+        setHasSynced(true);
+        try {
+            const data = await getPlayerProps();
+            setGames(data);
+        } catch (err: any) {
+            setError(err.message || "Failed to fetch player props. The API might be unavailable.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="p-4 md:p-8">
-            <header className="mb-8">
+            <header className="mb-8 flex justify-between items-center">
+              <div>
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">NBA Player Prop Hub</h1>
                 <p className="text-muted-foreground">Daily player prop markets from the Tank01 API.</p>
+              </div>
+              <Button onClick={handleSyncProps} disabled={loading} size="lg">
+                  <RefreshCw className={`mr-2 h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                  {loading ? 'Syncing...' : 'Sync Player Props'}
+              </Button>
             </header>
 
             {loading && (
@@ -111,8 +116,16 @@ export default function PropHubPage() {
                     </CardContent>
                 </Card>
             )}
+            
+            {!loading && !error && !hasSynced && (
+                 <Card>
+                    <CardContent className="p-8 text-center">
+                        <p className="text-muted-foreground">Click "Sync Player Props" to fetch today's markets.</p>
+                    </CardContent>
+                </Card>
+            )}
 
-            {!loading && !error && games.length === 0 && (
+            {!loading && !error && hasSynced && games.length === 0 && (
                 <Card>
                     <CardContent className="p-8 text-center">
                         <p className="text-muted-foreground">No player props available for today's NBA games.</p>
