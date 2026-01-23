@@ -8,7 +8,6 @@ import { nbaTeamAbbreviationToName, mapTank01MarketToApp } from '@/lib/nba-data'
 if (!admin.apps.length) {
     try {
         // Use application default credentials in a GCP environment.
-        // initializeApp() will automatically use them.
         admin.initializeApp();
     } catch (e) {
         console.error('Firebase admin initialization error', e);
@@ -26,11 +25,10 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: "API credentials are not configured on the server." }, { status: 500 });
     }
 
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const year = tomorrow.getFullYear();
-    const month = (tomorrow.getMonth() + 1).toString().padStart(2, '0');
-    const day = tomorrow.getDate().toString().padStart(2, '0');
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
     const gameDate = `${year}${month}${day}`;
 
     console.log(`Fetching props for: ${gameDate}`);
