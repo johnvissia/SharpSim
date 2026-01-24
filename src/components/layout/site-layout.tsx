@@ -37,6 +37,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
     { href: '/prop-hub', id: 'props', label: '🏀 Prop Hub' },
     { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
     { href: '/stats', id: 'stats', label: '📊 Stats' },
+    { href: '/data', id: 'data', label: '📈 Data' },
     { href: '/store', id: 'store', label: '🛒 Store' },
     { href: '/coaching', id: 'coaching', label: '🎓 Coaching' },
     { href: '/admin', id: 'admin', label: '🛡️ Admin' }
@@ -47,6 +48,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith('/my-picks')) return 'picks';
     if (pathname.startsWith('/prop-hub')) return 'props';
     if (pathname.startsWith('/stats')) return 'stats';
+    if (pathname.startsWith('/data')) return 'data';
     if (pathname.startsWith('/store')) return 'store';
     if (pathname.startsWith('/coaching')) return 'coaching';
     if (pathname.startsWith('/admin')) return 'admin';
