@@ -42,21 +42,25 @@ const LegProgressBadge = ({ legs }: { legs: ParlayLeg[] }) => {
 export function BetTicket({ bet }: { bet: UserBet }) {
   const isParlay = bet.betType === 'parlay';
 
-  // Create a unified list of legs to render. For single bets, it's an array with one item.
+  // The odds for the ticket are locked in when the bet is placed and stored in the `bet` object.
+  // This `useMemo` ensures we are always using the original odds from the database.
+  const ticketOdds = useMemo(() => bet.odds, [bet.odds]);
+
+  // Create a unified list of legs to render. For single bets, this creates a synthetic leg.
+  // The odds for each leg are the ones snapshotted at placement time.
   const legs = useMemo((): ParlayLeg[] => {
     if (isParlay && bet.legs) {
       return bet.legs;
     }
-    // For single bets, create a synthetic leg.
+    // For single bets, create a synthetic leg using the locked-in bet data.
     return [
       {
         gameId: bet.gameId,
         matchup: bet.matchup || 'N/A',
         commenceTime: bet.commenceTime || new Date().toISOString(),
         pick: bet.pick,
-        // Cast is safe here because if it's not a parlay, it's one of the other bet types.
         betType: bet.betType as 'moneyline' | 'spread' | 'total' | 'player_prop',
-        odds: bet.odds,
+        odds: bet.odds, // The odds for this single leg are the overall ticket odds.
         status: bet.status,
         sport: bet.sport,
       },
@@ -144,7 +148,7 @@ export function BetTicket({ bet }: { bet: UserBet }) {
           <div className="flex justify-between items-center font-bold text-base">
             <p>{ticketLabel}</p>
             <div className="flex items-center gap-4">
-              <p className="font-semibold">{bet.odds > 0 ? `+${bet.odds}`: bet.odds}</p>
+              <p className="font-semibold">{ticketOdds > 0 ? `+${ticketOdds}`: ticketOdds}</p>
               <div className="flex items-center gap-2">
                 {isParlay && bet.status !== 'pending' && <LegProgressBadge legs={legs} />}
                 {getBetStatusBadge(bet.status)}
