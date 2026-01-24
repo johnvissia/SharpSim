@@ -12,6 +12,7 @@ import { format, isSameDay, addDays, subDays } from 'date-fns';
 import { BetTicket } from '@/components/bets/bet-ticket';
 import { useToast } from '@/hooks/use-toast';
 import { gradeUserBets } from '@/lib/bet-grading';
+import { cn } from '@/lib/utils';
 
 
 export default function MyPicksPage() {
@@ -149,6 +150,21 @@ export default function MyPicksPage() {
     return bets.filter(bet => isSameDay(new Date(bet.placedAt), selectedDate));
   }, [bets, selectedDate]);
 
+  const dailyNet = useMemo(() => {
+    if (!filteredBets) return 0;
+    return filteredBets.reduce((acc, bet) => {
+      if (bet.status === 'won') {
+        return acc + (bet.potentialWinnings - bet.stake);
+      }
+      if (bet.status === 'lost') {
+        return acc - bet.stake;
+      }
+      // 'push' and 'pending' bets have a net of 0 for this calculation
+      return acc;
+    }, 0);
+  }, [filteredBets]);
+
+
   if (loading || !selectedDate) {
     return (
       <div className="p-4 md:p-8">
@@ -162,7 +178,10 @@ export default function MyPicksPage() {
         </header>
         <div className="flex items-center justify-center gap-4 mb-8">
             <Skeleton className="h-10 w-10" />
-            <Skeleton className="h-8 w-48" />
+            <div className="w-48 text-center">
+              <Skeleton className="h-8 w-3/4 mx-auto" />
+              <Skeleton className="h-4 w-1/2 mx-auto mt-2" />
+            </div>
             <Skeleton className="h-10 w-10" />
         </div>
         <div className="space-y-4">
@@ -219,9 +238,17 @@ export default function MyPicksPage() {
         <Button variant="outline" size="icon" onClick={() => setSelectedDate(subDays(selectedDate, 1))}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-xl font-semibold text-center w-48">
-          {format(selectedDate, 'MMM d, yyyy')}
-        </h2>
+        <div className="text-center w-48">
+            <h2 className="text-xl font-semibold">
+              {format(selectedDate, 'MMM d, yyyy')}
+            </h2>
+            <p className={cn(
+                "font-semibold text-sm",
+                dailyNet > 0 ? "text-green-500" : dailyNet < 0 ? "text-destructive" : "text-muted-foreground"
+            )}>
+                {dailyNet > 0 ? '+' : ''}{dailyNet.toFixed(2)} Coins
+            </p>
+        </div>
         <Button variant="outline" size="icon" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>
           <ChevronRight className="h-4 w-4" />
         </Button>
