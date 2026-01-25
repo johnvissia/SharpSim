@@ -141,7 +141,11 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
 
         const getLeader = (competitor: EspnCompetitor, stat: 'points' | 'rebounds' | 'assists') => {
             const leaderData = competitor.leaders?.find(l => l.name.toLowerCase() === stat);
-            return leaderData?.leaders[0]?.displayValue;
+            const leader = leaderData?.leaders[0];
+            if (!leader) return undefined;
+
+            // displayValue is like "25 PTS" or "10 REB"
+            return `${leader.athlete.displayName} - ${leader.displayValue}`;
         }
 
         const homeTeam: Team = {

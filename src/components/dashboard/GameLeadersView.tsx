@@ -1,11 +1,11 @@
 'use client';
 import type { Game } from '@/lib/types';
-import { User, Star, TrendingUp } from 'lucide-react';
+import { User } from 'lucide-react';
 
-const LeaderStat = ({ label, value, icon }: { label: string; value?: string; icon: React.ReactNode }) => (
+const LeaderStat = ({ label, value }: { label: string; value?: string; }) => (
     <div className="flex items-center gap-3">
         <div className="bg-muted p-2 rounded-full">
-            {icon}
+            <User className="h-5 w-5 text-accent" />
         </div>
         <div>
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -26,17 +26,14 @@ export function GameLeadersView({ game }: { game: Game }) {
                         <LeaderStat 
                             label="Leading Scorer"
                             value={game.awayTeam.leadingScorer}
-                            icon={<Star className="h-5 w-5 text-accent" />}
                         />
                          <LeaderStat 
                             label="Leading Assister"
                             value={game.awayTeam.leadingAssister}
-                            icon={<User className="h-5 w-5 text-accent" />}
                         />
                          <LeaderStat 
                             label="Leading Rebounder"
                             value={game.awayTeam.leadingRebounder}
-                            icon={<TrendingUp className="h-5 w-5 text-accent" />}
                         />
                     </div>
                 </div>
@@ -48,17 +45,14 @@ export function GameLeadersView({ game }: { game: Game }) {
                         <LeaderStat 
                             label="Leading Scorer"
                             value={game.homeTeam.leadingScorer}
-                            icon={<Star className="h-5 w-5 text-accent" />}
                         />
                          <LeaderStat 
                             label="Leading Assister"
                             value={game.homeTeam.leadingAssister}
-                            icon={<User className="h-5 w-5 text-accent" />}
                         />
                          <LeaderStat 
                             label="Leading Rebounder"
                             value={game.homeTeam.leadingRebounder}
-                            icon={<TrendingUp className="h-5 w-5 text-accent" />}
                         />
                     </div>
                 </div>
