@@ -99,13 +99,13 @@
 
 /* Vantage Logo Animation */
 .ball-path {
-  stroke-dasharray: 150;
-  stroke-dashoffset: 150;
-  animation: draw-line 1.5s ease-in-out forwards;
+  stroke-dasharray: 250;
+  stroke-dashoffset: 250;
+  animation: draw-line 2.5s ease-in-out forwards;
 }
 
-.ball-2 .ball-path { animation-delay: 0.2s; }
-.ball-3 .ball-path { animation-delay: 0.4s; }
+.ball-2 .ball-path { animation-delay: 0.3s; }
+.ball-3 .ball-path { animation-delay: 0.6s; }
 
 @keyframes draw-line {
   to {
@@ -119,9 +119,9 @@
   stroke: white;
   stroke-width: 1;
   fill: transparent;
-  stroke-dasharray: 850;
-  stroke-dashoffset: 850;
-  animation: write-signature 1.5s ease-in-out forwards 1.5s;
+  stroke-dasharray: 950;
+  stroke-dashoffset: 950;
+  animation: write-signature 1.5s ease-in-out forwards 3.2s;
 }
 
 @keyframes write-signature {
@@ -145,8 +145,8 @@
   white-space: nowrap;
   width: 0;
   animation:
-    typing 1s steps(18, end) 3s forwards,
-    blink-caret .75s step-end infinite 3s;
+    typing 1s steps(18, end) 4.7s forwards,
+    blink-caret .75s step-end infinite 4.7s;
 }
 
 @keyframes typing {
@@ -159,15 +159,16 @@
   50% { border-color: white; }
 }
 
-.fade-in-content {
-  animation: fade-in 1s ease-in forwards;
+.login-button-wrapper {
+    position: absolute;
+    bottom: -100px; /* Start off screen */
+    left: 50%;
+    transform: translateX(-50%);
+    animation: slide-up 0.75s ease-out forwards 6s;
 }
 
-@keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.hide-content {
-    opacity: 0;
+@keyframes slide-up {
+    to {
+        bottom: 40px; /* End position on screen */
+    }
 }
