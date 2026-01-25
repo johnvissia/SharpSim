@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
 import type { UserBet, CompletedGame, ParlayLeg } from '@/lib/types';
@@ -6,8 +5,6 @@ import type { UserBet, CompletedGame, ParlayLeg } from '@/lib/types';
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
     try {
-        // Use application default credentials in a GCP environment.
-        // initializeApp() will automatically use them.
         admin.initializeApp();
     } catch (e) {
         console.error('Firebase admin initialization error', e);
@@ -15,11 +12,11 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// Helpers from bet-grading.ts
 const normalizeName = (name: string): string => {
     if (!name) return '';
     return name.toLowerCase().replace(/[\s.&()']/g, '');
 };
+
 const extractNumber = (str: string | undefined): number | null => {
     if (!str) return null;
     const match = str.match(/[-+]?\d*\.?\d+/g);
@@ -27,166 +24,182 @@ const extractNumber = (str: string | undefined): number | null => {
     return parseFloat(match[match.length - 1]);
 };
 
-
 export async function GET(request: Request) {
-    let log = `--- Starting Game Line Grading Debug ---\n\n`;
+    let log = `=== GAME LINE GRADING DEBUG REPORT ===\n`;
+    log += `Generated: ${new Date().toISOString()}\n\n`;
 
     try {
-        // 1. Find one pending bet that is a game line (moneyline, spread, total, or parlay)
-        const betsCollection = db.collectionGroup('bets');
-        const q = await betsCollection
-            .where('status', '==', 'pending')
-            .where('betType', 'in', ['moneyline', 'spread', 'total', 'parlay'])
-            .limit(1)
-            .get();
+        // 1. Get statistics about completed_games collection
+        log += `--- STEP 1: Checking completed_games collection ---\n`;
+        const completedGamesSnapshot = await db.collection('completed_games').get();
+        log += `Total games in completed_games: ${completedGamesSnapshot.size}\n`;
+        
+        const completedGamesMap = new Map<string, CompletedGame>();
+        const sampleGameIds: string[] = [];
+        
+        completedGamesSnapshot.forEach(doc => {
+            const game = doc.data() as CompletedGame;
+            completedGamesMap.set(doc.id, game);
+            if (sampleGameIds.length < 5) {
+                sampleGameIds.push(doc.id);
+            }
+        });
+        
+        log += `Sample game IDs in completed_games:\n`;
+        sampleGameIds.forEach(id => log += `  - ${id}\n`);
+        log += `\n`;
 
-        if (q.empty) {
-            log += "No pending game line bets found to test.\n";
-            return NextResponse.json({ log });
+        // 2. Find ALL pending bets (not just one)
+        log += `--- STEP 2: Finding pending bets ---\n`;
+        
+        const usersSnapshot = await db.collection('users').get();
+        const allPendingBets: Array<{ bet: UserBet; userId: string; betId: string }> = [];
+        
+        for (const userDoc of usersSnapshot.docs) {
+            const betsSnapshot = await db.collection('users').doc(userDoc.id).collection('bets')
+                .where('status', '==', 'pending')
+                .get();
+            
+            betsSnapshot.forEach(betDoc => {
+                allPendingBets.push({
+                    bet: betDoc.data() as UserBet,
+                    userId: userDoc.id,
+                    betId: betDoc.id
+                });
+            });
+        }
+        
+        log += `Total pending bets found: ${allPendingBets.length}\n\n`;
+
+        if (allPendingBets.length === 0) {
+            log += "No pending bets to analyze.\n";
+            return NextResponse.json({ log, summary: "No pending bets" });
         }
 
-        const betDoc = q.docs[0];
-        const bet = betDoc.data() as UserBet;
-        const betId = betDoc.id;
-        const userId = betDoc.ref.parent.parent!.id;
+        // 3. Analyze ID matching
+        log += `--- STEP 3: Analyzing ID matches ---\n`;
+        let matchedCount = 0;
+        let unmatchedCount = 0;
+        const unmatchedExamples: string[] = [];
+        
+        for (const { bet, userId, betId } of allPendingBets) {
+            const legsToCheck: Partial<ParlayLeg>[] = bet.legs ? bet.legs : [{
+                gameId: bet.gameId,
+                pick: bet.pick,
+                betType: bet.betType,
+            }];
+            
+            for (const leg of legsToCheck) {
+                if (!leg.gameId) continue;
+                
+                if (completedGamesMap.has(leg.gameId)) {
+                    matchedCount++;
+                } else {
+                    unmatchedCount++;
+                    if (unmatchedExamples.length < 10) {
+                        unmatchedExamples.push(`  GameID: ${leg.gameId} | Pick: ${leg.pick}`);
+                    }
+                }
+            }
+        }
+        
+        log += `Matched game IDs: ${matchedCount}\n`;
+        log += `Unmatched game IDs: ${unmatchedCount}\n\n`;
+        
+        if (unmatchedExamples.length > 0) {
+            log += `Examples of unmatched game IDs:\n`;
+            unmatchedExamples.forEach(ex => log += `${ex}\n`);
+            log += `\n`;
+        }
 
-        log += `Found pending bet to debug.\n`;
-        log += `User ID: ${userId}\n`;
-        log += `Bet ID: ${betId}\n`;
-        log += `Bet Details:\n${JSON.stringify(bet, null, 2)}\n\n`;
+        // 4. Detailed analysis of first unmatched bet
+        log += `--- STEP 4: Detailed analysis of first pending bet ---\n`;
+        const firstBet = allPendingBets[0];
+        log += `User ID: ${firstBet.userId}\n`;
+        log += `Bet ID: ${firstBet.betId}\n`;
+        log += `Bet Type: ${firstBet.bet.betType}\n`;
+        log += `Status: ${firstBet.bet.status}\n`;
+        log += `Placed At: ${firstBet.bet.placedAt}\n`;
+        log += `\nBet Details:\n${JSON.stringify(firstBet.bet, null, 2)}\n\n`;
 
-        // 2. Simulate grading for this bet
-        const legsToProcess: Partial<ParlayLeg>[] = bet.legs ? bet.legs : [{
-            gameId: bet.gameId,
-            pick: bet.pick,
-            betType: bet.betType,
-            status: bet.status,
-            sport: bet.sport,
-            matchup: bet.matchup,
+        const legsToProcess: Partial<ParlayLeg>[] = firstBet.bet.legs ? firstBet.bet.legs : [{
+            gameId: firstBet.bet.gameId,
+            pick: firstBet.bet.pick,
+            betType: firstBet.bet.betType,
+            status: firstBet.bet.status,
+            matchup: firstBet.bet.matchup,
         }];
 
-        let finalVerdict = 'Undetermined';
-        let isBetFinalized = true;
-        const legVerdicts: string[] = [];
-
-        for (const leg of legsToProcess) {
-             if (!leg.gameId || !leg.pick || !leg.betType) {
-                log += `--- Invalid leg found in bet. Skipping. ---\n\n`;
-                continue;
-            }
-            if (leg.status !== 'pending') {
-                log += `--- Leg for "${leg.pick}" is already settled with status: ${leg.status}. Skipping. ---\n\n`;
-                continue;
-            }
-
-            log += `--- Processing Leg: "${leg.pick}" on Game ID: ${leg.gameId} ---\n`;
+        for (const [index, leg] of legsToProcess.entries()) {
+            log += `\n--- Analyzing Leg ${index + 1} ---\n`;
+            log += `Pick: ${leg.pick}\n`;
+            log += `Game ID: ${leg.gameId}\n`;
+            log += `Bet Type: ${leg.betType}\n`;
             
-            const gameRef = db.collection('completed_games').doc(leg.gameId);
-            const gameDoc = await gameRef.get();
-
-            if (!gameDoc.exists) {
-                log += `Game check: [NOT FOUND]\n`;
-                log += `  - No document found in 'completed_games' with ID: ${leg.gameId}\n\n`;
-                isBetFinalized = false;
-                legVerdicts.push('pending');
+            if (!leg.gameId) {
+                log += `ERROR: No game ID in leg!\n`;
                 continue;
             }
-
-            log += `Game check: [FOUND]\n`;
-            const game = gameDoc.data() as CompletedGame;
-            log += `Completed game data:\n${JSON.stringify(game, null, 2)}\n\n`;
-
-            const isGameCompleted = game.completed === true;
-            log += `Is game completed? [${isGameCompleted ? 'YES' : 'NO'}] (Value: ${game.completed})\n`;
-
-            if (!isGameCompleted) {
-                log += `  - Game is not final. Grading cannot proceed for this leg.\n\n`;
-                isBetFinalized = false;
-                legVerdicts.push('pending');
-                continue;
-            }
-
-            let legResult: 'won' | 'lost' | 'push' = 'push';
             
-            switch(leg.betType) {
-                case 'moneyline': {
-                    log += `Grading as Moneyline...\n`;
-                    const winner = game.homeScore > game.awayScore ? game.homeTeam : game.awayScore > game.homeScore ? game.awayTeam : null;
-                    if (!winner) {
-                        legResult = 'push';
-                        log += `  - Outcome: Game was a tie. Result is a PUSH.\n`;
-                    } else {
-                        const isWinner = normalizeName(winner) === normalizeName(leg.pick);
-                        legResult = isWinner ? 'won' : 'lost';
-                        log += `  - Winner was ${winner}. Bet was on ${leg.pick}.\n`;
-                        log += `  - Match? ${isWinner ? 'YES' : 'NO'}. Result is ${legResult.toUpperCase()}.\n`;
-                    }
-                    break;
-                }
-                case 'spread': {
-                    log += `Grading as Spread...\n`;
-                    const lastSpaceIndex = leg.pick.lastIndexOf(' ');
-                    if (lastSpaceIndex === -1) { log += '  - ERROR: Invalid spread format.\n'; break; }
-                    const teamName = leg.pick.substring(0, lastSpaceIndex).trim();
-                    const line = parseFloat(leg.pick.substring(lastSpaceIndex + 1));
-                    if (isNaN(line)) { log += '  - ERROR: Could not parse spread line.\n'; break; }
-
-                    const isHomePick = normalizeName(game.homeTeam) === normalizeName(teamName);
-                    const margin = isHomePick ? (game.homeScore - game.awayScore) : (game.awayScore - game.homeScore);
-                    const finalMargin = margin + line;
+            const game = completedGamesMap.get(leg.gameId);
+            
+            if (!game) {
+                log += `❌ GAME NOT FOUND in completed_games collection\n`;
+                log += `This is why the bet cannot be graded!\n`;
+                
+                // Try to find similar IDs
+                const similarIds = Array.from(completedGamesMap.keys())
+                    .filter(id => id.includes(leg.gameId!.substring(0, 10)) || leg.gameId!.includes(id.substring(0, 10)))
+                    .slice(0, 3);
                     
-                    log += `  - Pick: ${teamName} ${line > 0 ? '+' : ''}${line}\n`;
-                    log += `  - Actual Score: ${game.awayTeam} ${game.awayScore} @ ${game.homeTeam} ${game.homeScore}\n`;
-                    log += `  - Effective margin for bet: ${margin}. With spread: ${finalMargin}.\n`;
-                    
-                    if (finalMargin > 0) legResult = 'won';
-                    else if (finalMargin < 0) legResult = 'lost';
-                    else legResult = 'push';
-                    log += `  - Result is ${legResult.toUpperCase()}.\n`;
-                    break;
+                if (similarIds.length > 0) {
+                    log += `\nPossible similar game IDs found:\n`;
+                    similarIds.forEach(id => {
+                        const g = completedGamesMap.get(id)!;
+                        log += `  ${id}: ${g.awayTeam} @ ${g.homeTeam}\n`;
+                    });
                 }
-                case 'total': {
-                    log += `Grading as Total...\n`;
-                    const line = extractNumber(leg.pick);
-                    if (line === null) { log += '  - ERROR: Could not parse total line.\n'; break; }
-                    
-                    const correctedTotalScore = game.homeScore + game.awayScore;
-                    log += `  - Line: ${line}. Actual Total: ${correctedTotalScore}\n`;
-
-                    if (correctedTotalScore === line) legResult = 'push';
-                    else if (leg.pick.toLowerCase().includes('over')) legResult = correctedTotalScore > line ? 'won' : 'lost';
-                    else legResult = correctedTotalScore < line ? 'won' : 'lost';
-                    log += `  - Result is ${legResult.toUpperCase()}.\n`;
-                    break;
-                }
-                default:
-                    log += `  - Bet type '${leg.betType}' not supported by this debug tool.\n`;
-                    isBetFinalized = false;
+                continue;
             }
-            legVerdicts.push(legResult);
-            log += '\n';
-        }
-
-        if(isBetFinalized) {
-            if (bet.betType === 'parlay') {
-                if (legVerdicts.includes('lost')) finalVerdict = 'LOST';
-                else if (legVerdicts.every(v => v === 'push')) finalVerdict = 'PUSH';
-                else finalVerdict = 'WON';
+            
+            log += `✓ GAME FOUND in completed_games\n`;
+            log += `Matchup: ${game.awayTeam} @ ${game.homeTeam}\n`;
+            log += `Score: ${game.awayScore} - ${game.homeScore}\n`;
+            log += `Completed: ${game.completed}\n`;
+            log += `Commence Time: ${game.commenceTime}\n`;
+            
+            if (!game.completed) {
+                log += `⚠️  Game has scores but completed flag is FALSE\n`;
+                log += `This game needs completed=true to be graded\n`;
             } else {
-                finalVerdict = legVerdicts[0].toUpperCase();
+                log += `✓ Game is marked as completed and can be graded\n`;
             }
-             log += `--- Final Verdict ---\n`;
-             log += `The bet would be graded as: ${finalVerdict}\n`;
-        } else {
-             log += `--- Final Verdict ---\n`;
-             log += `Bet cannot be finalized yet as one or more legs are still pending or could not be graded.\n`;
         }
 
-        return NextResponse.json({ log, betDetails: bet, finalVerdict });
+        log += `\n\n=== SUMMARY ===\n`;
+        log += `Total pending bets: ${allPendingBets.length}\n`;
+        log += `Games in completed_games: ${completedGamesSnapshot.size}\n`;
+        log += `Matched game IDs: ${matchedCount}\n`;
+        log += `Unmatched game IDs: ${unmatchedCount}\n`;
+        
+        if (unmatchedCount > 0) {
+            log += `\n⚠️  ISSUE DETECTED: ${unmatchedCount} bets have game IDs not found in completed_games\n`;
+            log += `ACTION REQUIRED: Run the game sync to fetch latest scores\n`;
+        }
+
+        return NextResponse.json({ 
+            log, 
+            summary: {
+                pendingBets: allPendingBets.length,
+                completedGames: completedGamesSnapshot.size,
+                matched: matchedCount,
+                unmatched: unmatchedCount
+            }
+        });
 
     } catch (error: any) {
-        console.error("[DEBUG GAME LINE GRADING] An error occurred:", error);
-        log += `\n\n---!! UNEXPECTED ERROR !!---\n${error.message}\n${error.stack}`;
-        return NextResponse.json({ log }, { status: 500 });
+        console.error("[DEBUG] Error:", error);
+        log += `\n\n=== ERROR ===\n${error.message}\n${error.stack}`;
+        return NextResponse.json({ log, error: error.message }, { status: 500 });
     }
 }
