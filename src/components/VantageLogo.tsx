@@ -30,8 +30,8 @@ const VantageLogo = () => (
       {/* Baseball - bottom left */}
       <g className="ball-2">
         <circle className="ball-path" cx="45" cy="105" r="20" stroke="white" strokeWidth="1.5" fill="none" />
-        <path className="ball-path" d="M30.4,92.5 A 25 25 0 0 1 59.6,117.5" stroke="white" strokeWidth="1.2" fill="none" />
-        <path className="ball-path" d="M59.6,92.5 A 25 25 0 0 0 30.4,117.5" stroke="white" strokeWidth="1.2" fill="none" />
+        <path className="ball-path" d="M59.9,95.1 C 55,100, 50,110, 40.1,114.9" stroke="white" strokeWidth="1.2" fill="none" />
+        <path className="ball-path" d="M30.1,95.1 C 35,100, 40,110, 49.9,114.9" stroke="white" strokeWidth="1.2" fill="none" />
       </g>
       {/* Football - bottom right */}
       <g className="ball-3">
