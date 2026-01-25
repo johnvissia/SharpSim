@@ -74,8 +74,9 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
   const canBet = game.statusState === 'pre';
 
   const isPickInSlip = (betType: BetSlipPick['betType'], pick: string) => {
+    const marketId = `${game.id}-${betType}`;
     // This logic must exactly match the ID generation in BetSlipContext
-    const pickId = `${game.id}-${betType}-${pick.replace(/\s/g, '')}`;
+    const pickId = `${marketId}-${pick.replace(/\s/g, '')}`;
     return picks.some(p => p.id === pickId);
   };
 
@@ -104,7 +105,13 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
     betType: 'moneyline' | 'spread' | 'total'
   ) => {
     e.stopPropagation();
-    addPick({ pick, odds, betType, game });
+    addPick({ 
+      pick, 
+      odds, 
+      betType, 
+      game, 
+      marketId: `${game.id}-${betType}` 
+    });
   };
   
   const { odds, liveScore } = game;
