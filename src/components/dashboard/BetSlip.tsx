@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -183,8 +182,11 @@ export function BetSlip() {
 
       if (picks.length === 1) {
         const pick = picks[0];
+        // Use oddsApiId for grading, fallback to regular id if not available
+        const gameIdForGrading = pick.game.oddsApiId || pick.game.id;
+        
         const baseBet = {
-          gameId: pick.game.id,
+          gameId: gameIdForGrading,
           userId: user.uid,
           sport: pick.game.sport,
           betType: pick.betType,
@@ -211,8 +213,11 @@ export function BetSlip() {
 
       } else { // Parlay
         const parlayLegs: ParlayLeg[] = picks.map(p => {
+          // Use oddsApiId for grading, fallback to regular id if not available
+          const gameIdForGrading = p.game.oddsApiId || p.game.id;
+          
           const leg: Partial<ParlayLeg> = {
-            gameId: p.game.id,
+            gameId: gameIdForGrading,
             matchup: p.game.homeTeam && p.game.awayTeam ? `${p.game.awayTeam.name} @ ${p.game.homeTeam.name}` : p.pick,
             commenceTime: p.game.startTime,
             pick: p.pick,
@@ -232,7 +237,7 @@ export function BetSlip() {
         });
 
         newBet = {
-          gameId: picks.map(p => p.game.id).join(','),
+          gameId: picks.map(p => p.game.oddsApiId || p.game.id).join(','),
           userId: user.uid,
           sport: picks[0].game.sport!,
           betType: 'parlay',

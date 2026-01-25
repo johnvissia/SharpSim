@@ -34,7 +34,6 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   
   const navItems = [
     { href: '/', id: 'dashboard', label: '🔥 Dashboard' },
-    { href: '/prop-hub', id: 'props', label: '🏀 Prop Hub' },
     { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
     { href: '/stats', id: 'stats', label: '📊 Stats' },
     { href: '/data', id: 'data', label: '📈 Data' },
@@ -46,7 +45,6 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const getActiveTabId = () => {
     if (pathname === '/') return 'dashboard';
     if (pathname.startsWith('/my-picks')) return 'picks';
-    if (pathname.startsWith('/prop-hub')) return 'props';
     if (pathname.startsWith('/stats')) return 'stats';
     if (pathname.startsWith('/data')) return 'data';
     if (pathname.startsWith('/store')) return 'store';
