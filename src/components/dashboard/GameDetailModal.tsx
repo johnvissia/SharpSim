@@ -136,7 +136,7 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
       pick: `${prop.playerName} ${prop.market.toUpperCase()} - ${pickString}`,
       odds: pickOdds,
       betType: 'player_prop',
-      marketId: `${game.id}_${prop.playerId}_${prop.market}_${side}`,
+      marketId: `${game.id}_${prop.playerId}_${prop.market}_${prop.line}`,
       playerId: prop.playerId,
       market: prop.market,
       line: prop.line,
@@ -144,8 +144,12 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
   };
 
   const isInSlip = (prop: PlayerProp, side: 'over' | 'under') => {
-    const marketId = `${game.id}_${prop.playerId}_${prop.market}_${side}`;
-    return picks.some(p => p.marketId === marketId);
+    const marketId = `${game.id}_${prop.playerId}_${prop.market}_${prop.line}`;
+    const pickInSlip = picks.find(p => p.marketId === marketId);
+    if (!pickInSlip) {
+        return false;
+    }
+    return pickInSlip.pick.toLowerCase().includes(side);
   };
 
   // Group props by market type

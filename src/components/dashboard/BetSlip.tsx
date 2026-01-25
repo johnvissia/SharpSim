@@ -282,7 +282,7 @@ export function BetSlip() {
     <Card
       ref={slipRef}
       className={cn(
-        "fixed w-80 z-50",
+        "fixed w-80 z-[90]",
         isDragging ? 'shadow-2xl cursor-grabbing' : 'shadow-lg'
       )}
       style={{
