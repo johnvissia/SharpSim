@@ -3,6 +3,24 @@
 import { doc, Firestore, writeBatch, collection, getDocs, query, where } from 'firebase/firestore';
 import type { DailyGame, CompletedGame } from '@/lib/types';
 
+interface CompletedPlayerStats {
+  id: string;
+  gameId: string;
+  playerId: string;
+  playerName: string;
+  gameDate: string;
+  stats: {
+    points: number;
+    rebounds: number;
+    assists: number;
+    steals: number;
+    blocks: number;
+    turnovers: number;
+    threePointersMade: number;
+  };
+  completed: boolean;
+}
+
 // Helper function to introduce a delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -182,4 +200,161 @@ export async function syncGameLinesAndScores(firestore: Firestore) {
   }
   
   console.log("\n✓ Game sync complete!");
+}
+
+/**
+ * Fetches NBA player stats from ESPN API and saves them to Firestore.
+ * This enables grading of player prop bets.
+ */
+export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number = 3) {
+  console.log(`[PLAYER STATS] Starting NBA player stats sync for last ${daysBack} days...`);
+  
+  const allPlayerStats: CompletedPlayerStats[] = [];
+  
+  try {
+    const dates: string[] = [];
+    for (let i = 0; i <= daysBack; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      dates.push(date.toISOString().split('T')[0].replace(/-/g, ''));
+    }
+    
+    console.log(`[PLAYER STATS] Fetching stats for dates:`, dates);
+    
+    for (const dateStr of dates) {
+      try {
+        console.log(`[PLAYER STATS] Fetching games for ${dateStr}...`);
+        
+        const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`;
+        const scoreboardRes = await fetch(scoreboardUrl);
+        
+        if (!scoreboardRes.ok) {
+          console.error(`[PLAYER STATS] Failed to fetch scoreboard for ${dateStr}`);
+          await delay(500);
+          continue;
+        }
+        
+        const scoreboardData = await scoreboardRes.json();
+        const games = scoreboardData.events || [];
+        
+        console.log(`[PLAYER STATS] Found ${games.length} games on ${dateStr}`);
+        
+        for (const game of games) {
+          if (game.status?.type?.state !== 'post') {
+            continue;
+          }
+          
+          const gameId = game.id;
+          const gameDate = game.date;
+          
+          try {
+            console.log(`[PLAYER STATS] Fetching box score for game ${gameId}...`);
+            
+            const boxScoreUrl = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gameId}`;
+            const boxScoreRes = await fetch(boxScoreUrl);
+            
+            if (!boxScoreRes.ok) {
+              console.error(`[PLAYER STATS] Failed to fetch box score for game ${gameId}`);
+              await delay(500);
+              continue;
+            }
+            
+            const boxScoreData = await boxScoreRes.json();
+            const teams = boxScoreData.boxscore?.players || [];
+            
+            for (const team of teams) {
+              const players = team.statistics?.[0]?.athletes || [];
+              
+              for (const player of players) {
+                const stats = player.stats || [];
+                
+                const points = parseFloat(stats[13]) || 0;
+                const rebounds = parseFloat(stats[6]) || 0;
+                const assists = parseFloat(stats[7]) || 0;
+                const steals = parseFloat(stats[8]) || 0;
+                const blocks = parseFloat(stats[9]) || 0;
+                const turnovers = parseFloat(stats[10]) || 0;
+                const threePointersMade = stats[2] ? parseFloat(stats[2].split('-')[0]) : 0;
+                
+                const playerName = player.athlete?.displayName || 'Unknown';
+                const playerId = player.athlete?.id || player.athlete?.displayName?.replace(/\s+/g, '_');
+                
+                if (!playerId) continue;
+                
+                const completedStat: CompletedPlayerStats = {
+                  id: `${gameId}_${playerId}`,
+                  gameId: gameId,
+                  playerId: playerId,
+                  playerName: playerName,
+                  gameDate: gameDate,
+                  stats: {
+                    points,
+                    rebounds,
+                    assists,
+                    steals,
+                    blocks,
+                    turnovers,
+                    threePointersMade,
+                  },
+                  completed: true,
+                };
+                
+                allPlayerStats.push(completedStat);
+                console.log(`[PLAYER STATS] ✓ ${playerName}: ${points} PTS, ${rebounds} REB, ${assists} AST`);
+              }
+            }
+            
+            await delay(500);
+            
+          } catch (err) {
+            console.error(`[PLAYER STATS] Error processing game ${gameId}:`, err);
+            await delay(500);
+          }
+        }
+        
+        await delay(1000);
+        
+      } catch (err) {
+        console.error(`[PLAYER STATS] Error fetching date ${dateStr}:`, err);
+        await delay(1000);
+      }
+    }
+    
+    console.log(`[PLAYER STATS] Total player stats collected: ${allPlayerStats.length}`);
+    
+    if (allPlayerStats.length > 0) {
+      const batch = writeBatch(firestore);
+      const playerStatsRef = collection(firestore, 'completed_player_stats');
+      
+      let batchCount = 0;
+      const maxBatchSize = 500;
+      
+      for (const stat of allPlayerStats) {
+        const statRef = doc(playerStatsRef, stat.id);
+        batch.set(statRef, stat, { merge: true });
+        batchCount++;
+        
+        if (batchCount >= maxBatchSize) {
+          await batch.commit();
+          console.log(`[PLAYER STATS] Committed batch of ${batchCount} stats`);
+          batchCount = 0;
+        }
+      }
+      
+      if (batchCount > 0) {
+        await batch.commit();
+        console.log(`[PLAYER STATS] Committed final batch of ${batchCount} stats`);
+      }
+      
+      console.log(`[PLAYER STATS] ✓ ${allPlayerStats.length} player stats saved to Firestore`);
+    } else {
+      console.log(`[PLAYER STATS] No player stats to save`);
+    }
+    
+  } catch (error) {
+    console.error('[PLAYER STATS] Unexpected error:', error);
+    throw error;
+  }
+  
+  console.log('[PLAYER STATS] ✓ NBA player stats sync complete!');
 }

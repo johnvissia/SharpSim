@@ -2,19 +2,31 @@
 
 import type { CompletedGame, UserBet, ParlayLeg } from './types';
 
+interface CompletedPlayerStats {
+  id: string;
+  gameId: string;
+  playerId: string;
+  playerName: string;
+  gameDate: string;
+  stats: {
+    points: number;
+    rebounds: number;
+    assists: number;
+    steals: number;
+    blocks: number;
+    turnovers: number;
+    threePointersMade: number;
+  };
+  completed: boolean;
+}
+
 /**
- * Normalizes a team name by handling diacritics and removing special characters.
- * This helps in matching team names from different API sources (e.g., "Montréal" vs "Montreal").
+ * Normalizes a team name by converting to lowercase and removing spaces, periods, and parentheses.
+ * This helps in matching team names from different API sources.
  */
 const normalizeName = (name: string): string => {
-    if (!name) return '';
-    return name
-        .normalize("NFD") // Decompose characters (e.g., 'é' -> 'e' + '´')
-        .replace(/[\u0300-\u036f]/g, "") // Remove diacritical marks
-        .toLowerCase()
-        .replace(/[\s.&()']/g, ''); // Remove spaces, periods, etc.
+    return name.toLowerCase().replace(/[\s.&()']/g, '');
 };
-
 
 /**
  * Extracts a number (integer or float, positive or negative) from a string.
@@ -58,15 +70,17 @@ const isGameGradeable = (game: CompletedGame): boolean => {
 };
 
 /**
- * Grades all pending bets for a given user against a set of completed games.
+ * Grades all pending bets for a given user against completed games and player stats.
  * This is a pure function that returns a list of required updates.
  * @param pendingBets The user's bets that have a 'pending' status.
  * @param completedGamesMap A Map of completed game data, with game ID as the key.
+ * @param completedPlayerStatsMap A Map of completed player stats, with "{gameId}_{playerId}" as the key.
  * @returns An object with an array of bet updates and the total payout to be applied.
  */
 export function gradeUserBets(
   pendingBets: UserBet[],
-  completedGamesMap: Map<string, CompletedGame>
+  completedGamesMap: Map<string, CompletedGame>,
+  completedPlayerStatsMap?: Map<string, CompletedPlayerStats>
 ): { updates: { betId: string, payload: Partial<UserBet> }[]; totalPayout: number } {
   
   if (!pendingBets || pendingBets.length === 0 || completedGamesMap.size === 0) {
@@ -210,6 +224,82 @@ export function gradeUserBets(
                     legResult = totalScore < line ? 'won' : 'lost';
                 }
                 console.log(`[GRADING] Total result: ${legResult.toUpperCase()} (total: ${totalScore}, line: ${line}, pick: ${leg.pick})`);
+                break;
+            }
+
+            case 'player_prop': {
+                // Player props require individual player stats
+                if (!completedPlayerStatsMap) {
+                    console.log(`[GRADING] Player prop bet detected but no stats provided - skipping`);
+                    isBetFinalized = false;
+                    return leg;
+                }
+                
+                if (!leg.playerId || !leg.market || leg.line === undefined) {
+                    console.error(`[GRADING] Player prop missing required fields:`, leg);
+                    isBetFinalized = false;
+                    return leg;
+                }
+                
+                // Look up player stats using gameId_playerId format
+                const statsKey = `${leg.gameId}_${leg.playerId}`;
+                const playerStats = completedPlayerStatsMap.get(statsKey);
+                
+                if (!playerStats) {
+                    console.log(`[GRADING] Player stats not found for ${statsKey}. Leg stays pending.`);
+                    isBetFinalized = false;
+                    return leg;
+                }
+                
+                if (!playerStats.completed) {
+                    console.log(`[GRADING] Player stats exist but game not completed for ${statsKey}`);
+                    isBetFinalized = false;
+                    return leg;
+                }
+                
+                // Get the actual stat value based on market
+                let actualValue: number;
+                switch (leg.market.toLowerCase()) {
+                    case 'points':
+                        actualValue = playerStats.stats.points;
+                        break;
+                    case 'rebounds':
+                        actualValue = playerStats.stats.rebounds;
+                        break;
+                    case 'assists':
+                        actualValue = playerStats.stats.assists;
+                        break;
+                    case 'steals':
+                        actualValue = playerStats.stats.steals;
+                        break;
+                    case 'blocks':
+                        actualValue = playerStats.stats.blocks;
+                        break;
+                    case 'turnovers':
+                        actualValue = playerStats.stats.turnovers;
+                        break;
+                    case 'threes':
+                    case 'three_pointers_made':
+                        actualValue = playerStats.stats.threePointersMade;
+                        break;
+                    default:
+                        console.error(`[GRADING] Unknown player prop market: ${leg.market}`);
+                        isBetFinalized = false;
+                        return leg;
+                }
+                
+                // Determine if it's an over or under bet
+                const isOver = leg.pick.toLowerCase().includes('over');
+                
+                if (actualValue === leg.line) {
+                    legResult = 'push';
+                } else if (isOver) {
+                    legResult = actualValue > leg.line ? 'won' : 'lost';
+                } else {
+                    legResult = actualValue < leg.line ? 'won' : 'lost';
+                }
+                
+                console.log(`[GRADING] Player prop result: ${legResult.toUpperCase()} (${playerStats.playerName} ${leg.market}: ${actualValue} vs line ${leg.line})`);
                 break;
             }
 

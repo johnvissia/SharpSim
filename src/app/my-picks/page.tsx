@@ -76,6 +76,14 @@ export default function MyPicksPage() {
         const completedGames = completedGamesSnapshot.docs.map(doc => doc.data() as CompletedGame);
         const completedGamesMap = new Map(completedGames.map(g => [g.id, g]));
 
+        // Fetch completed player stats
+        const completedPlayerStatsRef = collection(firestore, 'completed_player_stats');
+        const completedPlayerStatsSnapshot = await getDocs(completedPlayerStatsRef);
+        const completedPlayerStats = completedPlayerStatsSnapshot.docs.map(doc => doc.data() as any);
+        const completedPlayerStatsMap = new Map(completedPlayerStats.map((s: any) => [s.id, s]));
+
+        console.log(`[GRADING] Loaded ${completedGamesMap.size} completed games and ${completedPlayerStatsMap.size} player stats`);
+
         if (completedGamesMap.size === 0) {
              toast({
                 title: 'No Game Results',
@@ -86,7 +94,7 @@ export default function MyPicksPage() {
             return;
         }
 
-        const { updates, totalPayout } = gradeUserBets(pendingBets, completedGamesMap);
+        const { updates, totalPayout } = gradeUserBets(pendingBets, completedGamesMap, completedPlayerStatsMap);
 
         if (updates.length === 0) {
             toast({

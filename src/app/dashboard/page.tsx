@@ -5,7 +5,7 @@ import { GameCard } from '@/components/dashboard/game-card';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
-import { syncGameLinesAndScores } from '@/lib/api';
+import { syncGameLinesAndScores, syncNBAPlayerStats } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
 import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -173,9 +173,10 @@ export default function DashboardPage() {
     setIsSyncingLines(true);
     try {
       await syncGameLinesAndScores(firestore);
+      await syncNBAPlayerStats(firestore, 3);
       toast({
         title: 'Sync Complete',
-        description: 'Game lines and scores have been updated.',
+        description: 'Game lines, scores, and player stats have been updated.',
       });
     } catch (error: any) {
       console.error('Failed to sync game lines:', error);
