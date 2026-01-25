@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { signInAnonymously } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
-import { Coins, Pencil, Save } from 'lucide-react';
+import { Coins, Pencil, Save, LogIn, LogOut } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,16 +25,11 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   );
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  useEffect(() => {
-    if (auth && !user && !isUserLoading) {
-      signInAnonymously(auth);
-    }
-  }, [auth, user, isUserLoading]);
-  
   const [isEditing, setIsEditing] = useState(false);
 
   const initialNavItems = [
-    { href: '/', id: 'dashboard', label: '🔥 Dashboard' },
+    { href: '/', id: 'home', label: '🏠 Home' },
+    { href: '/dashboard', id: 'dashboard', label: '🔥 Dashboard' },
     { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
     { href: '/stats', id: 'stats', label: '📊 Stats' },
     { href: '/data', id: 'data', label: '📈 Data' },
@@ -95,7 +90,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   };
   
   const getActiveTabId = () => {
-    if (pathname === '/') return 'dashboard';
+    if (pathname === '/') return 'home';
     const activeSegment = pathname.split('/')[1];
     if (activeSegment) {
         const activeItem = initialNavItems.find(item => item.href === `/${activeSegment}`);
@@ -161,7 +156,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
 
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 flex items-center gap-2">
                     {isUserLoading || isProfileLoading ? (
                         <div className="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-full">
                             <Skeleton className="h-5 w-5 rounded-full" />
@@ -173,6 +168,22 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
                             <span>{userProfile.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                         </div>
                     ) : null}
+                    
+                    {isUserLoading ? (
+                        <Skeleton className="h-9 w-20" />
+                    ) : user ? (
+                        <Button variant="ghost" size="sm" onClick={() => signOut(auth)}>
+                            <LogOut className="h-4 w-4 mr-2" />
+                            Logout
+                        </Button>
+                    ) : (
+                        <Button asChild size="sm">
+                            <Link href="/login">
+                                <LogIn className="h-4 w-4 mr-2" />
+                                Login
+                            </Link>
+                        </Button>
+                    )}
                 </div>
             </div>
         </div>

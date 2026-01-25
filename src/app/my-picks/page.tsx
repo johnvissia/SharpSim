@@ -6,13 +6,14 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { UserBet, CompletedGame } from '@/lib/types';
-import { Ticket, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Ticket, ChevronLeft, ChevronRight, RefreshCw, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, isSameDay, addDays, subDays } from 'date-fns';
 import { BetTicket } from '@/components/bets/bet-ticket';
 import { useToast } from '@/hooks/use-toast';
 import { gradeUserBets } from '@/lib/bet-grading';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 
 export default function MyPicksPage() {
@@ -21,6 +22,7 @@ export default function MyPicksPage() {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [isSyncing, setIsSyncing] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   const [isGradingDebugging, setIsGradingDebugging] = useState(false);
   const [gradingDebugResponse, setGradingDebugResponse] = useState<string | null>(null);
@@ -29,6 +31,12 @@ export default function MyPicksPage() {
     // Set the date only on the client-side to prevent hydration mismatch
     setSelectedDate(new Date());
   }, []);
+  
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+        router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
 
   const betsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -165,6 +173,20 @@ export default function MyPicksPage() {
   }, [filteredBets]);
 
 
+  if (isUserLoading || !user) {
+    return (
+        <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
+            <Loader className="h-12 w-12 animate-spin text-primary" />
+            <h2 className="text-xl font-semibold text-foreground">
+                Loading...
+            </h2>
+            <p className="text-muted-foreground">
+                Authenticating and fetching your picks.
+            </p>
+        </div>
+    );
+  }
+  
   if (loading || !selectedDate) {
     return (
       <div className="p-4 md:p-8">
@@ -270,4 +292,3 @@ export default function MyPicksPage() {
     </div>
   );
 }
-    
