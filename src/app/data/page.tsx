@@ -46,6 +46,8 @@ export default function DataPage() {
   const [scraperData, setScraperData] = useState<any>(null);
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncAllResults, setSyncAllResults] = useState<any>(null);
+  const [calculatingRatings, setCalculatingRatings] = useState(false);
+  const [ratingsResults, setRatingsResults] = useState<any>(null);
   const { toast } = useToast();
 
   const handleScrape = async () => {
@@ -90,6 +92,7 @@ export default function DataPage() {
     setSyncingAll(true);
     setScraperData(null);
     setSyncAllResults(null);
+    setRatingsResults(null);
 
     try {
       toast({
@@ -120,6 +123,42 @@ export default function DataPage() {
       });
     } finally {
       setSyncingAll(false);
+    }
+  };
+
+  const handleCalculateRatings = async () => {
+    setCalculatingRatings(true);
+    setRatingsResults(null);
+
+    try {
+      toast({
+        title: 'Calculating',
+        description: 'Running SRS algorithm and calculating power ratings...',
+      });
+
+      const response = await fetch('/api/calculate-power-ratings', {
+        method: 'POST',
+      });
+      
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to calculate ratings');
+      }
+
+      setRatingsResults(data);
+      toast({
+        title: 'Calculation Complete!',
+        description: `SRS converged after ${data.iterations} iterations`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Calculation Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setCalculatingRatings(false);
     }
   };
 
@@ -190,6 +229,87 @@ export default function DataPage() {
                       <p className="text-sm text-red-400">{syncAllResults.failedTeams.join(', ')}</p>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Power Ratings Calculator */}
+        <Card className="border-green-500/50">
+          <CardHeader>
+            <CardTitle>⚡ Calculate Power Ratings (SRS)</CardTitle>
+            <CardDescription>
+              Run Phase 1 & 2: Net Rating normalization and recursive SRS algorithm
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button 
+              onClick={handleCalculateRatings} 
+              disabled={calculatingRatings || syncingAll} 
+              size="lg"
+              className="w-full"
+              variant="default"
+            >
+              {calculatingRatings ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Calculating SRS...
+                </>
+              ) : (
+                <>
+                  ⚡ Calculate Power Ratings
+                </>
+              )}
+            </Button>
+
+            {/* Ratings Results */}
+            {ratingsResults && (
+              <div className="space-y-4">
+                <div className="bg-slate-900 rounded-lg p-6">
+                  <h3 className="text-lg font-bold mb-4">📊 SRS Calculation Results</h3>
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Teams Processed</p>
+                      <p className="text-2xl font-bold">{ratingsResults.message?.match(/\d+/)?.[0]}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Iterations</p>
+                      <p className="text-2xl font-bold text-blue-500">{ratingsResults.iterations}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Convergence</p>
+                      <p className="text-2xl font-bold text-green-500">{ratingsResults.convergence?.toFixed(4)}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Top Teams */}
+                    <div>
+                      <h4 className="font-bold text-green-500 mb-2">🏆 Top 5 Teams</h4>
+                      <div className="space-y-2">
+                        {ratingsResults.topTeams?.map((team: any, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center bg-green-900/20 p-2 rounded">
+                            <span className="text-sm">{idx + 1}. {team.team}</span>
+                            <span className="font-bold text-green-400">+{team.srsRating}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Bottom Teams */}
+                    <div>
+                      <h4 className="font-bold text-red-500 mb-2">📉 Bottom 5 Teams</h4>
+                      <div className="space-y-2">
+                        {ratingsResults.bottomTeams?.map((team: any, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center bg-red-900/20 p-2 rounded">
+                            <span className="text-sm">{team.team}</span>
+                            <span className="font-bold text-red-400">{team.srsRating}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

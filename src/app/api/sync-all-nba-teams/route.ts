@@ -1,9 +1,24 @@
 // src/app/api/sync-all-nba-teams/route.ts
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // 5 minutes max execution time
+export const maxDuration = 300;
+
+// Initialize Firebase Admin
+if (!getApps().length) {
+  initializeApp({
+    credential: cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+  });
+}
+
+const db = getFirestore();
 
 interface GameResult {
   gameNumber: number;
@@ -214,16 +229,76 @@ export async function POST() {
       await new Promise(resolve => setTimeout(resolve, 1500));
     }
 
-    console.log(`\n🎉 Sync complete: ${results.success.length} success, ${results.failed.length} failed`);
+    console.log(`\n🎉 Scrape complete: ${results.success.length} success, ${results.failed.length} failed`);
+
+    // Calculate Strength of Schedule (SOS) for each team
+    console.log('\n📊 Calculating Strength of Schedule...');
+    
+    // Create a map of team name to MOV for quick lookup
+    const teamMOVMap = new Map<string, number>();
+    results.success.forEach(team => {
+      teamMOVMap.set(team.teamName, team.summary.avgAdjustedMargin);
+    });
+
+    // Calculate SOS for each team
+    const teamsWithSOS = results.success.map(team => {
+      let totalOpponentMOV = 0;
+      let opponentCount = 0;
+
+      // Sum up the MOV of all opponents
+      team.games.forEach(game => {
+        const opponentMOV = teamMOVMap.get(game.opponent);
+        if (opponentMOV !== undefined) {
+          totalOpponentMOV += opponentMOV;
+          opponentCount++;
+        }
+      });
+
+      const sos = opponentCount > 0 ? totalOpponentMOV / opponentCount : 0;
+      
+      // Schedule-Adjusted MOV (Formula #5)
+      const scheduleAdjustedMOV = team.summary.avgAdjustedMargin - sos;
+
+      return {
+        ...team,
+        summary: {
+          ...team.summary,
+          sos,
+          scheduleAdjustedMOV,
+        },
+      };
+    });
+
+    console.log('✅ SOS calculation complete');
+
+    // Save all teams to Firestore
+    console.log('\n💾 Saving to Firestore...');
+    
+    const batch = db.batch();
+    
+    teamsWithSOS.forEach(team => {
+      const teamRef = db.collection('nba_team_stats').doc(team.abbreviation);
+      batch.set(teamRef, {
+        teamName: team.teamName,
+        abbreviation: team.abbreviation,
+        summary: team.summary,
+        games: team.games,
+        scrapedAt: team.scrapedAt,
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    await batch.commit();
+    console.log(`✅ Saved ${teamsWithSOS.length} teams to Firestore`);
 
     return NextResponse.json({
       success: true,
-      message: `Synced ${results.success.length} of ${teams.length} teams`,
-      teamsData: results.success,
+      message: `Synced ${results.success.length} of ${teams.length} teams and saved to Firestore`,
       failedTeams: results.failed,
       totalTeams: teams.length,
       successCount: results.success.length,
       failedCount: results.failed.length,
+      savedToFirestore: true,
     });
 
   } catch (error: any) {
