@@ -105,7 +105,7 @@ export function BetTicket({ bet }: { bet: UserBet }) {
       { 'bg-red-100/50 dark:bg-red-500/10': bet.status === 'lost' }
     )}>
       <CardContent className="!p-0">
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-3">
           {legs.map((leg, index) => {
             const getLegIconDetails = (status: ParlayLeg['status']) => {
               switch (status) {
@@ -122,23 +122,29 @@ export function BetTicket({ bet }: { bet: UserBet }) {
 
             const { Icon, color: iconColor } = getLegIconDetails(leg.status);
             const gameDate = new Date(leg.commenceTime);
-            const gameTime = gameDate.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+            const gameTime = gameDate.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
             return (
               <div key={index}>
-                <div className="flex justify-between items-center text-sm">
-                  <p className="font-bold truncate pr-2">{leg.matchup}</p>
-                  <p className="font-semibold">{leg.odds > 0 ? `+${leg.odds}` : leg.odds}</p>
-                </div>
-                <p className="text-xs text-muted-foreground">{gameTime}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Icon className={cn("h-5 w-5 flex-shrink-0", iconColor)} />
-                  <div>
-                    <p className="font-semibold">{leg.pick}</p>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider">{leg.betType}</p>
+                <div className="flex items-start gap-3">
+                  <Icon className={cn("h-5 w-5 flex-shrink-0 mt-1", iconColor)} />
+                  <div className="flex-grow min-w-0">
+                    <div className="flex justify-between items-center">
+                      <p className="text-lg font-bold truncate pr-2">{leg.pick}</p>
+                      <p className="font-mono tabular-nums text-base font-semibold">
+                        {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-x-2 flex-wrap text-xs text-muted-foreground">
+                        <span className="truncate">{leg.matchup}</span>
+                        <span className="text-muted-foreground/50">•</span>
+                        <span>{gameTime}</span>
+                        <span className="text-muted-foreground/50">•</span>
+                        <span className="uppercase tracking-wider">{leg.betType}</span>
+                    </div>
                   </div>
                 </div>
-                {index < legs.length - 1 && <Separator className="my-3" />}
+                {index < legs.length - 1 && <Separator className="my-2" />}
               </div>
             );
           })}
@@ -148,22 +154,22 @@ export function BetTicket({ bet }: { bet: UserBet }) {
           <div className="flex justify-between items-center font-bold text-base">
             <p>{ticketLabel}</p>
             <div className="flex items-center gap-4">
-              <p className="font-semibold">{ticketOdds > 0 ? `+${ticketOdds}`: ticketOdds}</p>
+              <p className="font-semibold font-mono tabular-nums">{ticketOdds > 0 ? `+${ticketOdds}`: ticketOdds}</p>
               <div className="flex items-center gap-2">
                 {isParlay && bet.status !== 'pending' && <LegProgressBadge legs={legs} />}
                 {getBetStatusBadge(bet.status)}
               </div>
             </div>
           </div>
-          <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-800">
+          <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-800">
             <div className="flex flex-col">
               <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">Risk</span>
-              <span className="text-lg font-bold text-white">${bet.stake.toFixed(2)}</span>
+              <span className="text-lg font-bold text-white font-mono tabular-nums">${bet.stake.toFixed(2)}</span>
             </div>
             
             <div className="text-right flex flex-col">
               <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">{toWinLabel}</span>
-              <span className="text-xl font-black text-emerald-400 drop-shadow-sm">
+              <span className="text-xl font-black text-emerald-400 drop-shadow-sm font-mono tabular-nums">
                 ${toWinAmount.toFixed(2)}
               </span>
             </div>

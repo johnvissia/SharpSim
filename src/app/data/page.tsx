@@ -289,9 +289,16 @@ export default function DataPage() {
                       <h4 className="font-bold text-green-500 mb-2">🏆 Top 5 Teams</h4>
                       <div className="space-y-2">
                         {ratingsResults.topTeams?.map((team: any, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center bg-green-900/20 p-2 rounded">
-                            <span className="text-sm">{idx + 1}. {team.team}</span>
-                            <span className="font-bold text-green-400">+{team.srsRating}</span>
+                          <div key={idx} className="bg-green-900/20 p-3 rounded">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm font-semibold">{idx + 1}. {team.team}</span>
+                              <span className="font-bold text-green-400 text-lg">TPR: {team.tpr}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground flex gap-3">
+                              <span>SRS: {team.srs}</span>
+                              <span>Recency: {team.recency}</span>
+                              <span>Blended: {team.blended}</span>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -302,9 +309,16 @@ export default function DataPage() {
                       <h4 className="font-bold text-red-500 mb-2">📉 Bottom 5 Teams</h4>
                       <div className="space-y-2">
                         {ratingsResults.bottomTeams?.map((team: any, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center bg-red-900/20 p-2 rounded">
-                            <span className="text-sm">{team.team}</span>
-                            <span className="font-bold text-red-400">{team.srsRating}</span>
+                          <div key={idx} className="bg-red-900/20 p-3 rounded">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm font-semibold">{team.team}</span>
+                              <span className="font-bold text-red-400 text-lg">TPR: {team.tpr}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground flex gap-3">
+                              <span>SRS: {team.srs}</span>
+                              <span>Recency: {team.recency}</span>
+                              <span>Blended: {team.blended}</span>
+                            </div>
                           </div>
                         ))}
                       </div>

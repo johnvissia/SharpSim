@@ -22,6 +22,11 @@ const db = getFirestore();
 const HCA_NET = 2.5; // Home Court Advantage in Net Rating points
 const SRS_CONVERGENCE_THRESHOLD = 0.01; // Iteration stops when changes < 0.01
 const MAX_ITERATIONS = 100; // Safety limit
+const WEIGHT_SEASON = 0.70; // Weight for SRS
+const WEIGHT_RECENCY = 0.30; // Weight for last 10 games
+const REPLACEMENT_BPM = -2.0; // Replacement player value
+const REST_PENALTY_AWAY = -2.5; // Back-to-back away
+const REST_PENALTY_HOME = -1.5; // Back-to-back home
 
 interface GameData {
   gameNumber: number;
@@ -57,6 +62,11 @@ interface TeamWithRating extends TeamStats {
   netRatings: number[]; // Array of adjusted net ratings for each game
   avgNetRating: number; // Average net rating
   srsRating: number; // Final SRS rating after recursion
+  recencyRating: number; // Weighted last 10 games
+  blendedRating: number; // 70% SRS + 30% Recency
+  injuryAdjustment: number; // Injury penalty
+  restAdjustment: number; // Rest penalty
+  finalTPR: number; // Final Team Power Rating
 }
 
 export async function POST() {
@@ -172,6 +182,73 @@ export async function POST() {
 
     console.log(`✅ SRS converged after ${iteration} iterations (max change: ${maxChange.toFixed(6)})`);
 
+    // PHASE 3: CONTEXTUAL ADJUSTMENTS
+    console.log('\n🎯 PHASE 3: Calculating Contextual Adjustments...');
+    
+    // Calculate Recency Rating for each team
+    teamsWithNetRatings.forEach(team => {
+      // Get last 10 games
+      const last10NetRatings = team.netRatings.slice(-10);
+      
+      // Weights: 1.0, 0.9, 0.8, ..., 0.1 (for most recent to least recent)
+      const weights = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1];
+      const sumWeights = 5.5; // Pre-calculated sum of weights
+      
+      let weightedSum = 0;
+      last10NetRatings.forEach((nr, idx) => {
+        const weight = weights[last10NetRatings.length - 1 - idx] || 0.1;
+        weightedSum += nr * weight;
+      });
+      
+      team.recencyRating = last10NetRatings.length > 0 
+        ? weightedSum / sumWeights 
+        : team.avgNetRating;
+      
+      // Blended Rating
+      team.blendedRating = (team.srsRating * WEIGHT_SEASON) + (team.recencyRating * WEIGHT_RECENCY);
+      
+      // Initialize injury and rest adjustments (will be set per game)
+      team.injuryAdjustment = 0;
+      team.restAdjustment = 0;
+      
+      // Final TPR (baseline - will be adjusted per game for injuries/rest)
+      team.finalTPR = team.blendedRating;
+    });
+
+    console.log('✅ Recency and Blended Ratings calculated');
+
+    // Fetch injury data from ESPN
+    console.log('\n🏥 Fetching injury data from ESPN...');
+    let injuryData: Map<string, any[]> = new Map();
+    
+    try {
+      // ESPN injury API endpoint
+      const injuryResponse = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams?enable=injuries');
+      
+      if (injuryResponse.ok) {
+        const data = await injuryResponse.json();
+        
+        // Parse injury data
+        data.sports?.[0]?.leagues?.[0]?.teams?.forEach((teamData: any) => {
+          const team = teamData.team;
+          const injuries = team.injuries || [];
+          
+          const outPlayers = injuries.filter((inj: any) => 
+            inj.status?.toUpperCase() === 'OUT' || 
+            inj.status?.toUpperCase() === 'DOUBTFUL'
+          );
+          
+          if (outPlayers.length > 0) {
+            injuryData.set(team.displayName, outPlayers);
+          }
+        });
+        
+        console.log(`✅ Fetched injuries for ${injuryData.size} teams`);
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not fetch injury data, continuing without it');
+    }
+
     // Save results to Firestore
     console.log('\n💾 Saving Power Ratings to Firestore...');
     
@@ -182,6 +259,9 @@ export async function POST() {
       batch.update(teamRef, {
         'powerRatings.avgNetRating': team.avgNetRating,
         'powerRatings.srsRating': team.srsRating,
+        'powerRatings.recencyRating': team.recencyRating,
+        'powerRatings.blendedRating': team.blendedRating,
+        'powerRatings.baselineTPR': team.finalTPR,
         'powerRatings.calculatedAt': new Date().toISOString(),
       });
     });
@@ -189,23 +269,28 @@ export async function POST() {
     await batch.commit();
     console.log('✅ Power Ratings saved to Firestore');
 
-    // Sort teams by SRS for display
-    const sortedTeams = [...teamsWithNetRatings].sort((a, b) => b.srsRating - a.srsRating);
+    // Sort teams by TPR for display
+    const sortedTeams = [...teamsWithNetRatings].sort((a, b) => b.finalTPR - a.finalTPR);
 
     return NextResponse.json({
       success: true,
-      message: `Calculated SRS ratings for ${teams.length} teams`,
+      message: `Calculated power ratings for ${teams.length} teams`,
       iterations: iteration,
       convergence: maxChange,
+      injuriesFound: injuryData.size,
       topTeams: sortedTeams.slice(0, 5).map(t => ({
         team: t.teamName,
-        srsRating: t.srsRating.toFixed(2),
-        avgNetRating: t.avgNetRating.toFixed(2),
+        tpr: t.finalTPR.toFixed(2),
+        srs: t.srsRating.toFixed(2),
+        recency: t.recencyRating.toFixed(2),
+        blended: t.blendedRating.toFixed(2),
       })),
       bottomTeams: sortedTeams.slice(-5).map(t => ({
         team: t.teamName,
-        srsRating: t.srsRating.toFixed(2),
-        avgNetRating: t.avgNetRating.toFixed(2),
+        tpr: t.finalTPR.toFixed(2),
+        srs: t.srsRating.toFixed(2),
+        recency: t.recencyRating.toFixed(2),
+        blended: t.blendedRating.toFixed(2),
       })),
     });
 
