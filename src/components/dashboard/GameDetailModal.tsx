@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import type { Game, UserProfile } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Heart, Loader2, User } from 'lucide-react';
+import { Heart, Loader2, User, Star, TrendingUp } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { sportIconMap } from '@/lib/team-logos';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '../ui/button';
 import { MainLinesView } from './MainLinesView';
+import { GameLeadersView } from './GameLeadersView';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
@@ -379,21 +380,25 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
             </DialogHeader>
 
             <div className="px-6 pb-6 overflow-y-auto">
-                {showPlayerProps ? (
-                  <Tabs defaultValue="lines" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 mb-4">
-                      <TabsTrigger value="lines">Game Lines</TabsTrigger>
-                      <TabsTrigger value="props">Player Props</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="lines">
-                      <MainLinesView game={game} />
-                    </TabsContent>
-                    <TabsContent value="props">
-                      <PlayerPropsView game={game} />
-                    </TabsContent>
-                  </Tabs>
+                {canBet ? (
+                    showPlayerProps ? (
+                    <Tabs defaultValue="lines" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 mb-4">
+                        <TabsTrigger value="lines">Game Lines</TabsTrigger>
+                        <TabsTrigger value="props">Player Props</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="lines">
+                        <MainLinesView game={game} />
+                        </TabsContent>
+                        <TabsContent value="props">
+                        <PlayerPropsView game={game} />
+                        </TabsContent>
+                    </Tabs>
+                    ) : (
+                    <MainLinesView game={game} />
+                    )
                 ) : (
-                  <MainLinesView game={game} />
+                    <GameLeadersView game={game} />
                 )}
             </div>
         </DialogContent>

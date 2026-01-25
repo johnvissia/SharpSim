@@ -10,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Ticket } from 'lucide-react';
+import { Ticket, Star, Users } from 'lucide-react';
 import { useBetSlip, type BetSlipPick } from '@/context/BetSlipContext';
 import { sportIconMap } from '@/lib/team-logos';
 import Image from 'next/image';
@@ -64,6 +64,24 @@ const TeamDisplay = ({ team, sport, score }: { team: Team, sport: SportName, sco
         </div>
     );
 };
+
+const LiveLeaders = ({ team }: { team: Team }) => (
+    <div className="space-y-2 text-xs text-muted-foreground">
+        <p className="font-bold text-xs text-foreground truncate">{team.name}</p>
+        {team.leadingScorer && (
+            <div className="flex items-center gap-1.5 truncate" title={`Points Leader: ${team.leadingScorer}`}>
+                <Star className="h-3 w-3 text-amber-400 flex-shrink-0" />
+                <span className="truncate">{team.leadingScorer}</span>
+            </div>
+        )}
+        {team.leadingAssister && (
+            <div className="flex items-center gap-1.5 truncate" title={`Assists Leader: ${team.leadingAssister}`}>
+                <Users className="h-3 w-3 text-sky-400 flex-shrink-0" />
+                <span className="truncate">{team.leadingAssister}</span>
+            </div>
+        )}
+    </div>
+);
 
 
 export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGameClick: (game: Game) => void, hasActiveBet: boolean }) {
@@ -152,8 +170,8 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
               </div>
           </div>
 
-          {/* Right Side: Odds */}
-          {canBet && odds && (
+          {/* Right Side: Odds or Leaders */}
+          {canBet && odds ? (
             <div className="flex-none grid grid-cols-3 gap-2 text-xs md:text-sm w-1/2 lg:w-2/5">
                 {/* Spread Column */}
                 <div className="flex flex-col gap-2">
@@ -216,7 +234,12 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                     </OddsButton>
                 </div>
             </div>
-            )}
+            ) : (isLive || isFinal) ? (
+            <div className="flex-none grid grid-cols-2 gap-4 text-xs w-1/2 lg:w-2/5">
+                <LiveLeaders team={game.awayTeam} />
+                <LiveLeaders team={game.homeTeam} />
+            </div>
+          ) : null}
         </div>
       </Card>
   );
