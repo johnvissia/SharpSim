@@ -96,3 +96,78 @@
     scrollbar-width: none; /* Firefox */
   }
 }
+
+/* Vantage Logo Animation */
+.ball-path {
+  stroke-dasharray: 150;
+  stroke-dashoffset: 150;
+  animation: draw-line 1.5s ease-in-out forwards;
+}
+
+.ball-2 .ball-path { animation-delay: 0.2s; }
+.ball-3 .ball-path { animation-delay: 0.4s; }
+
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.signature-text {
+  font-family: 'Kalam', cursive;
+  font-size: 70px;
+  stroke: white;
+  stroke-width: 1;
+  fill: transparent;
+  stroke-dasharray: 850;
+  stroke-dashoffset: 850;
+  animation: write-signature 1.5s ease-in-out forwards 1.5s;
+}
+
+@keyframes write-signature {
+  to {
+    stroke-dashoffset: 0;
+    fill: white;
+  }
+}
+
+.slogan-wrapper {
+  margin-top: 1rem;
+  font-family: 'Inter', sans-serif;
+  color: white;
+  letter-spacing: 0.3em;
+  font-size: 14px;
+}
+
+.slogan {
+  overflow: hidden;
+  border-right: 2px solid white;
+  white-space: nowrap;
+  width: 0;
+  animation:
+    typing 1s steps(18, end) 3s forwards,
+    blink-caret .75s step-end infinite 3s;
+}
+
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent }
+  50% { border-color: white; }
+}
+
+.fade-in-content {
+  animation: fade-in 1s ease-in forwards;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.hide-content {
+    opacity: 0;
+}
