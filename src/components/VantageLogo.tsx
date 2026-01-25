@@ -18,28 +18,29 @@ const VantageLogo = () => (
       position: 'relative',
     }}
   >
-    <svg className="sports-balls" width="180" height="180" viewBox="0 0 120 120" style={{'marginBottom': '2rem'}}>
+    <svg className="sports-balls" width="220" height="220" viewBox="0 0 150 150" style={{'marginBottom': '2rem'}}>
       {/* Basketball - top middle */}
       <g className="ball-1">
-        <circle className="ball-path" cx="60" cy="40" r="22" stroke="white" strokeWidth="1.5" fill="none" />
-        <path className="ball-path" d="M42 25 C 50 35, 70 35, 78 25" stroke="white" strokeWidth="1.5" fill="none" />
-        <path className="ball-path" d="M42 55 C 50 45, 70 45, 78 55" stroke="white" strokeWidth="1.5" fill="none" />
-        <path className="ball-path" d="M38 40 H 82" stroke="white" strokeWidth="1.5" fill="none" />
+        <circle className="ball-path" cx="75" cy="45" r="28" stroke="white" strokeWidth="1.5" fill="none" />
+        <path className="ball-path" d="M51 28 C 65 40, 85 40, 99 28" stroke="white" strokeWidth="1.5" fill="none" />
+        <path className="ball-path" d="M51 62 C 65 50, 85 50, 99 62" stroke="white" strokeWidth="1.5" fill="none" />
+        <path className="ball-path" d="M75 17 V 73" stroke="white" strokeWidth="1.5" fill="none" />
+        <path className="ball-path" d="M47 45 H 103" stroke="white" strokeWidth="1.5" fill="none" />
       </g>
       {/* Baseball - bottom left */}
       <g className="ball-2">
-        <circle className="ball-path" cx="35" cy="85" r="16" stroke="white" strokeWidth="1.5" fill="none" />
-        <path className="ball-path" d="M24 78 C 35 82, 35 88, 24 92" stroke="white" strokeWidth="1" fill="none" />
-        <path className="ball-path" d="M46 78 C 35 82, 35 88, 46 92" stroke="white" strokeWidth="1" fill="none" />
+        <circle className="ball-path" cx="45" cy="105" r="20" stroke="white" strokeWidth="1.5" fill="none" />
+        <path className="ball-path" d="M32 96 C 45 100, 45 110, 32 114" stroke="white" strokeWidth="1" fill="none" />
+        <path className="ball-path" d="M58 96 C 45 100, 45 110, 58 114" stroke="white" strokeWidth="1" fill="none" />
       </g>
       {/* Football - bottom right */}
       <g className="ball-3">
-        <ellipse className="ball-path" cx="85" cy="85" rx="20" ry="13" stroke="white" strokeWidth="1.5" fill="none" />
-        <path className="ball-path" d="M83 81h4" stroke="white" strokeWidth="1" fill="none" />
-        <path className="ball-path" d="M83 83h4" stroke="white" strokeWidth="1" fill="none" />
-        <path className="ball-path" d="M83 85h4" stroke="white" strokeWidth="1" fill="none" />
-        <path className="ball-path" d="M83 87h4" stroke="white" strokeWidth="1" fill="none" />
-        <path className="ball-path" d="M85 80v10" stroke="white" strokeWidth="1" fill="none" />
+        <ellipse className="ball-path" cx="105" cy="105" rx="25" ry="18" stroke="white" strokeWidth="1.5" fill="none" />
+        <path className="ball-path" d="M103 100h4" stroke="white" strokeWidth="1" fill="none" />
+        <path className="ball-path" d="M103 103h4" stroke="white" strokeWidth="1" fill="none" />
+        <path className="ball-path" d="M103 106h4" stroke="white" strokeWidth="1" fill="none" />
+        <path className="ball-path" d="M103 109h4" stroke="white" strokeWidth="1" fill="none" />
+        <path className="ball-path" d="M105 98v14" stroke="white" strokeWidth="1" fill="none" />
       </g>
     </svg>
 
