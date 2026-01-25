@@ -107,7 +107,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
   try {
     const promises: Promise<{ data: any, slug: string, sport: SportName }>[] = [];
     sources.forEach(src => {
-      promises.push(fetch(`${src.url}?dates=${getDateStr(0)}&limit=100`).then(r => r.json()).then(d => ({ data: d, slug: src.slug, sport: src.sport })));
+      promises.push(fetch(`${src.url}?dates=${getDateStr(0)}&limit=100`, { cache: 'no-store' }).then(r => r.json()).then(d => ({ data: d, slug: src.slug, sport: src.sport })));
     });
 
     const results = await Promise.all(promises);
