@@ -16,11 +16,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { UserPlus } from 'lucide-react';
+import { GoogleIcon } from '@/components/auth/google-icon';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -29,6 +30,7 @@ const formSchema = z.object({
 
 export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const auth = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -62,6 +64,29 @@ export default function SignUpPage() {
     }
   }
 
+  async function handleGoogleSignUp() {
+    setGoogleLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      toast({
+        title: 'Account Created',
+        description: 'You have been successfully signed up.',
+      });
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error(error);
+      if (error.code === 'auth/popup-closed-by-user') return;
+      toast({
+        variant: 'destructive',
+        title: 'Google Sign-Up Failed',
+        description: error.message || 'Could not sign up with Google. Please try again.',
+      });
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
       <Card className="w-full max-w-md">
@@ -73,6 +98,24 @@ export default function SignUpPage() {
           <CardDescription>Create a new account to start betting.</CardDescription>
         </CardHeader>
         <CardContent>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-11 font-medium"
+            onClick={handleGoogleSignUp}
+            disabled={loading || googleLoading}
+          >
+            <GoogleIcon className="mr-2 h-5 w-5" />
+            {googleLoading ? 'Signing up...' : 'Sign up with Google'}
+          </Button>
+          <div className="relative my-6">
+            <span className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </span>
+            <span className="relative flex justify-center text-xs uppercase text-muted-foreground">
+              or continue with email
+            </span>
+          </div>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
@@ -101,7 +144,7 @@ export default function SignUpPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full" disabled={loading || googleLoading}>
                 {loading ? 'Creating Account...' : 'Sign Up'}
               </Button>
             </form>

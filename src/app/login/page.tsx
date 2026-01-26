@@ -16,11 +16,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { LogIn } from 'lucide-react';
+import { GoogleIcon } from '@/components/auth/google-icon';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -29,6 +30,7 @@ const formSchema = z.object({
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const auth = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -62,6 +64,29 @@ export default function LoginPage() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    setGoogleLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      toast({
+        title: 'Login Successful',
+        description: 'Welcome back!',
+      });
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error(error);
+      if (error.code === 'auth/popup-closed-by-user') return;
+      toast({
+        variant: 'destructive',
+        title: 'Google Sign-In Failed',
+        description: error.message || 'Could not sign in with Google. Please try again.',
+      });
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
       <Card className="w-full max-w-md">
@@ -73,6 +98,24 @@ export default function LoginPage() {
           <CardDescription>Enter your credentials to access your account.</CardDescription>
         </CardHeader>
         <CardContent>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-11 font-medium"
+            onClick={handleGoogleSignIn}
+            disabled={loading || googleLoading}
+          >
+            <GoogleIcon className="mr-2 h-5 w-5" />
+            {googleLoading ? 'Signing in...' : 'Sign in with Google'}
+          </Button>
+          <div className="relative my-6">
+            <span className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </span>
+            <span className="relative flex justify-center text-xs uppercase text-muted-foreground">
+              or continue with email
+            </span>
+          </div>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
@@ -93,7 +136,15 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Password</FormLabel>
+                      <Link
+                        href="/forgot-password"
+                        className="text-xs text-muted-foreground hover:text-primary underline"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
@@ -101,7 +152,7 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full" disabled={loading || googleLoading}>
                 {loading ? 'Logging in...' : 'Login'}
               </Button>
             </form>

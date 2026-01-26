@@ -1,6 +1,7 @@
 // src/app/api/scrape-bbref-team/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { fetchBbrefHtml } from '@/lib/bbref';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,18 +80,7 @@ export async function GET(request: NextRequest) {
     // Basketball Reference team page
     const url = `https://www.basketball-reference.com/teams/${abbreviation}/2025.html`;
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      },
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      throw new Error(`Basketball Reference returned ${response.status}`);
-    }
-
-    const html = await response.text();
+    const html = await fetchBbrefHtml(url);
     const $ = cheerio.load(html);
 
     // Extract team stats from the page

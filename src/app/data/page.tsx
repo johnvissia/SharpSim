@@ -67,32 +67,88 @@ export default function DataPage() {
     }
   };
 
+  const PAUSE_BETWEEN_BATCHES_MS = 35_000;
+
+  async function syncRequest(body?: { batch?: number }): Promise<any> {
+    const response = await fetch('/api/sync-all-nba-teams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    });
+    const text = await response.text();
+    let data: any;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error(
+        'Server returned an error page instead of data. Basketball Reference may be blocking requests. Use smaller batches and try again.'
+      );
+    }
+    if (!response.ok) {
+      throw new Error(data.error || 'Sync failed');
+    }
+    return data;
+  }
+
+  const handleSyncBatch = async (batch: 1 | 2 | 3) => {
+    setSyncingAll(true);
+    setScraperData(null);
+    setSyncAllResults(null);
+    setRatingsResults(null);
+    try {
+      const label = batch === 1 ? '1–10' : batch === 2 ? '11–20' : '21–30';
+      toast({
+        title: `Syncing batch ${batch}`,
+        description: `Teams ${label}… This may take a few minutes.`,
+      });
+      const data = await syncRequest({ batch });
+      setSyncAllResults(data);
+      toast({
+        title: 'Batch complete',
+        description: `Synced ${data.successCount} of ${data.totalTeams} teams (${label})`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Sync Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
   const handleSyncAll = async () => {
     setSyncingAll(true);
     setScraperData(null);
     setSyncAllResults(null);
     setRatingsResults(null);
-
     try {
       toast({
-        title: 'Starting Sync',
-        description: 'Scraping all 30 NBA teams... This will take ~1 minute.',
+        title: 'Syncing all (3 batches)',
+        description: 'Batch 1/3… Avoids timeouts and rate limits.',
       });
-
-      const response = await fetch('/api/sync-all-nba-teams', {
-        method: 'POST',
-      });
-      
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to sync teams');
-      }
-
-      setSyncAllResults(data);
+      let accSuccess = 0;
+      let accFailed: string[] = [];
+      let data: any = await syncRequest({ batch: 1 });
+      accSuccess += data.successCount ?? 0;
+      accFailed = [...accFailed, ...(data.failedTeams ?? [])];
+      setSyncAllResults({ ...data, totalTeams: 30, successCount: accSuccess, failedCount: accFailed.length, failedTeams: accFailed, batchLabel: '1–30 (batch 1 done)' });
+      toast({ title: 'Batch 1 done', description: 'Waiting 35s before batch 2…' });
+      await new Promise((r) => setTimeout(r, PAUSE_BETWEEN_BATCHES_MS));
+      data = await syncRequest({ batch: 2 });
+      accSuccess += data.successCount ?? 0;
+      accFailed = [...accFailed, ...(data.failedTeams ?? [])];
+      setSyncAllResults({ ...data, totalTeams: 30, successCount: accSuccess, failedCount: accFailed.length, failedTeams: accFailed, batchLabel: '1–30 (batches 1–2 done)' });
+      toast({ title: 'Batch 2 done', description: 'Waiting 35s before batch 3…' });
+      await new Promise((r) => setTimeout(r, PAUSE_BETWEEN_BATCHES_MS));
+      data = await syncRequest({ batch: 3 });
+      accSuccess += data.successCount ?? 0;
+      accFailed = [...accFailed, ...(data.failedTeams ?? [])];
+      setSyncAllResults({ ...data, totalTeams: 30, successCount: accSuccess, failedCount: accFailed.length, failedTeams: accFailed, scheduleAnalysisComplete: true, savedToFirestore: true, batchLabel: '1–30 (all batches)' });
       toast({
-        title: 'Sync Complete!',
-        description: `Successfully synced ${data.successCount} of ${data.totalTeams} teams`,
+        title: 'All batches complete',
+        description: `Synced ${accSuccess}/30 teams across 3 batches.`,
       });
     } catch (error: any) {
       toast({
@@ -254,30 +310,59 @@ export default function DataPage() {
         {/* Sync All Teams Section */}
         <Card className="border-primary/50">
           <CardHeader>
-            <CardTitle>🏀 Sync All NBA Teams</CardTitle>
+            <CardTitle>🏀 Sync NBA Teams</CardTitle>
             <CardDescription>
-              Scrape game data for all 30 NBA teams with schedule fatigue analysis.
+              Scrape game data from Basketball Reference. Use <strong>batches</strong> to avoid timeouts and blocking — each batch runs ~3–4 minutes.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button 
-              onClick={handleSyncAll} 
-              disabled={syncingAll || loading} 
-              size="lg"
-              className="w-full"
-            >
-              {syncingAll ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Syncing All Teams... ({syncAllResults?.successCount || 0}/30)
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-5 w-5" />
-                  Sync All 30 Teams
-                </>
-              )}
-            </Button>
+          <CardContent className="space-y-3">
+            {syncingAll && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Syncing… {syncAllResults?.successCount != null ? `${syncAllResults.successCount}/30` : ''}
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button
+                onClick={() => handleSyncBatch(1)}
+                disabled={syncingAll || loading}
+                variant="outline"
+                size="lg"
+                className="w-full"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Batch 1 (1–10)
+              </Button>
+              <Button
+                onClick={() => handleSyncBatch(2)}
+                disabled={syncingAll || loading}
+                variant="outline"
+                size="lg"
+                className="w-full"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Batch 2 (11–20)
+              </Button>
+              <Button
+                onClick={() => handleSyncBatch(3)}
+                disabled={syncingAll || loading}
+                variant="outline"
+                size="lg"
+                className="w-full"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Batch 3 (21–30)
+              </Button>
+              <Button
+                onClick={handleSyncAll}
+                disabled={syncingAll || loading}
+                size="lg"
+                className="w-full sm:col-span-2"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Sync All (3 batches)
+              </Button>
+            </div>
 
             {syncAllResults && (
               <div className="mt-6 space-y-4">
