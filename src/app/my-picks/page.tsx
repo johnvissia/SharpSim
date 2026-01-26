@@ -169,16 +169,28 @@ export default function MyPicksPage() {
     let betsToShow: UserBet[];
 
     if (isViewingToday) {
-      // On today's view, show ALL pending bets + today's settled bets.
-      const pendingBets = bets.filter(bet => bet.status === 'pending');
+      // On today's view, show pending bets FOR TODAY'S GAMES + settled bets placed today.
+      const isGameToday = (bet: UserBet) => {
+        if (bet.betType === 'parlay' && bet.legs) {
+          // A parlay is for "today" if at least one of its legs starts today.
+          return bet.legs.some(leg => isSameDay(new Date(leg.commenceTime), selectedDate));
+        }
+        // For single bets, check the main commenceTime.
+        return bet.commenceTime ? isSameDay(new Date(bet.commenceTime), selectedDate) : false;
+      };
+
+      const pendingBetsForToday = bets.filter(bet => 
+        bet.status === 'pending' && isGameToday(bet)
+      );
+      
       const settledBetsForToday = bets.filter(bet => 
         bet.status !== 'pending' && isSameDay(new Date(bet.placedAt), selectedDate)
       );
-
-      // Use a map to avoid duplicates if a pending bet was placed today
+      
+      // Combine them, ensuring no duplicates.
       const betMap = new Map<string, UserBet>();
       settledBetsForToday.forEach(b => betMap.set(b.id, b));
-      pendingBets.forEach(b => betMap.set(b.id, b));
+      pendingBetsForToday.forEach(b => betMap.set(b.id, b));
       betsToShow = Array.from(betMap.values());
 
     } else {
