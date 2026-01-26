@@ -33,6 +33,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
     { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
     { href: '/stats', id: 'stats', label: '📊 Stats' },
     { href: '/data', id: 'data', label: '📈 Data' },
+    { href: '/model', id: 'model', label: '🧠 Our Model' },
     { href: '/store', id: 'store', label: '🛒 Store' },
     { href: '/coaching', id: 'coaching', label: '🎓 Coaching' },
     { href: '/admin', id: 'admin', label: '🛡️ Admin' }
