@@ -163,31 +163,43 @@ export default function MyPicksPage() {
 
   const filteredBets = useMemo(() => {
     if (!bets || !selectedDate) return [];
-
-    const pendingBets = bets.filter(bet => bet.status === 'pending');
-    const settledBetsForDate = bets.filter(bet => bet.status !== 'pending' && isSameDay(new Date(bet.placedAt), selectedDate));
-
-    // Use a map to ensure pending bets aren't duplicated if their date is selected
-    const betMap = new Map<string, UserBet>();
     
-    for (const bet of settledBetsForDate) {
-        betMap.set(bet.id, bet);
-    }
-    for (const bet of pendingBets) {
-        betMap.set(bet.id, bet);
+    const isViewingToday = isSameDay(selectedDate, new Date());
+
+    let betsToShow: UserBet[];
+
+    if (isViewingToday) {
+      // On today's view, show ALL pending bets + today's settled bets.
+      const pendingBets = bets.filter(bet => bet.status === 'pending');
+      const settledBetsForToday = bets.filter(bet => 
+        bet.status !== 'pending' && isSameDay(new Date(bet.placedAt), selectedDate)
+      );
+
+      // Use a map to avoid duplicates if a pending bet was placed today
+      const betMap = new Map<string, UserBet>();
+      settledBetsForToday.forEach(b => betMap.set(b.id, b));
+      pendingBets.forEach(b => betMap.set(b.id, b));
+      betsToShow = Array.from(betMap.values());
+
+    } else {
+      // On a past day's view, show ONLY bets placed on that day.
+      betsToShow = bets.filter(bet => isSameDay(new Date(bet.placedAt), selectedDate));
     }
     
-    const combined = Array.from(betMap.values());
-
-    combined.sort((a, b) => {
+    // Sort whatever list we ended up with.
+    betsToShow.sort((a, b) => {
         const aIsPending = a.status === 'pending';
         const bIsPending = b.status === 'pending';
+
+        // Pending bets always go to the top
         if (aIsPending && !bIsPending) return -1;
         if (!aIsPending && bIsPending) return 1;
+
+        // Otherwise, sort by most recent placedAt time
         return new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime();
     });
 
-    return combined;
+    return betsToShow;
   }, [bets, selectedDate]);
 
   const dailyNet = useMemo(() => {
