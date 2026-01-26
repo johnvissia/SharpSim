@@ -163,22 +163,47 @@ export default function MyPicksPage() {
 
   const filteredBets = useMemo(() => {
     if (!bets || !selectedDate) return [];
-    return bets.filter(bet => isSameDay(new Date(bet.placedAt), selectedDate));
+
+    const pendingBets = bets.filter(bet => bet.status === 'pending');
+    const settledBetsForDate = bets.filter(bet => bet.status !== 'pending' && isSameDay(new Date(bet.placedAt), selectedDate));
+
+    // Use a map to ensure pending bets aren't duplicated if their date is selected
+    const betMap = new Map<string, UserBet>();
+    
+    for (const bet of settledBetsForDate) {
+        betMap.set(bet.id, bet);
+    }
+    for (const bet of pendingBets) {
+        betMap.set(bet.id, bet);
+    }
+    
+    const combined = Array.from(betMap.values());
+
+    combined.sort((a, b) => {
+        const aIsPending = a.status === 'pending';
+        const bIsPending = b.status === 'pending';
+        if (aIsPending && !bIsPending) return -1;
+        if (!aIsPending && bIsPending) return 1;
+        return new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime();
+    });
+
+    return combined;
   }, [bets, selectedDate]);
 
   const dailyNet = useMemo(() => {
-    if (!filteredBets) return 0;
-    return filteredBets.reduce((acc, bet) => {
+    if (!bets || !selectedDate) return 0;
+    const betsForDate = bets.filter(bet => isSameDay(new Date(bet.placedAt), selectedDate));
+    
+    return betsForDate.reduce((acc, bet) => {
       if (bet.status === 'won') {
         return acc + (bet.potentialWinnings - bet.stake);
       }
       if (bet.status === 'lost') {
         return acc - bet.stake;
       }
-      // 'push' and 'pending' bets have a net of 0 for this calculation
       return acc;
     }, 0);
-  }, [filteredBets]);
+  }, [bets, selectedDate]);
 
 
   if (isUserLoading || !user) {
@@ -288,7 +313,7 @@ export default function MyPicksPage() {
         {filteredBets.length === 0 ? (
             <Card>
                 <CardContent className="p-6 text-center text-muted-foreground">
-                    No slips found for this date.
+                    No active bets or slips for this date.
                 </CardContent>
             </Card>
         ) : (
