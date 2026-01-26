@@ -25,8 +25,14 @@ interface CompletedPlayerStats {
  * This helps in matching team names from different API sources.
  */
 const normalizeName = (name: string): string => {
-    return name.toLowerCase().replace(/[\s.&()']/g, '');
+    if (!name) return '';
+    return name
+        .normalize('NFD') // Decompose accented characters
+        .replace(/[\u0300-\u036f]/g, '') // Remove diacritical marks
+        .toLowerCase()
+        .replace(/[\s.&()']/g, '');
 };
+
 
 /**
  * Extracts a number (integer or float, positive or negative) from a string.
