@@ -7,7 +7,7 @@ import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/fireb
 import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
-import { Coins, Pencil, Save, LogIn, LogOut } from 'lucide-react';
+import { Coins, Pencil, Save, LogIn, LogOut, Users } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const initialNavItems = [
     { href: '/', id: 'home', label: '🏠 Home' },
     { href: '/dashboard', id: 'dashboard', label: '🔥 Dashboard' },
+    { href: '/prop-hub', id: 'prop-hub', label: '👥 Prop Hub' },
     { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
     { href: '/stats', id: 'stats', label: '📊 Stats' },
     { href: '/data', id: 'data', label: '📈 Data' },

@@ -65,7 +65,8 @@ export async function GET() {
     console.log("🚀 Starting Player Prop Sync from Tank01...");
     
     // 1. Fetch upcoming NBA game props from Tank01
-    const dateString = "20260123";
+    const now = new Date();
+    const dateString = now.toISOString().slice(0, 10).replace(/-/g, '');
     const url = `https://${rapidApiHost}/getNBABettingOdds?gameDate=${dateString}&playerProps=true`;
     
     const response = await fetch(url, {
