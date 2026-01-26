@@ -163,22 +163,71 @@ export default function MyPicksPage() {
 
   const filteredBets = useMemo(() => {
     if (!bets || !selectedDate) return [];
-    return bets.filter(bet => isSameDay(new Date(bet.placedAt), selectedDate));
+    
+    const isViewingToday = isSameDay(selectedDate, new Date());
+
+    let betsToShow: UserBet[];
+
+    if (isViewingToday) {
+      // On today's view, show pending bets FOR TODAY'S GAMES + settled bets placed today.
+      const isGameToday = (bet: UserBet) => {
+        if (bet.betType === 'parlay' && bet.legs) {
+          // A parlay is for "today" if at least one of its legs starts today.
+          return bet.legs.some(leg => isSameDay(new Date(leg.commenceTime), selectedDate));
+        }
+        // For single bets, check the main commenceTime.
+        return bet.commenceTime ? isSameDay(new Date(bet.commenceTime), selectedDate) : false;
+      };
+
+      const pendingBetsForToday = bets.filter(bet => 
+        bet.status === 'pending' && isGameToday(bet)
+      );
+      
+      const settledBetsForToday = bets.filter(bet => 
+        bet.status !== 'pending' && isSameDay(new Date(bet.placedAt), selectedDate)
+      );
+      
+      // Combine them, ensuring no duplicates.
+      const betMap = new Map<string, UserBet>();
+      settledBetsForToday.forEach(b => betMap.set(b.id, b));
+      pendingBetsForToday.forEach(b => betMap.set(b.id, b));
+      betsToShow = Array.from(betMap.values());
+
+    } else {
+      // On a past day's view, show ONLY bets placed on that day.
+      betsToShow = bets.filter(bet => isSameDay(new Date(bet.placedAt), selectedDate));
+    }
+    
+    // Sort whatever list we ended up with.
+    betsToShow.sort((a, b) => {
+        const aIsPending = a.status === 'pending';
+        const bIsPending = b.status === 'pending';
+
+        // Pending bets always go to the top
+        if (aIsPending && !bIsPending) return -1;
+        if (!aIsPending && bIsPending) return 1;
+
+        // Otherwise, sort by most recent placedAt time
+        return new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime();
+    });
+
+    return betsToShow;
   }, [bets, selectedDate]);
 
   const dailyNet = useMemo(() => {
-    if (!filteredBets) return 0;
-    return filteredBets.reduce((acc, bet) => {
+    if (!bets || !selectedDate) return 0;
+    const betsForDate = bets.filter(bet => isSameDay(new Date(bet.placedAt), selectedDate));
+    
+    return betsForDate.reduce((acc, bet) => {
       if (bet.status === 'won') {
         return acc + (bet.potentialWinnings - bet.stake);
       }
       if (bet.status === 'lost') {
         return acc - bet.stake;
       }
-      // 'push' and 'pending' bets have a net of 0 for this calculation
       return acc;
     }, 0);
-  }, [filteredBets]);
+  }, [bets, selectedDate]);
 
 
   if (isUserLoading || !user) {
@@ -288,7 +337,7 @@ export default function MyPicksPage() {
         {filteredBets.length === 0 ? (
             <Card>
                 <CardContent className="p-6 text-center text-muted-foreground">
-                    No slips found for this date.
+                    No active bets or slips for this date.
                 </CardContent>
             </Card>
         ) : (

@@ -6,46 +6,46 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import type { TeamRanking } from '@/lib/types';
 import { Shield, UploadCloud, ShieldCheck } from 'lucide-react';
 
 const placeholderJson = JSON.stringify(
   [
-    { "teamName": "Georgia Bulldogs", "rank": 1 },
-    { "teamName": "Michigan Wolverines", "rank": 2 },
-    { "teamName": "Ohio State Buckeyes", "rank": 3 },
+    { "teamName": "Georgia Bulldogs", "rank": 1, "conference": "SEC" },
+    { "teamName": "Michigan Wolverines", "rank": 2, "conference": "Big 10" },
+    { "teamName": "Ohio State Buckeyes", "rank": 3, "conference": "Big 10" },
   ],
   null,
   2
 );
 
 const customRankings = [
-    { "team": "Arizona Wildcats", "rank": 1, "conference": "Big 12" },
-    { "team": "UConn Huskies", "rank": 2, "conference": "Big East" },
-    { "team": "Michigan Wolverines", "rank": 3, "conference": "Big 10" },
-    { "team": "Purdue Boilermakers", "rank": 4, "conference": "Big 10" },
-    { "team": "Duke Blue Devils", "rank": 5, "conference": "ACC" },
-    { "team": "Houston Cougars", "rank": 6, "conference": "Big 12" },
-    { "team": "Nebraska Cornhuskers", "rank": 7, "conference": "Big 10" },
-    { "team": "Gonzaga Bulldogs", "rank": 8, "conference": "WCC" },
-    { "team": "Iowa State Cyclones", "rank": 9, "conference": "Big 12" },
-    { "team": "Michigan State Spartans", "rank": 10, "conference": "Big 10" },
-    { "team": "Illinois Fighting Illini", "rank": 11, "conference": "Big 10" },
-    { "team": "Texas Tech Red Raiders", "rank": 12, "conference": "Big 12" },
-    { "team": "BYU Cougars", "rank": 13, "conference": "Big 12" },
-    { "team": "Virginia Cavaliers", "rank": 14, "conference": "ACC" },
-    { "team": "Vanderbilt Commodores", "rank": 15, "conference": "SEC" },
-    { "team": "Florida Gators", "rank": 16, "conference": "SEC" },
-    { "team": "Alabama Crimson Tide", "rank": 17, "conference": "SEC" },
-    { "team": "Clemson Tigers", "rank": 18, "conference": "ACC" },
-    { "team": "Kansas Jayhawks", "rank": 19, "conference": "Big 12" },
-    { "team": "Arkansas Razorbacks", "rank": 20, "conference": "SEC" },
-    { "team": "Georgia Bulldogs", "rank": 21, "conference": "SEC" },
-    { "team": "North Carolina Tar Heels", "rank": 22, "conference": "ACC" },
-    { "team": "Louisville Cardinals", "rank": 23, "conference": "ACC" },
-    { "team": "Saint Louis Billikens", "rank": 24, "conference": "A-10" },
-    { "team": "Miami (OH) RedHawks", "rank": 25, "conference": "MAC" }
+    { "teamName": "Arizona Wildcats", "rank": 1, "conference": "Big 12" },
+    { "teamName": "UConn Huskies", "rank": 2, "conference": "Big East" },
+    { "teamName": "Michigan Wolverines", "rank": 3, "conference": "Big 10" },
+    { "teamName": "Purdue Boilermakers", "rank": 4, "conference": "Big 10" },
+    { "teamName": "Duke Blue Devils", "rank": 5, "conference": "ACC" },
+    { "teamName": "Houston Cougars", "rank": 6, "conference": "Big 12" },
+    { "teamName": "Nebraska Cornhuskers", "rank": 7, "conference": "Big 10" },
+    { "teamName": "Gonzaga Bulldogs", "rank": 8, "conference": "WCC" },
+    { "teamName": "Iowa State Cyclones", "rank": 9, "conference": "Big 12" },
+    { "teamName": "Michigan State Spartans", "rank": 10, "conference": "Big 10" },
+    { "teamName": "Illinois Fighting Illini", "rank": 11, "conference": "Big 10" },
+    { "teamName": "Texas Tech Red Raiders", "rank": 12, "conference": "Big 12" },
+    { "teamName": "BYU Cougars", "rank": 13, "conference": "Big 12" },
+    { "teamName": "Virginia Cavaliers", "rank": 14, "conference": "ACC" },
+    { "teamName": "Vanderbilt Commodores", "rank": 15, "conference": "SEC" },
+    { "teamName": "Florida Gators", "rank": 16, "conference": "SEC" },
+    { "teamName": "Alabama Crimson Tide", "rank": 17, "conference": "SEC" },
+    { "teamName": "Clemson Tigers", "rank": 18, "conference": "ACC" },
+    { "teamName": "Kansas Jayhawks", "rank": 19, "conference": "Big 12" },
+    { "teamName": "Arkansas Razorbacks", "rank": 20, "conference": "SEC" },
+    { "teamName": "Georgia Bulldogs", "rank": 21, "conference": "SEC" },
+    { "teamName": "North Carolina Tar Heels", "rank": 22, "conference": "ACC" },
+    { "teamName": "Louisville Cardinals", "rank": 23, "conference": "ACC" },
+    { "teamName": "Saint Louis Billikens", "rank": 24, "conference": "A-10" },
+    { "teamName": "Miami (OH) RedHawks", "rank": 25, "conference": "MAC" }
 ];
 
 export default function AdminPage() {
@@ -76,12 +76,19 @@ export default function AdminPage() {
     }
 
     try {
+      const rankingsCollectionRef = collection(firestore, 'rankings');
+      const existingRankingsSnapshot = await getDocs(rankingsCollectionRef);
+      
       const batch = writeBatch(firestore);
-      const rankingsRef = collection(firestore, 'rankings');
+
+      // Delete all existing documents
+      existingRankingsSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
       
       rankings.forEach(ranking => {
-        const docRef = doc(rankingsRef, ranking.teamName);
-        batch.set(docRef, { teamName: ranking.teamName, rank: ranking.rank, conference: 'N/A' }); // Add default conference
+        const docRef = doc(rankingsCollectionRef, ranking.teamName);
+        batch.set(docRef, { teamName: ranking.teamName, rank: ranking.rank, conference: ranking.conference || 'N/A' });
       });
 
       await batch.commit();
@@ -106,12 +113,19 @@ export default function AdminPage() {
     if (!firestore) return;
     setSeeding(true);
     try {
+        const rankingsCollectionRef = collection(firestore, 'rankings');
+        const existingRankingsSnapshot = await getDocs(rankingsCollectionRef);
+
         const batch = writeBatch(firestore);
-        const rankingsRef = collection(firestore, 'rankings');
+
+        // Delete all existing documents
+        existingRankingsSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
 
         customRankings.forEach(ranking => {
-            const docRef = doc(rankingsRef, ranking.team);
-            batch.set(docRef, { teamName: ranking.team, rank: ranking.rank, conference: ranking.conference });
+            const docRef = doc(rankingsCollectionRef, ranking.teamName);
+            batch.set(docRef, { teamName: ranking.teamName, rank: ranking.rank, conference: ranking.conference });
         });
 
         await batch.commit();

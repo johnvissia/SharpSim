@@ -41,8 +41,8 @@ const TeamDisplay = ({ team, sport, score }: { team: Team, sport: SportName, sco
     const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
     return (
         <div className="flex justify-between items-center w-full">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-                <div className="w-8 h-8 mr-2 flex-shrink-0 flex items-center justify-center">
+            <div className="flex items-center gap-3 text-sm font-semibold">
+                <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
                     {team.logo ? (
                         <Image
                             src={team.logo}
@@ -55,8 +55,8 @@ const TeamDisplay = ({ team, sport, score }: { team: Team, sport: SportName, sco
                         <FallbackIcon className="w-6 h-6 text-muted-foreground" />
                     )}
                 </div>
+                {team.rank && <span className="font-bold w-6 text-center">#{team.rank}</span>}
                 <span className="truncate">{team.name}</span>
-                {team.rank && <span className="font-bold text-muted-foreground ml-1">#{team.rank}</span>}
             </div>
              {typeof score === 'number' && !isNaN(score) && (
                 <span className="text-3xl font-bold tracking-tight">{score}</span>
