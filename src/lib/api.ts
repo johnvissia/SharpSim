@@ -260,21 +260,36 @@ export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number 
             }
             
             const boxScoreData = await boxScoreRes.json();
-            const teams = boxScoreData.boxscore?.players || [];
+            const teamsData = boxScoreData.boxscore?.players || [];
             
-            for (const team of teams) {
-              const players = team.statistics?.[0]?.athletes || [];
+            for (const team of teamsData) {
+              const labels: string[] = team.statistics?.[0]?.labels || [];
+              const athletes = team.statistics?.[0]?.athletes || [];
+
+              if (labels.length === 0 || athletes.length === 0) continue;
               
-              for (const player of players) {
-                const stats = player.stats || [];
+              for (const player of athletes) {
+                const stats: string[] = player.stats || [];
+                const statsMap = new Map(labels.map((label, index) => [label.toLowerCase(), stats[index]]));
+
+                const getStat = (key: string) => parseFloat(statsMap.get(key) || '0') || 0;
+
+                // Handle DNP - Did Not Play
+                const minutes = statsMap.get('min');
+                if (!minutes || minutes === '0' || minutes === '0:00') {
+                    continue; // Skip players who didn't play
+                }
                 
-                const points = parseFloat(stats[13]) || 0;
-                const rebounds = parseFloat(stats[6]) || 0;
-                const assists = parseFloat(stats[7]) || 0;
-                const steals = parseFloat(stats[8]) || 0;
-                const blocks = parseFloat(stats[9]) || 0;
-                const turnovers = parseFloat(stats[10]) || 0;
-                const threePointersMade = stats[2] ? parseFloat(stats[2].split('-')[0]) : 0;
+                const points = getStat('pts');
+                const rebounds = getStat('reb');
+                const assists = getStat('ast');
+                const steals = getStat('stl');
+                const blocks = getStat('blk');
+                const turnovers = getStat('to');
+
+                // 3PM-A is like "2-5", so we need to parse it
+                const threePointStr = statsMap.get('3pm-a') || '0-0';
+                const threePointersMade = parseFloat(threePointStr.split('-')[0]) || 0;
                 
                 const playerName = player.athlete?.displayName || 'Unknown';
                 const playerId = player.athlete?.id || player.athlete?.displayName?.replace(/\s+/g, '_');
