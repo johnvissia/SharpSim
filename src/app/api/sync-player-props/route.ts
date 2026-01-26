@@ -21,8 +21,11 @@ if (!getApps().length) {
 }
 const db = getFirestore();
 
+// Helper to normalize team names for matching
+const normalizeTeamName = (name: string): string => {
+    return name.toLowerCase().replace(/[\s.&()']/g, '');
+};
 
-// Types for parsing Tank01 API response
 interface Tank01Player {
     playerID: string;
     playerName: string;
@@ -32,7 +35,7 @@ interface Tank01Player {
 interface Tank01Market {
     gameID: string;
     player: Tank01Player;
-    marketName: string; // e.g. "player_points_over_under"
+    marketName: string;
     line: number;
     overPrice: number;
     underPrice: number;
@@ -40,7 +43,7 @@ interface Tank01Market {
 
 interface Tank01Game {
     gameID: string;
-    gameTime: string; // ISO Date String
+    gameTime: string;
     homeTeam: { teamAbbr: string };
     awayTeam: { teamAbbr: string };
     markets?: Tank01Market[];
@@ -49,7 +52,6 @@ interface Tank01Game {
 interface Tank01Response {
     body: Tank01Game[];
 }
-
 
 export async function GET() {
   const rapidApiKey = process.env.RAPIDAPI_KEY;
@@ -63,9 +65,7 @@ export async function GET() {
     console.log("🚀 Starting Player Prop Sync from Tank01...");
     
     // 1. Fetch upcoming NBA game props from Tank01
-    // API expects YYYYMMDD format. The mock data uses 20260123, so we'll use that for consistency.
     const dateString = "20260123";
-    
     const url = `https://${rapidApiHost}/getNBABettingOdds?gameDate=${dateString}&playerProps=true`;
     
     const response = await fetch(url, {
@@ -84,11 +84,57 @@ export async function GET() {
         throw new Error("Invalid data structure from Tank01 API. 'body' array not found.");
     }
     
-    const allProps: any[] = [];
+    // 2. Build a mapping from Tank01 team matchups to Odds API game IDs
+    console.log("🔍 Building Tank01 -> Odds API game ID mapping...");
+    const gameIdMapping = new Map<string, string>(); // Tank01 gameID -> Odds API ID
     
-    // 2. Parse the response into our PlayerProp format
+    // Fetch all daily_games (which have Odds API IDs)
+    const dailyGamesSnapshot = await db.collection('daily_games').get();
+    
+    // Create a map of normalized matchups to Odds API IDs
+    const matchupToOddsId = new Map<string, string>();
+    dailyGamesSnapshot.docs.forEach(doc => {
+        const dailyGame = doc.data();
+        const normalizedHome = normalizeTeamName(dailyGame.homeTeam);
+        const normalizedAway = normalizeTeamName(dailyGame.awayTeam);
+        const matchupKey = `${normalizedAway}@${normalizedHome}`;
+        matchupToOddsId.set(matchupKey, doc.id);
+    });
+    
+    // Map each Tank01 game to an Odds API ID
+    data.body.forEach(tank01Game => {
+        const homeTeamName = nbaTeamAbbreviationToName[tank01Game.homeTeam.teamAbbr] || tank01Game.homeTeam.teamAbbr;
+        const awayTeamName = nbaTeamAbbreviationToName[tank01Game.awayTeam.teamAbbr] || tank01Game.awayTeam.teamAbbr;
+        
+        const normalizedHome = normalizeTeamName(homeTeamName);
+        const normalizedAway = normalizeTeamName(awayTeamName);
+        const matchupKey = `${normalizedAway}@${normalizedHome}`;
+        
+        const oddsApiId = matchupToOddsId.get(matchupKey);
+        
+        if (oddsApiId) {
+            gameIdMapping.set(tank01Game.gameID, oddsApiId);
+            console.log(`✓ Mapped Tank01 ${tank01Game.gameID} -> Odds API ${oddsApiId} (${awayTeamName} @ ${homeTeamName})`);
+        } else {
+            console.warn(`⚠️  No Odds API game found for ${awayTeamName} @ ${homeTeamName}`);
+        }
+    });
+    
+    console.log(`📊 Successfully mapped ${gameIdMapping.size}/${data.body.length} games to Odds API IDs`);
+    
+    const allProps: any[] = [];
+    let unmappedGamesCount = 0;
+    
+    // 3. Parse the response into our PlayerProp format
     data.body.forEach(game => {
         if (!game.markets) return;
+        
+        const oddsApiId = gameIdMapping.get(game.gameID);
+        if (!oddsApiId) {
+            console.warn(`⚠️  Skipping props for Tank01 game ${game.gameID} - no Odds API mapping`);
+            unmappedGamesCount++;
+            return; // Skip games that couldn't be mapped
+        }
         
         const homeTeamName = nbaTeamAbbreviationToName[game.homeTeam.teamAbbr] || game.homeTeam.teamAbbr;
         const awayTeamName = nbaTeamAbbreviationToName[game.awayTeam.teamAbbr] || game.awayTeam.teamAbbr;
@@ -96,17 +142,18 @@ export async function GET() {
         
         game.markets.forEach(market => {
             const appMarket = mapTank01MarketToApp(market.marketName);
-            if (!appMarket) return; // Skip unknown markets
+            if (!appMarket) return;
             
             const teamName = nbaTeamAbbreviationToName[market.player.teamAbbr] || market.player.teamAbbr;
 
             const prop = {
-                gameId: game.gameID,
+                gameId: oddsApiId, // Use Odds API ID for grading compatibility
+                tank01GameId: game.gameID, // Keep Tank01 ID for reference/debugging
                 playerId: market.player.playerID,
                 playerName: market.player.playerName,
                 teamName: teamName,
                 matchup: matchup,
-                commenceTime: game.gameTime, // This is an ISO string from the API
+                commenceTime: game.gameTime,
                 market: appMarket,
                 line: market.line,
                 overOdds: market.overPrice,
@@ -116,9 +163,17 @@ export async function GET() {
         });
     });
     
-    console.log(`✅ Parsed ${allProps.length} total player props from the API.`);
+    if (allProps.length === 0) {
+        return NextResponse.json({ 
+            message: "No props could be synced. Make sure game lines are synced first on the dashboard.",
+            mapped: gameIdMapping.size,
+            unmapped: unmappedGamesCount
+        }, { status: 400 });
+    }
     
-    // 3. Clear existing player_props collection in Firestore
+    console.log(`✅ Parsed ${allProps.length} total player props from ${gameIdMapping.size} games.`);
+    
+    // 4. Clear existing player_props collection
     console.log("🗑️ Deleting all existing player props in Firestore...");
     const propsCollectionRef = db.collection('player_props');
     const querySnapshot = await propsCollectionRef.get();
@@ -126,44 +181,58 @@ export async function GET() {
     if (!querySnapshot.empty) {
         let batch = db.batch();
         let deleteCount = 0;
+        const deleteBatches: Promise<any>[] = [];
+        
         querySnapshot.docs.forEach((doc, index) => {
             batch.delete(doc.ref);
             deleteCount++;
-            if ((index + 1) % 500 === 0) { // Commit every 500 deletes
-                batch.commit();
+            if ((index + 1) % 500 === 0) {
+                deleteBatches.push(batch.commit());
                 batch = db.batch();
             }
         });
-        await batch.commit(); // Commit the final batch
+        
+        // Commit any remaining deletes
+        if (deleteCount % 500 !== 0) {
+            deleteBatches.push(batch.commit());
+        }
+        
+        await Promise.all(deleteBatches);
         console.log(`🔥 Deleted ${deleteCount} old player props.`);
-    } else {
-        console.log("No old player props to delete.");
     }
 
-    // 4. Write new props to Firestore
-    if (allProps.length > 0) {
-        console.log("💾 Writing new props to Firestore...");
-        let batch: WriteBatch = db.batch();
-        let writeCount = 0;
+    // 5. Write new props to Firestore
+    console.log("💾 Writing new props to Firestore...");
+    let batch: WriteBatch = db.batch();
+    let writeCount = 0;
+    const writeBatches: Promise<any>[] = [];
 
-        allProps.forEach((prop, index) => {
-            const docRef = propsCollectionRef.doc(); // Auto-generate ID
-            // Add the auto-generated doc ID to the object itself
-            batch.set(docRef, { ...prop, id: docRef.id }); 
-            writeCount++;
-            if ((index + 1) % 500 === 0) { // Commit every 500 writes
-                batch.commit();
-                batch = db.batch();
-            }
-        });
-        await batch.commit(); // Commit any remaining items
-        console.log(`✨ Successfully wrote ${writeCount} new player props.`);
-        return NextResponse.json({ 
-            message: `Synced ${writeCount} player props successfully. Old props cleared.`
-        });
+    allProps.forEach((prop, index) => {
+        const docRef = propsCollectionRef.doc();
+        batch.set(docRef, { ...prop, id: docRef.id }); 
+        writeCount++;
+        if ((index + 1) % 500 === 0) {
+            writeBatches.push(batch.commit());
+            batch = db.batch();
+        }
+    });
+    
+    // Commit any remaining writes
+    if (writeCount % 500 !== 0) {
+        writeBatches.push(batch.commit());
     }
-
-    return NextResponse.json({ message: "Sync complete. No new player props found to add." });
+    
+    await Promise.all(writeBatches);
+    console.log(`✨ Successfully wrote ${writeCount} new player props.`);
+    
+    return NextResponse.json({ 
+        message: `✅ Synced ${writeCount} player props from ${gameIdMapping.size} games successfully!`,
+        details: {
+            propsWritten: writeCount,
+            gamesMapped: gameIdMapping.size,
+            gamesUnmapped: unmappedGamesCount
+        }
+    });
 
   } catch (error: any) {
     console.error("❌ Player prop sync failed:", error);

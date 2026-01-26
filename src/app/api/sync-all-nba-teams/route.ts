@@ -85,7 +85,7 @@ const NBA_TEAMS: Record<string, string> = {
   'Oklahoma City Thunder': 'OKC',
   'Orlando Magic': 'ORL',
   'Philadelphia 76ers': 'PHI',
-  'Phoenix Suns': 'PHO',  // FIXED: Was PHX, should be PHO
+  'Phoenix Suns': 'PHX',  // FIXED: Should be PHX
   'Portland Trail Blazers': 'POR',
   'Sacramento Kings': 'SAC',
   'San Antonio Spurs': 'SAS',
@@ -94,7 +94,7 @@ const NBA_TEAMS: Record<string, string> = {
   'Washington Wizards': 'WAS',
 };
 
-const HOME_COURT_ADVANTAGE = 2.3; // Updated from 2.5 to 2.3
+const HOME_COURT_ADVANTAGE = 2.3;
 
 // ============================================================================
 // SCHEDULE ANALYSIS FUNCTIONS
@@ -152,7 +152,7 @@ function analyzeScheduleFatigue(games: any[]): GameResult[] {
 }
 
 // ============================================================================
-// SCRAPER WITH RETRY LOGIC
+// ENHANCED SCRAPER WITH BETTER ERROR HANDLING
 // ============================================================================
 
 async function scrapeTeam(
@@ -161,7 +161,7 @@ async function scrapeTeam(
   retryCount: number = 0
 ): Promise<TeamData | null> {
   const MAX_RETRIES = 3;
-  const RETRY_DELAY = 3000; // 3 seconds
+  const RETRY_DELAY = 5000; // Increased to 5 seconds
   
   try {
     console.log(`📥 Scraping ${teamName} (${abbreviation})...`);
@@ -172,10 +172,20 @@ async function scrapeTeam(
     const seasonEndYear = currentMonth >= 7 ? currentYear + 1 : currentYear;
 
     const url = `https://www.basketball-reference.com/teams/${abbreviation}/${seasonEndYear}_games.html`;
+    console.log(`   URL: ${url}`);
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0',
       },
       cache: 'no-store',
     });
@@ -184,7 +194,25 @@ async function scrapeTeam(
       throw new Error(`HTTP ${response.status} for ${teamName}`);
     }
 
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('text/html')) {
+      throw new Error(`Unexpected content type: ${contentType} for ${teamName}`);
+    }
+
     const html = await response.text();
+    
+    // Check if we got an error page
+    if (html.includes('Rate Limit') || html.includes('Too Many Requests') || html.includes('403 Forbidden')) {
+      throw new Error(`Rate limited or blocked for ${teamName}`);
+    }
+
+    // Check if HTML is valid
+    if (!html.includes('basketball-reference.com') && !html.includes('games')) {
+      console.error(`❌ Invalid HTML received for ${teamName}`);
+      console.error(`First 500 chars: ${html.substring(0, 500)}`);
+      throw new Error(`Invalid HTML response for ${teamName}`);
+    }
+
     const $ = cheerio.load(html);
 
     const games: any[] = [];
@@ -225,9 +253,12 @@ async function scrapeTeam(
       });
     });
 
-    // Check if we got games - if not, might be rate limited or error
+    // Check if we got games
     if (games.length === 0) {
-      throw new Error(`No games found for ${teamName}`);
+      console.error(`❌ No games found for ${teamName}. Checking HTML structure...`);
+      console.error(`Table exists: ${$('#games').length > 0}`);
+      console.error(`Rows found: ${$('#games tbody tr').length}`);
+      throw new Error(`No games found for ${teamName} - possible HTML structure change`);
     }
 
     // Add schedule fatigue analysis
@@ -269,7 +300,6 @@ async function scrapeTeam(
       rollingMOV = weightedSum / totalWeight;
     }
 
-    // Calculate schedule statistics
     const backToBackGames = gamesWithSchedule.filter(g => g.isBackToBack).length;
     const threeInFourGames = gamesWithSchedule.filter(g => g.gamesInLast4Days >= 3).length;
     const deathScheduleGames = gamesWithSchedule.filter(g => g.gamesInLast5Days >= 4).length;
@@ -305,9 +335,9 @@ async function scrapeTeam(
   } catch (error: any) {
     console.error(`❌ Error scraping ${teamName}: ${error.message}`);
     
-    // Retry logic for Phoenix Suns and other failed teams
+    // Retry logic
     if (retryCount < MAX_RETRIES) {
-      console.log(`🔄 Retrying ${teamName} (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+      console.log(`🔄 Retrying ${teamName} (attempt ${retryCount + 1}/${MAX_RETRIES}) in ${RETRY_DELAY/1000}s...`);
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
       return scrapeTeam(teamName, abbreviation, retryCount + 1);
     }
@@ -324,12 +354,17 @@ async function scrapeTeam(
 export async function POST() {
   try {
     console.log('🚀 Starting sync of all 30 NBA teams...');
+    console.log('⏱️  Using 4-second delays to avoid rate limiting...');
     
     const teams = Object.entries(NBA_TEAMS);
     const results: { success: TeamData[], failed: string[] } = { success: [], failed: [] };
 
     // Scrape teams one by one with delay
-    for (const [teamName, abbreviation] of teams) {
+    for (let i = 0; i < teams.length; i++) {
+      const [teamName, abbreviation] = teams[i];
+      
+      console.log(`\n[${i + 1}/${teams.length}] Processing ${teamName}...`);
+      
       const teamData = await scrapeTeam(teamName, abbreviation);
       
       if (teamData) {
@@ -338,8 +373,11 @@ export async function POST() {
         results.failed.push(teamName);
       }
 
-      // Delay between requests (2 seconds to be safe)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Delay between requests (4 seconds to avoid rate limiting)
+      if (i < teams.length - 1) {
+        console.log(`⏳ Waiting 4 seconds before next request...`);
+        await new Promise(resolve => setTimeout(resolve, 4000));
+      }
     }
 
     console.log(`\n🎉 Scrape complete: ${results.success.length}/30 success, ${results.failed.length} failed`);
@@ -418,7 +456,8 @@ export async function POST() {
   } catch (error: any) {
     console.error('❌ Sync error:', error);
     return NextResponse.json({ 
-      error: error.message 
+      error: error.message,
+      stack: error.stack,
     }, { status: 500 });
   }
 }

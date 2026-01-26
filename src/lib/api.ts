@@ -323,7 +323,7 @@ export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number 
     console.log(`[PLAYER STATS] Total player stats collected: ${allPlayerStats.length}`);
     
     if (allPlayerStats.length > 0) {
-      const batch = writeBatch(firestore);
+      let batch = writeBatch(firestore);
       const playerStatsRef = collection(firestore, 'completed_player_stats');
       
       let batchCount = 0;
@@ -337,6 +337,7 @@ export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number 
         if (batchCount >= maxBatchSize) {
           await batch.commit();
           console.log(`[PLAYER STATS] Committed batch of ${batchCount} stats`);
+          batch = writeBatch(firestore); // Re-initialize the batch
           batchCount = 0;
         }
       }
