@@ -13,7 +13,11 @@ interface GameResult {
   teamScore: number;
   opponentScore: number;
   margin: number;
-  adjustedMargin: number; // Adjusted for home court
+  adjustedMargin: number;
+  daysRest: number;
+  isBackToBack: boolean;
+  gamesInLast4Days: number;
+  gamesInLast5Days: number;
 }
 
 // Map team names to Basketball Reference abbreviations
@@ -51,7 +55,75 @@ const teamAbbreviations: Record<string, string> = {
   'Washington Wizards': 'WAS',
 };
 
-const HOME_COURT_ADVANTAGE = 2.5;
+const HOME_COURT_ADVANTAGE = 2.3; // Updated from 2.5 to 2.3
+
+// ============================================================================
+// SCHEDULE ANALYSIS FUNCTIONS
+// ============================================================================
+
+/**
+ * Calculate days of rest between two game dates
+ */
+function calculateDaysRest(currentGameDate: string, previousGameDate: string | null): number {
+  if (!previousGameDate) return 99; // First game of season
+  
+  const current = new Date(currentGameDate);
+  const previous = new Date(previousGameDate);
+  
+  const diffTime = current.getTime() - previous.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  return diffDays - 1; // Same day = 0 days rest
+}
+
+/**
+ * Count games in the last N days (including current game)
+ */
+function countGamesInLastNDays(currentIndex: number, games: any[], days: number): number {
+  if (currentIndex === 0) return 1;
+  
+  const currentDate = new Date(games[currentIndex].date);
+  const cutoffDate = new Date(currentDate);
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+  
+  let count = 1; // Include current game
+  
+  for (let i = currentIndex - 1; i >= 0; i--) {
+    const gameDate = new Date(games[i].date);
+    if (gameDate >= cutoffDate) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  
+  return count;
+}
+
+/**
+ * Add schedule fatigue analysis to all games
+ */
+function analyzeScheduleFatigue(games: any[]): GameResult[] {
+  return games.map((game, index) => {
+    const previousGame = index > 0 ? games[index - 1] : null;
+    const daysRest = calculateDaysRest(game.date, previousGame?.date || null);
+    const isBackToBack = daysRest === 0;
+    const gamesInLast4Days = countGamesInLastNDays(index, games, 4);
+    const gamesInLast5Days = countGamesInLastNDays(index, games, 5);
+    
+    return {
+      ...game,
+      daysRest,
+      isBackToBack,
+      gamesInLast4Days,
+      gamesInLast5Days,
+    };
+  });
+}
+
+// ============================================================================
+// MAIN SCRAPER
+// ============================================================================
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,14 +144,11 @@ export async function GET(request: NextRequest) {
 
     console.log(`🏀 Scraping game results for ${teamName} (${abbreviation})...`);
 
-    // Determine current season year (Basketball Reference uses the END year)
-    // NBA season runs Oct-Apr, so if it's before July, use current year, otherwise next year
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // 1-12
+    const currentMonth = now.getMonth() + 1;
     const seasonEndYear = currentMonth >= 7 ? currentYear + 1 : currentYear;
 
-    // Basketball Reference schedule page
     const url = `https://www.basketball-reference.com/teams/${abbreviation}/${seasonEndYear}_games.html`;
 
     const response = await fetch(url, {
@@ -96,40 +165,30 @@ export async function GET(request: NextRequest) {
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    const games: GameResult[] = [];
+    const games: any[] = [];
     let gameNumber = 0;
 
     // Parse the games table
     $('#games tbody tr').each((_, row) => {
       const $row = $(row);
       
-      // Skip header rows
-      if ($row.hasClass('thead')) {
-        return;
-      }
+      if ($row.hasClass('thead')) return;
       
-      // IMPORTANT: Only include games that have been played (have a result)
       const result = $row.find('td[data-stat="game_result"]').text().trim();
-      if (!result || (result !== 'W' && result !== 'L')) {
-        return; // Skip future games without results
-      }
+      if (!result || (result !== 'W' && result !== 'L')) return;
 
       gameNumber++;
 
       const date = $row.find('td[data-stat="date_game"]').text().trim();
       const locationSymbol = $row.find('td[data-stat="game_location"]').text().trim();
-      const isHome = locationSymbol !== '@'; // @ means away game
+      const isHome = locationSymbol !== '@';
       const opponent = $row.find('td[data-stat="opp_name"]').text().trim();
       const teamScore = parseInt($row.find('td[data-stat="pts"]').text()) || 0;
       const opponentScore = parseInt($row.find('td[data-stat="opp_pts"]').text()) || 0;
 
-      // Double-check that both scores exist (another safeguard for completed games)
       if (!teamScore || !opponentScore) return;
 
-      // Calculate margin (positive = win, negative = loss)
       const margin = teamScore - opponentScore;
-
-      // Adjust for home court advantage (Formula #2)
       const adjustedMargin = isHome 
         ? margin - HOME_COURT_ADVANTAGE 
         : margin + HOME_COURT_ADVANTAGE;
@@ -149,19 +208,22 @@ export async function GET(request: NextRequest) {
 
     console.log(`✅ Scraped ${games.length} games for ${teamName}`);
 
+    // ========================================================================
+    // ADD SCHEDULE FATIGUE ANALYSIS
+    // ========================================================================
+    const gamesWithSchedule = analyzeScheduleFatigue(games);
+
     // Calculate basic stats
-    const totalGames = games.length;
-    const wins = games.filter(g => g.result === 'W').length;
-    const losses = games.filter(g => g.result === 'L').length;
+    const totalGames = gamesWithSchedule.length;
+    const wins = gamesWithSchedule.filter(g => g.result === 'W').length;
+    const losses = gamesWithSchedule.filter(g => g.result === 'L').length;
     
-    // Formula #3: Average Adjusted Margin (MOV)
     const avgAdjustedMargin = totalGames > 0 
-      ? games.reduce((sum, g) => sum + g.adjustedMargin, 0) / totalGames 
+      ? gamesWithSchedule.reduce((sum, g) => sum + g.adjustedMargin, 0) / totalGames 
       : 0;
 
-    // Home/Away splits (Formula #7)
-    const homeGames = games.filter(g => g.isHome);
-    const awayGames = games.filter(g => !g.isHome);
+    const homeGames = gamesWithSchedule.filter(g => g.isHome);
+    const awayGames = gamesWithSchedule.filter(g => !g.isHome);
     
     const homeMOV = homeGames.length > 0
       ? homeGames.reduce((sum, g) => sum + g.adjustedMargin, 0) / homeGames.length
@@ -173,21 +235,30 @@ export async function GET(request: NextRequest) {
     
     const homeAwayDelta = homeMOV - awayMOV;
 
-    // Formula #6: Rolling Margin (last 10 games, weighted)
-    const recentGames = games.slice(-10);
+    const recentGames = gamesWithSchedule.slice(-10);
     let rollingMOV = 0;
     if (recentGames.length > 0) {
       let totalWeight = 0;
       let weightedSum = 0;
       
       recentGames.forEach((game, idx) => {
-        const weight = idx + 1; // More recent = higher weight
+        const weight = idx + 1;
         weightedSum += game.adjustedMargin * weight;
         totalWeight += weight;
       });
       
       rollingMOV = weightedSum / totalWeight;
     }
+
+    // ========================================================================
+    // SCHEDULE STATISTICS
+    // ========================================================================
+    const backToBackGames = gamesWithSchedule.filter(g => g.isBackToBack).length;
+    const threeInFourGames = gamesWithSchedule.filter(g => g.gamesInLast4Days >= 3).length;
+    const deathScheduleGames = gamesWithSchedule.filter(g => g.gamesInLast5Days >= 4).length;
+    const avgDaysRest = totalGames > 0
+      ? gamesWithSchedule.reduce((sum, g) => sum + g.daysRest, 0) / totalGames
+      : 0;
 
     return NextResponse.json({
       success: true,
@@ -203,7 +274,13 @@ export async function GET(request: NextRequest) {
         homeAwayDelta,
         rollingMOV,
       },
-      games,
+      scheduleStats: {
+        backToBackGames,
+        threeInFourGames,
+        deathScheduleGames,
+        avgDaysRest,
+      },
+      games: gamesWithSchedule,
       scrapedAt: new Date().toISOString(),
     });
 

@@ -30,6 +30,10 @@ interface GameResult {
   opponentScore: number;
   margin: number;
   adjustedMargin: number;
+  daysRest: number;
+  isBackToBack: boolean;
+  gamesInLast4Days: number;
+  gamesInLast5Days: number;
 }
 
 interface TeamData {
@@ -44,6 +48,14 @@ interface TeamData {
     awayMOV: number;
     homeAwayDelta: number;
     rollingMOV: number;
+    sos?: number;
+    scheduleAdjustedMOV?: number;
+  };
+  scheduleStats: {
+    backToBackGames: number;
+    threeInFourGames: number;
+    deathScheduleGames: number;
+    avgDaysRest: number;
   };
   games: GameResult[];
   scrapedAt: string;
@@ -73,7 +85,7 @@ const NBA_TEAMS: Record<string, string> = {
   'Oklahoma City Thunder': 'OKC',
   'Orlando Magic': 'ORL',
   'Philadelphia 76ers': 'PHI',
-  'Phoenix Suns': 'PHX',
+  'Phoenix Suns': 'PHO',  // FIXED: Was PHX, should be PHO
   'Portland Trail Blazers': 'POR',
   'Sacramento Kings': 'SAC',
   'San Antonio Spurs': 'SAS',
@@ -82,10 +94,78 @@ const NBA_TEAMS: Record<string, string> = {
   'Washington Wizards': 'WAS',
 };
 
-const HOME_COURT_ADVANTAGE = 2.5;
+const HOME_COURT_ADVANTAGE = 2.3; // Updated from 2.5 to 2.3
 
-async function scrapeTeam(teamName: string, abbreviation: string): Promise<TeamData | null> {
+// ============================================================================
+// SCHEDULE ANALYSIS FUNCTIONS
+// ============================================================================
+
+function calculateDaysRest(currentGameDate: string, previousGameDate: string | null): number {
+  if (!previousGameDate) return 99;
+  
+  const current = new Date(currentGameDate);
+  const previous = new Date(previousGameDate);
+  
+  const diffTime = current.getTime() - previous.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  return diffDays - 1;
+}
+
+function countGamesInLastNDays(currentIndex: number, games: any[], days: number): number {
+  if (currentIndex === 0) return 1;
+  
+  const currentDate = new Date(games[currentIndex].date);
+  const cutoffDate = new Date(currentDate);
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+  
+  let count = 1;
+  
+  for (let i = currentIndex - 1; i >= 0; i--) {
+    const gameDate = new Date(games[i].date);
+    if (gameDate >= cutoffDate) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  
+  return count;
+}
+
+function analyzeScheduleFatigue(games: any[]): GameResult[] {
+  return games.map((game, index) => {
+    const previousGame = index > 0 ? games[index - 1] : null;
+    const daysRest = calculateDaysRest(game.date, previousGame?.date || null);
+    const isBackToBack = daysRest === 0;
+    const gamesInLast4Days = countGamesInLastNDays(index, games, 4);
+    const gamesInLast5Days = countGamesInLastNDays(index, games, 5);
+    
+    return {
+      ...game,
+      daysRest,
+      isBackToBack,
+      gamesInLast4Days,
+      gamesInLast5Days,
+    };
+  });
+}
+
+// ============================================================================
+// SCRAPER WITH RETRY LOGIC
+// ============================================================================
+
+async function scrapeTeam(
+  teamName: string, 
+  abbreviation: string, 
+  retryCount: number = 0
+): Promise<TeamData | null> {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 3000; // 3 seconds
+  
   try {
+    console.log(`📥 Scraping ${teamName} (${abbreviation})...`);
+    
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
@@ -101,14 +181,13 @@ async function scrapeTeam(teamName: string, abbreviation: string): Promise<TeamD
     });
 
     if (!response.ok) {
-      console.error(`Failed to fetch ${teamName}: ${response.status}`);
-      return null;
+      throw new Error(`HTTP ${response.status} for ${teamName}`);
     }
 
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    const games: GameResult[] = [];
+    const games: any[] = [];
     let gameNumber = 0;
 
     $('#games tbody tr').each((_, row) => {
@@ -146,16 +225,24 @@ async function scrapeTeam(teamName: string, abbreviation: string): Promise<TeamD
       });
     });
 
-    const totalGames = games.length;
-    const wins = games.filter(g => g.result === 'W').length;
-    const losses = games.filter(g => g.result === 'L').length;
+    // Check if we got games - if not, might be rate limited or error
+    if (games.length === 0) {
+      throw new Error(`No games found for ${teamName}`);
+    }
+
+    // Add schedule fatigue analysis
+    const gamesWithSchedule = analyzeScheduleFatigue(games);
+
+    const totalGames = gamesWithSchedule.length;
+    const wins = gamesWithSchedule.filter(g => g.result === 'W').length;
+    const losses = gamesWithSchedule.filter(g => g.result === 'L').length;
     
     const avgAdjustedMargin = totalGames > 0 
-      ? games.reduce((sum, g) => sum + g.adjustedMargin, 0) / totalGames 
+      ? gamesWithSchedule.reduce((sum, g) => sum + g.adjustedMargin, 0) / totalGames 
       : 0;
 
-    const homeGames = games.filter(g => g.isHome);
-    const awayGames = games.filter(g => !g.isHome);
+    const homeGames = gamesWithSchedule.filter(g => g.isHome);
+    const awayGames = gamesWithSchedule.filter(g => !g.isHome);
     
     const homeMOV = homeGames.length > 0
       ? homeGames.reduce((sum, g) => sum + g.adjustedMargin, 0) / homeGames.length
@@ -167,7 +254,7 @@ async function scrapeTeam(teamName: string, abbreviation: string): Promise<TeamD
     
     const homeAwayDelta = homeMOV - awayMOV;
 
-    const recentGames = games.slice(-10);
+    const recentGames = gamesWithSchedule.slice(-10);
     let rollingMOV = 0;
     if (recentGames.length > 0) {
       let totalWeight = 0;
@@ -182,6 +269,16 @@ async function scrapeTeam(teamName: string, abbreviation: string): Promise<TeamD
       rollingMOV = weightedSum / totalWeight;
     }
 
+    // Calculate schedule statistics
+    const backToBackGames = gamesWithSchedule.filter(g => g.isBackToBack).length;
+    const threeInFourGames = gamesWithSchedule.filter(g => g.gamesInLast4Days >= 3).length;
+    const deathScheduleGames = gamesWithSchedule.filter(g => g.gamesInLast5Days >= 4).length;
+    const avgDaysRest = totalGames > 0
+      ? gamesWithSchedule.reduce((sum, g) => sum + g.daysRest, 0) / totalGames
+      : 0;
+
+    console.log(`✅ ${teamName}: ${totalGames} games (${wins}-${losses}), ${deathScheduleGames} death schedule games`);
+
     return {
       teamName,
       abbreviation,
@@ -195,57 +292,74 @@ async function scrapeTeam(teamName: string, abbreviation: string): Promise<TeamD
         homeAwayDelta,
         rollingMOV,
       },
-      games,
+      scheduleStats: {
+        backToBackGames,
+        threeInFourGames,
+        deathScheduleGames,
+        avgDaysRest,
+      },
+      games: gamesWithSchedule,
       scrapedAt: new Date().toISOString(),
     };
-  } catch (error) {
-    console.error(`Error scraping ${teamName}:`, error);
+    
+  } catch (error: any) {
+    console.error(`❌ Error scraping ${teamName}: ${error.message}`);
+    
+    // Retry logic for Phoenix Suns and other failed teams
+    if (retryCount < MAX_RETRIES) {
+      console.log(`🔄 Retrying ${teamName} (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return scrapeTeam(teamName, abbreviation, retryCount + 1);
+    }
+    
+    console.error(`💀 ${teamName} failed after ${MAX_RETRIES} retries`);
     return null;
   }
 }
 
+// ============================================================================
+// MAIN SYNC FUNCTION
+// ============================================================================
+
 export async function POST() {
   try {
-    console.log('🚀 Starting sync of all NBA teams...');
+    console.log('🚀 Starting sync of all 30 NBA teams...');
     
     const teams = Object.entries(NBA_TEAMS);
     const results: { success: TeamData[], failed: string[] } = { success: [], failed: [] };
 
-    // Scrape teams one by one with delay to avoid rate limiting
+    // Scrape teams one by one with delay
     for (const [teamName, abbreviation] of teams) {
-      console.log(`📥 Scraping ${teamName}...`);
-      
       const teamData = await scrapeTeam(teamName, abbreviation);
       
       if (teamData) {
         results.success.push(teamData);
-        console.log(`✅ ${teamName}: ${teamData.summary.totalGames} games`);
       } else {
         results.failed.push(teamName);
-        console.log(`❌ ${teamName}: Failed`);
       }
 
-      // Delay between requests to be polite to Basketball Reference
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Delay between requests (2 seconds to be safe)
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
-    console.log(`\n🎉 Scrape complete: ${results.success.length} success, ${results.failed.length} failed`);
+    console.log(`\n🎉 Scrape complete: ${results.success.length}/30 success, ${results.failed.length} failed`);
 
-    // Calculate Strength of Schedule (SOS) for each team
+    if (results.failed.length > 0) {
+      console.log(`⚠️ Failed teams: ${results.failed.join(', ')}`);
+    }
+
+    // Calculate Strength of Schedule (SOS)
     console.log('\n📊 Calculating Strength of Schedule...');
     
-    // Create a map of team name to MOV for quick lookup
     const teamMOVMap = new Map<string, number>();
     results.success.forEach(team => {
       teamMOVMap.set(team.teamName, team.summary.avgAdjustedMargin);
     });
 
-    // Calculate SOS for each team
     const teamsWithSOS = results.success.map(team => {
       let totalOpponentMOV = 0;
       let opponentCount = 0;
 
-      // Sum up the MOV of all opponents
       team.games.forEach(game => {
         const opponentMOV = teamMOVMap.get(game.opponent);
         if (opponentMOV !== undefined) {
@@ -255,8 +369,6 @@ export async function POST() {
       });
 
       const sos = opponentCount > 0 ? totalOpponentMOV / opponentCount : 0;
-      
-      // Schedule-Adjusted MOV (Formula #5)
       const scheduleAdjustedMOV = team.summary.avgAdjustedMargin - sos;
 
       return {
@@ -271,7 +383,7 @@ export async function POST() {
 
     console.log('✅ SOS calculation complete');
 
-    // Save all teams to Firestore
+    // Save to Firestore
     console.log('\n💾 Saving to Firestore...');
     
     const batch = db.batch();
@@ -282,6 +394,7 @@ export async function POST() {
         teamName: team.teamName,
         abbreviation: team.abbreviation,
         summary: team.summary,
+        scheduleStats: team.scheduleStats,
         games: team.games,
         scrapedAt: team.scrapedAt,
         updatedAt: new Date().toISOString(),
@@ -293,12 +406,13 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Synced ${results.success.length} of ${teams.length} teams and saved to Firestore`,
+      message: `Synced ${results.success.length} of ${teams.length} teams`,
       failedTeams: results.failed,
       totalTeams: teams.length,
       successCount: results.success.length,
       failedCount: results.failed.length,
       savedToFirestore: true,
+      scheduleAnalysisComplete: true,
     });
 
   } catch (error: any) {

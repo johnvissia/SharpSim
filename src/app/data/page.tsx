@@ -2,42 +2,21 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Download, Loader2 } from 'lucide-react';
+import { LineChart, Download, Loader2, TrendingUp, TrendingDown, Activity, Heart, Battery, AlertTriangle, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
 const NBA_TEAMS = [
-  'Atlanta Hawks',
-  'Boston Celtics',
-  'Brooklyn Nets',
-  'Charlotte Hornets',
-  'Chicago Bulls',
-  'Cleveland Cavaliers',
-  'Dallas Mavericks',
-  'Denver Nuggets',
-  'Detroit Pistons',
-  'Golden State Warriors',
-  'Houston Rockets',
-  'Indiana Pacers',
-  'LA Clippers',
-  'Los Angeles Lakers',
-  'Memphis Grizzlies',
-  'Miami Heat',
-  'Milwaukee Bucks',
-  'Minnesota Timberwolves',
-  'New Orleans Pelicans',
-  'New York Knicks',
-  'Oklahoma City Thunder',
-  'Orlando Magic',
-  'Philadelphia 76ers',
-  'Phoenix Suns',
-  'Portland Trail Blazers',
-  'Sacramento Kings',
-  'San Antonio Spurs',
-  'Toronto Raptors',
-  'Utah Jazz',
-  'Washington Wizards',
+  'Atlanta Hawks', 'Boston Celtics', 'Brooklyn Nets', 'Charlotte Hornets',
+  'Chicago Bulls', 'Cleveland Cavaliers', 'Dallas Mavericks', 'Denver Nuggets',
+  'Detroit Pistons', 'Golden State Warriors', 'Houston Rockets', 'Indiana Pacers',
+  'LA Clippers', 'Los Angeles Lakers', 'Memphis Grizzlies', 'Miami Heat',
+  'Milwaukee Bucks', 'Minnesota Timberwolves', 'New Orleans Pelicans', 'New York Knicks',
+  'Oklahoma City Thunder', 'Orlando Magic', 'Philadelphia 76ers', 'Phoenix Suns',
+  'Portland Trail Blazers', 'Sacramento Kings', 'San Antonio Spurs', 'Toronto Raptors',
+  'Utah Jazz', 'Washington Wizards',
 ];
 
 export default function DataPage() {
@@ -149,7 +128,7 @@ export default function DataPage() {
       setRatingsResults(data);
       toast({
         title: 'Calculation Complete!',
-        description: `SRS converged after ${data.iterations} iterations`,
+        description: `Power ratings calculated successfully`,
       });
     } catch (error: any) {
       toast({
@@ -162,6 +141,103 @@ export default function DataPage() {
     }
   };
 
+  // Helper function to get fatigue badge for a game
+  const getFatigueBadge = (game: any) => {
+    if (game.gamesInLast5Days >= 4) {
+      return (
+        <Badge variant="destructive" className="text-xs">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          4 in 5
+        </Badge>
+      );
+    }
+    if (game.gamesInLast4Days >= 3) {
+      return (
+        <Badge className="text-xs bg-orange-600 hover:bg-orange-700">
+          3 in 4
+        </Badge>
+      );
+    }
+    if (game.isBackToBack) {
+      return (
+        <Badge variant="outline" className="text-xs text-yellow-500 border-yellow-500">
+          B2B
+        </Badge>
+      );
+    }
+    return null;
+  };
+
+  const TeamRatingCard = ({ team, rank, isTop }: any) => {
+    const tprValue = parseFloat(team.tpr);
+    const injuryValue = parseFloat(team.injuries);
+    const hasInjuries = injuryValue > 0.1;
+
+    return (
+      <div className={`p-4 rounded-lg border-2 ${
+        isTop 
+          ? 'bg-gradient-to-br from-green-950/40 to-green-900/20 border-green-500/50' 
+          : 'bg-gradient-to-br from-red-950/40 to-red-900/20 border-red-500/50'
+      }`}>
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex items-center gap-2">
+            <span className={`text-2xl font-bold ${isTop ? 'text-green-400' : 'text-red-400'}`}>
+              #{rank}
+            </span>
+            <div>
+              <h4 className="font-bold text-white">{team.team}</h4>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant={tprValue > 5 ? "default" : tprValue > 0 ? "secondary" : "destructive"}>
+                  TPR: {team.tpr}
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  Pace: {team.pace}
+                </Badge>
+              </div>
+            </div>
+          </div>
+          {hasInjuries && (
+            <div className="flex items-center gap-1 text-orange-400">
+              <Heart className="h-4 w-4" />
+              <span className="text-xs">-{team.injuries}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="bg-black/20 p-2 rounded">
+            <div className="text-muted-foreground mb-1">SRS</div>
+            <div className="font-bold text-blue-400">{team.srs}</div>
+          </div>
+          <div className="bg-black/20 p-2 rounded">
+            <div className="text-muted-foreground mb-1">Recency</div>
+            <div className="font-bold text-purple-400">{team.recency}</div>
+          </div>
+          <div className="bg-black/20 p-2 rounded">
+            <div className="text-muted-foreground mb-1">Blended</div>
+            <div className="font-bold text-cyan-400">{team.blended}</div>
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+            <span>Team Power</span>
+            <span>{tprValue > 0 ? '+' : ''}{tprValue.toFixed(1)}</span>
+          </div>
+          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div 
+              className={`h-full ${isTop ? 'bg-green-500' : 'bg-red-500'}`}
+              style={{ 
+                width: `${Math.min(Math.abs(tprValue) * 5, 100)}%`,
+                marginLeft: tprValue < 0 ? 'auto' : '0'
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-4 md:p-8">
       <header className="mb-8">
@@ -170,7 +246,7 @@ export default function DataPage() {
           Data Hub
         </h1>
         <p className="text-muted-foreground">
-          Analyze scraped data to build your betting edge.
+          NBA betting model with SRS ratings, injury tracking, schedule fatigue, and blowout dampening
         </p>
       </header>
 
@@ -180,7 +256,7 @@ export default function DataPage() {
           <CardHeader>
             <CardTitle>🏀 Sync All NBA Teams</CardTitle>
             <CardDescription>
-              Scrape game data for all 30 NBA teams at once. Takes ~60 seconds.
+              Scrape game data for all 30 NBA teams with schedule fatigue analysis.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -203,7 +279,6 @@ export default function DataPage() {
               )}
             </Button>
 
-            {/* Sync Results */}
             {syncAllResults && (
               <div className="mt-6 space-y-4">
                 <div className="bg-slate-900 rounded-lg p-6">
@@ -224,9 +299,15 @@ export default function DataPage() {
                   </div>
 
                   {syncAllResults.failedTeams && syncAllResults.failedTeams.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-sm text-muted-foreground">Failed teams:</p>
-                      <p className="text-sm text-red-400">{syncAllResults.failedTeams.join(', ')}</p>
+                    <div className="mt-4 bg-red-950/30 border border-red-500/50 rounded p-3">
+                      <p className="text-sm font-semibold text-red-400 mb-1">Failed teams:</p>
+                      <p className="text-sm text-red-300">{syncAllResults.failedTeams.join(', ')}</p>
+                    </div>
+                  )}
+
+                  {syncAllResults.scheduleAnalysisComplete && (
+                    <div className="mt-4 bg-green-950/30 border border-green-500/50 rounded p-3">
+                      <p className="text-sm text-green-400">✅ Schedule fatigue analysis complete for all teams</p>
                     </div>
                   )}
                 </div>
@@ -238,12 +319,34 @@ export default function DataPage() {
         {/* Power Ratings Calculator */}
         <Card className="border-green-500/50">
           <CardHeader>
-            <CardTitle>⚡ Calculate Power Ratings (SRS)</CardTitle>
-            <CardDescription>
-              Run Phase 1 & 2: Net Rating normalization and recursive SRS algorithm
-            </CardDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  ⚡ Complete Power Ratings System
+                  <Badge variant="outline" className="ml-2">Updated Model</Badge>
+                </CardTitle>
+                <CardDescription className="mt-2">
+                  Phase 1-3: Net Rating → SRS → Injuries + Blowout Dampening + Schedule Fatigue
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="bg-slate-900/50 rounded-lg p-4 mb-4">
+              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-blue-400" />
+                Model Improvements
+              </h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>✅ HCA reduced to 2.3 pts (modern NBA)</li>
+                <li>✅ Blowout dampening (20+ margin = 50% weight)</li>
+                <li>✅ Tiered injury replacements (Star/Starter/Bench)</li>
+                <li>✅ Expanded rest penalties (B2B, 3-in-4, 4-in-5)</li>
+                <li>✅ Bet sizing capped at 3-5% max</li>
+                <li>✅ Schedule fatigue tracking</li>
+              </ul>
+            </div>
+
             <Button 
               onClick={handleCalculateRatings} 
               disabled={calculatingRatings || syncingAll} 
@@ -254,7 +357,7 @@ export default function DataPage() {
               {calculatingRatings ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Calculating SRS...
+                  Calculating Power Ratings...
                 </>
               ) : (
                 <>
@@ -263,65 +366,105 @@ export default function DataPage() {
               )}
             </Button>
 
-            {/* Ratings Results */}
             {ratingsResults && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div className="bg-slate-900 rounded-lg p-6">
-                  <h3 className="text-lg font-bold mb-4">📊 SRS Calculation Results</h3>
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Teams Processed</p>
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-green-500" />
+                    Calculation Summary
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-black/20 p-4 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Teams</p>
                       <p className="text-2xl font-bold">{ratingsResults.message?.match(/\d+/)?.[0]}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Iterations</p>
+                    <div className="bg-black/20 p-4 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">SRS Iterations</p>
                       <p className="text-2xl font-bold text-blue-500">{ratingsResults.iterations}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Convergence</p>
-                      <p className="text-2xl font-bold text-green-500">{ratingsResults.convergence?.toFixed(4)}</p>
+                    <div className="bg-black/20 p-4 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Convergence</p>
+                      <p className="text-2xl font-bold text-green-500">{ratingsResults.convergence?.toFixed(6)}</p>
+                    </div>
+                    <div className="bg-black/20 p-4 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Injuries Tracked</p>
+                      <p className="text-2xl font-bold text-orange-500">{ratingsResults.injuriesFound || 0}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingUp className="h-5 w-5 text-green-500" />
+                      <h4 className="font-bold text-lg">Top 5 Teams</h4>
+                    </div>
+                    <div className="space-y-3">
+                      {ratingsResults.topTeams?.map((team: any, idx: number) => (
+                        <TeamRatingCard key={idx} team={team} rank={idx + 1} isTop={true} />
+                      ))}
                     </div>
                   </div>
 
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {/* Top Teams */}
-                    <div>
-                      <h4 className="font-bold text-green-500 mb-2">🏆 Top 5 Teams</h4>
-                      <div className="space-y-2">
-                        {ratingsResults.topTeams?.map((team: any, idx: number) => (
-                          <div key={idx} className="bg-green-900/20 p-3 rounded">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-sm font-semibold">{idx + 1}. {team.team}</span>
-                              <span className="font-bold text-green-400 text-lg">TPR: {team.tpr}</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground flex gap-3">
-                              <span>SRS: {team.srs}</span>
-                              <span>Recency: {team.recency}</span>
-                              <span>Blended: {team.blended}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingDown className="h-5 w-5 text-red-500" />
+                      <h4 className="font-bold text-lg">Bottom 5 Teams</h4>
                     </div>
+                    <div className="space-y-3">
+                      {ratingsResults.bottomTeams?.map((team: any, idx: number) => (
+                        <TeamRatingCard 
+                          key={idx} 
+                          team={team} 
+                          rank={30 - (4 - idx)} 
+                          isTop={false} 
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Bottom Teams */}
+                <div className="bg-blue-950/20 border border-blue-500/30 rounded-lg p-6">
+                  <h4 className="font-bold mb-3 flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-blue-400" />
+                    Understanding the Ratings
+                  </h4>
+                  <div className="grid md:grid-cols-2 gap-4 text-sm">
                     <div>
-                      <h4 className="font-bold text-red-500 mb-2">📉 Bottom 5 Teams</h4>
-                      <div className="space-y-2">
-                        {ratingsResults.bottomTeams?.map((team: any, idx: number) => (
-                          <div key={idx} className="bg-red-900/20 p-3 rounded">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-sm font-semibold">{team.team}</span>
-                              <span className="font-bold text-red-400 text-lg">TPR: {team.tpr}</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground flex gap-3">
-                              <span>SRS: {team.srs}</span>
-                              <span>Recency: {team.recency}</span>
-                              <span>Blended: {team.blended}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      <p className="font-semibold text-blue-400 mb-1">TPR (Team Power Rating)</p>
+                      <p className="text-muted-foreground">
+                        Final rating after all adjustments. Positive = above average.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-blue-400 mb-1">SRS (Simple Rating System)</p>
+                      <p className="text-muted-foreground">
+                        Season-long strength adjusted for opponent quality (70% weight).
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-purple-400 mb-1">Recency Rating</p>
+                      <p className="text-muted-foreground">
+                        Last 10 games with blowout dampening (30% weight).
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-cyan-400 mb-1">Blended Rating</p>
+                      <p className="text-muted-foreground">
+                        70% SRS + 30% Recent form = base strength.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-orange-400 mb-1">Injury Penalty</p>
+                      <p className="text-muted-foreground">
+                        Tiered system: Stars hurt more than bench players.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-yellow-400 mb-1">Pace</p>
+                      <p className="text-muted-foreground">
+                        Possessions per game. Affects final point spread.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -333,9 +476,9 @@ export default function DataPage() {
         {/* Single Team Test Scraper */}
         <Card>
           <CardHeader>
-            <CardTitle>Basketball Reference Scraper</CardTitle>
+            <CardTitle>Basketball Reference Scraper (Single Team Test)</CardTitle>
             <CardDescription>
-              Test the scraper to fetch game-by-game data and calculate advanced metrics
+              Test the scraper with schedule fatigue analysis
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -370,10 +513,9 @@ export default function DataPage() {
               </Button>
             </div>
 
-            {/* Display Results */}
             {scraperData && (
               <div className="mt-6 space-y-6">
-                {/* Summary Stats */}
+                {/* Team Summary */}
                 <div className="bg-slate-900 rounded-lg p-6">
                   <h3 className="text-lg font-bold mb-4">📊 Team Summary</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -384,7 +526,7 @@ export default function DataPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Avg Adjusted Margin</p>
+                      <p className="text-xs text-muted-foreground">Avg Margin</p>
                       <p className="text-2xl font-bold text-primary">
                         {scraperData.summary.avgAdjustedMargin > 0 ? '+' : ''}
                         {scraperData.summary.avgAdjustedMargin.toFixed(2)}
@@ -404,27 +546,90 @@ export default function DataPage() {
                         {scraperData.summary.awayMOV.toFixed(2)}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Home/Away Delta</p>
-                      <p className="text-2xl font-bold">
-                        {scraperData.summary.homeAwayDelta > 0 ? '+' : ''}
-                        {scraperData.summary.homeAwayDelta.toFixed(2)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Rolling MOV (L10)</p>
-                      <p className="text-2xl font-bold text-blue-500">
-                        {scraperData.summary.rollingMOV > 0 ? '+' : ''}
-                        {scraperData.summary.rollingMOV.toFixed(2)}
-                      </p>
-                    </div>
                   </div>
                 </div>
 
-                {/* Recent Games */}
+                {/* Schedule Fatigue Analysis */}
+                {scraperData.scheduleStats && (
+                  <div className="bg-slate-900 rounded-lg p-6">
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                      <Battery className="h-5 w-5 text-orange-500" />
+                      Schedule Fatigue Analysis
+                    </h3>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-black/20 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="h-2 w-2 bg-yellow-500 rounded-full" />
+                          <p className="text-xs text-muted-foreground">Back-to-Backs</p>
+                        </div>
+                        <p className="text-2xl font-bold text-yellow-500">
+                          {scraperData.scheduleStats.backToBackGames}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          -0.5 to -1.5 pts
+                        </p>
+                      </div>
+
+                      <div className="bg-black/20 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="h-2 w-2 bg-orange-500 rounded-full" />
+                          <p className="text-xs text-muted-foreground">3 in 4 Nights</p>
+                        </div>
+                        <p className="text-2xl font-bold text-orange-500">
+                          {scraperData.scheduleStats.threeInFourGames}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          -2.0 pts penalty
+                        </p>
+                      </div>
+
+                      <div className="bg-black/20 p-4 rounded-lg border border-red-500/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className="h-4 w-4 text-red-500" />
+                          <p className="text-xs text-muted-foreground">Death Schedule</p>
+                        </div>
+                        <p className="text-2xl font-bold text-red-500">
+                          {scraperData.scheduleStats.deathScheduleGames}
+                        </p>
+                        <p className="text-xs text-red-400 mt-1 font-semibold">
+                          -4.0 pts penalty!
+                        </p>
+                      </div>
+
+                      <div className="bg-black/20 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Zap className="h-4 w-4 text-blue-500" />
+                          <p className="text-xs text-muted-foreground">Avg Days Rest</p>
+                        </div>
+                        <p className="text-2xl font-bold text-blue-500">
+                          {scraperData.scheduleStats.avgDaysRest.toFixed(1)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {scraperData.scheduleStats.avgDaysRest >= 2 ? 'Well-rested' : 'Fatigued'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {scraperData.scheduleStats.deathScheduleGames > 0 && (
+                      <div className="mt-4 bg-red-950/30 border border-red-500/50 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className="h-5 w-5 text-red-500" />
+                          <p className="font-semibold text-red-400">Death Schedule Alert!</p>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          This team has played <span className="text-red-400 font-bold">{scraperData.scheduleStats.deathScheduleGames}</span> games 
+                          on brutal "4 in 5 nights" schedules. These are prime fade opportunities with -4.0 point penalties.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Recent Games with Fatigue Badges */}
                 <div className="bg-slate-900 rounded-lg p-6">
                   <h3 className="text-lg font-bold mb-4">🏀 Recent Games (Last 10)</h3>
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                  <div className="space-y-2">
                     {scraperData.games.slice(-10).reverse().map((game: any, idx: number) => (
                       <div
                         key={idx}
@@ -442,6 +647,7 @@ export default function DataPage() {
                             {game.isHome ? 'vs' : '@'}
                           </span>
                           <span className="font-semibold">{game.opponent}</span>
+                          {getFatigueBadge(game)}
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="text-sm">
@@ -452,41 +658,13 @@ export default function DataPage() {
                           }`}>
                             {game.margin > 0 ? '+' : ''}{game.margin}
                           </span>
-                          <span className="text-xs text-muted-foreground">
-                            Adj: {game.adjustedMargin > 0 ? '+' : ''}{game.adjustedMargin.toFixed(1)}
-                          </span>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-
-                {/* Raw JSON (for debugging) */}
-                <details className="bg-slate-900 rounded-lg p-6">
-                  <summary className="cursor-pointer font-bold mb-2">
-                    🔍 View Raw JSON Data
-                  </summary>
-                  <pre className="text-xs bg-slate-950 p-4 rounded overflow-x-auto mt-4">
-                    {JSON.stringify(scraperData, null, 2)}
-                  </pre>
-                </details>
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Coming Soon Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Power Ratings Calculator</CardTitle>
-            <CardDescription>
-              Coming next: Calculate team power ratings using the formulas and predict game spreads
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Once we verify the scraper works, we'll build the power ratings system and integrate it into game predictions.
-            </p>
           </CardContent>
         </Card>
       </div>
