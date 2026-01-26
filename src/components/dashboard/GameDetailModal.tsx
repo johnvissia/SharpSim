@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import type { Game, UserProfile } from '@/lib/types';
+import { useState, useMemo } from 'react';
+import type { Game, UserProfile, PlayerProp } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Heart, Loader2, User, Star, TrendingUp } from 'lucide-react';
+import { Heart, Loader2, User, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { sportIconMap } from '@/lib/team-logos';
@@ -11,26 +11,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '../ui/button';
 import { MainLinesView } from './MainLinesView';
 import { GameLeadersView } from './GameLeadersView';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, updateDoc, arrayUnion, arrayRemove, query, collection, where } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBetSlip } from '@/context/BetSlipContext';
-import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface GameDetailModalProps {
   game: Game | null;
   isOpen: boolean;
   onClose: () => void;
-}
-
-interface PlayerProp {
-  playerId: string;
-  playerName: string;
-  market: string;
-  line: number;
-  overOdds: number;
-  underOdds: number;
 }
 
 const TeamHeader = ({ team, sport, isFavorite, onToggleFavorite, isUpdating }: { 
@@ -71,220 +62,198 @@ const TeamHeader = ({ team, sport, isFavorite, onToggleFavorite, isUpdating }: {
             </Link>
         </div>
     )
-}
+};
+
+const PlayerLines = ({ playerName, props, game }: { playerName: string; props: PlayerProp[]; game: Game }) => {
+    const { addPick, picks } = useBetSlip();
+    const [isOpen, setIsOpen] = useState(false);
+
+    if (props.length === 0) return null;
+
+    const sortedProps = [...props].sort((a, b) => a.line - b.line);
+    const mainLine = sortedProps[Math.floor(sortedProps.length / 2)];
+    const alternateLines = sortedProps.filter(p => p.id !== mainLine.id);
+
+    const handlePick = (prop: PlayerProp, side: 'over' | 'under') => {
+        const pickString = `${side.charAt(0).toUpperCase() + side.slice(1)} ${prop.line}`;
+        const pickOdds = side === 'over' ? prop.overOdds : prop.underOdds;
+
+        addPick({
+            game,
+            pick: `${prop.playerName} ${prop.market.toUpperCase()} - ${pickString}`,
+            odds: pickOdds,
+            betType: 'player_prop',
+            marketId: `${game.id}_${prop.playerId}_${prop.market}_${prop.line}`,
+            playerId: prop.playerId,
+            market: prop.market,
+            line: prop.line,
+        });
+    };
+
+    const isInSlip = (prop: PlayerProp, side: 'over' | 'under') => {
+        const marketId = `${game.id}_${prop.playerId}_${prop.market}_${prop.line}`;
+        const pickInSlip = picks.find(p => p.marketId === marketId);
+        if (!pickInSlip) return false;
+        return pickInSlip.pick.toLowerCase().includes(side);
+    };
+    
+    return (
+        <div className="bg-slate-800/50 rounded-lg overflow-hidden transition-all duration-300">
+            <div 
+              className="grid grid-cols-[200px_1fr] md:grid-cols-[250px_1fr] items-center gap-3 p-3 cursor-pointer hover:bg-slate-700/50"
+              onClick={() => setIsOpen(!isOpen)}
+            >
+                <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{playerName}</p>
+                        <p className="text-primary font-bold text-xl">{mainLine.line}</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <Button
+                        variant={isInSlip(mainLine, 'over') ? 'secondary' : 'outline'}
+                        onClick={(e) => { e.stopPropagation(); handlePick(mainLine, 'over'); }}
+                        className="flex flex-col items-center justify-center p-2 h-auto gap-0.5"
+                    >
+                        <span className="font-medium text-xs">Over</span>
+                        <span className="font-bold text-base">{mainLine.overOdds > 0 ? `+${mainLine.overOdds}` : mainLine.overOdds}</span>
+                    </Button>
+                    <Button
+                        variant={isInSlip(mainLine, 'under') ? 'secondary' : 'outline'}
+                        onClick={(e) => { e.stopPropagation(); handlePick(mainLine, 'under'); }}
+                        className="flex flex-col items-center justify-center p-2 h-auto gap-0.5"
+                    >
+                        <span className="font-medium text-xs">Under</span>
+                        <span className="font-bold text-base">{mainLine.underOdds > 0 ? `+${mainLine.underOdds}` : mainLine.underOdds}</span>
+                    </Button>
+                </div>
+            </div>
+
+            {isOpen && alternateLines.length > 0 && (
+                <div className="px-3 pb-3 space-y-2">
+                    <div className="pt-2 border-t border-slate-700/50">
+                        {alternateLines.map(prop => (
+                             <div key={prop.id} className="grid grid-cols-[200px_1fr] md:grid-cols-[250px_1fr] items-center gap-3 py-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="min-w-0 pl-6">
+                                        <p className="text-primary font-bold text-lg">{prop.line}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button size="sm" variant={isInSlip(prop, 'over') ? 'secondary' : 'outline'} onClick={() => handlePick(prop, 'over')} className="justify-between">
+                                        <span>Over</span>
+                                        <span>{prop.overOdds > 0 ? `+${prop.overOdds}` : prop.overOdds}</span>
+                                    </Button>
+                                    <Button size="sm" variant={isInSlip(prop, 'under') ? 'secondary' : 'outline'} onClick={() => handlePick(prop, 'under')} className="justify-between">
+                                        <span>Under</span>
+                                        <span>{prop.underOdds > 0 ? `+${prop.underOdds}` : prop.underOdds}</span>
+                                    </Button>
+                                </div>
+                             </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 
 const PlayerPropsView = ({ game }: { game: Game }) => {
-  const [props, setProps] = useState<PlayerProp[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [apiUsage, setApiUsage] = useState<{ used: string | null; remaining: string | null }>({ used: null, remaining: null });
-  const { addPick, picks } = useBetSlip();
-  const { toast } = useToast();
+    const firestore = useFirestore();
 
-  const loadPlayerProps = async () => {
-    if (loaded || loading) return;
+    const propsQuery = useMemoFirebase(() => {
+        if (!firestore || !game?.oddsApiId) return null;
+        return query(
+            collection(firestore, 'player_props'),
+            where('gameId', '==', game.oddsApiId)
+        );
+    }, [firestore, game?.oddsApiId]);
 
-    if (!game.oddsApiId) {
-      setError('No odds data available for this game');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/fetch-game-props?eventId=${game.oddsApiId}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch player props');
-      }
-
-      if (data.props && data.props.length > 0) {
-        setProps(data.props);
-        setLoaded(true);
-        
-        if (data.apiUsage) {
-          setApiUsage(data.apiUsage);
-        }
-
-        toast({
-          title: 'Player Props Loaded',
-          description: `Found ${data.props.length} props${data.apiUsage?.remaining ? ` • ${data.apiUsage.remaining} API calls remaining` : ''}`,
+    const { data: playerProps, isLoading: isLoadingProps } = useCollection<PlayerProp>(propsQuery);
+    
+    // Group props by market type first
+    const marketPropsMap = useMemo(() => {
+        const map = new Map<string, PlayerProp[]>();
+        if (!playerProps) return map;
+        playerProps.forEach(prop => {
+            if (!map.has(prop.market)) {
+                map.set(prop.market, []);
+            }
+            map.get(prop.market)!.push(prop);
         });
-      } else {
-        setError('No player props available for this game');
-      }
-    } catch (err: any) {
-      setError(err.message);
-      toast({
-        title: 'Error',
-        description: err.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+        return map;
+    }, [playerProps]);
 
-  const handlePick = (prop: PlayerProp, side: 'over' | 'under') => {
-    const pickString = `${side.charAt(0).toUpperCase() + side.slice(1)} ${prop.line}`;
-    const pickOdds = side === 'over' ? prop.overOdds : prop.underOdds;
+    const markets = useMemo(() => Array.from(marketPropsMap.entries()).sort((a, b) => a[0].localeCompare(b[0])), [marketPropsMap]);
 
-    addPick({
-      game,
-      pick: `${prop.playerName} ${prop.market.toUpperCase()} - ${pickString}`,
-      odds: pickOdds,
-      betType: 'player_prop',
-      marketId: `${game.id}_${prop.playerId}_${prop.market}_${prop.line}`,
-      playerId: prop.playerId,
-      market: prop.market,
-      line: prop.line,
-    });
-  };
-
-  const isInSlip = (prop: PlayerProp, side: 'over' | 'under') => {
-    const marketId = `${game.id}_${prop.playerId}_${prop.market}_${prop.line}`;
-    const pickInSlip = picks.find(p => p.marketId === marketId);
-    if (!pickInSlip) {
-        return false;
-    }
-    return pickInSlip.pick.toLowerCase().includes(side);
-  };
-
-  // Group props by market type
-  const marketPropsMap = new Map<string, PlayerProp[]>();
-  props.forEach(prop => {
-    if (!marketPropsMap.has(prop.market)) {
-      marketPropsMap.set(prop.market, []);
-    }
-    marketPropsMap.get(prop.market)!.push(prop);
-  });
-
-  // Sort players within each market alphabetically
-  marketPropsMap.forEach(marketProps => {
-    marketProps.sort((a, b) => a.playerName.localeCompare(b.playerName));
-  });
-
-  const markets = Array.from(marketPropsMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-
-  return (
-    <div className="space-y-4">
-      {!loaded && !loading && (
-        <div className="text-center py-12">
-          <Button onClick={loadPlayerProps} size="lg" className="gap-2">
-            <span>Load Player Props</span>
-            <span className="text-xs text-muted-foreground">(Uses 1 API call)</span>
-          </Button>
-        </div>
-      )}
-
-      {loading && (
-        <div className="flex items-center justify-center py-12 gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <div className="text-center">
-            <p className="font-semibold">Fetching player props...</p>
-            <p className="text-xs text-muted-foreground mt-1">This may take a moment</p>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="text-center py-12 text-muted-foreground">
-          <p className="font-semibold">{error}</p>
-          <Button onClick={loadPlayerProps} variant="outline" size="sm" className="mt-4">
-            Try Again
-          </Button>
-        </div>
-      )}
-
-      {loaded && props.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          <p>No player props available for this game</p>
-        </div>
-      )}
-
-      {loaded && markets.length > 0 && (
-        <>
-          {apiUsage.remaining && (
-            <div className="text-xs text-muted-foreground text-right px-2 mb-2">
-              📊 API calls remaining: {apiUsage.remaining}
+    if (isLoadingProps) {
+        return (
+            <div className="space-y-4">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
             </div>
-          )}
-          <div className="space-y-2">
-            {markets.map(([marketType, marketProps]) => {
-              // Format market name nicely
-              const marketName = marketType
-                .replace(/_/g, ' ')
-                .split(' ')
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                .join(' ');
+        )
+    }
 
-              return (
-                <details key={marketType} className="group bg-slate-900 rounded-lg overflow-hidden">
-                  <summary className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-800 transition-colors select-none">
-                    <div className="flex items-center gap-3">
-                      <svg 
-                        className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" 
-                        fill="none" 
-                        viewBox="0 0 24 24" 
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                      <span className="font-bold text-base">{marketName}</span>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {marketProps.length} players
-                    </Badge>
-                  </summary>
-                  <div className="px-4 pb-3 pt-1 space-y-2">
-                    {marketProps.map((prop, idx) => (
-                      <div
-                        key={`${prop.playerId}_${prop.market}_${prop.line}_${idx}`}
-                        className="grid grid-cols-[200px_1fr] md:grid-cols-[250px_1fr] items-center gap-3 p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-semibold text-sm truncate">{prop.playerName}</p>
-                            <p className="text-primary font-bold text-xl">{prop.line}</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            variant={isInSlip(prop, 'over') ? 'secondary' : 'outline'}
-                            onClick={() => handlePick(prop, 'over')}
-                            className="flex flex-col items-center justify-center p-2 h-auto gap-0.5"
-                          >
-                            <span className="font-medium text-xs">Over</span>
-                            <span className="font-bold text-base">
-                              {prop.overOdds > 0 ? `+${prop.overOdds}` : prop.overOdds}
-                            </span>
-                          </Button>
-                          <Button
-                            variant={isInSlip(prop, 'under') ? 'secondary' : 'outline'}
-                            onClick={() => handlePick(prop, 'under')}
-                            className="flex flex-col items-center justify-center p-2 h-auto gap-0.5"
-                          >
-                            <span className="font-medium text-xs">Under</span>
-                            <span className="font-bold text-base">
-                              {prop.underOdds > 0 ? `+${prop.underOdds}` : prop.underOdds}
-                            </span>
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
+    if (!playerProps || playerProps.length === 0) {
+        return (
+            <div className="text-center py-12 text-muted-foreground">
+                <p>No player props found for this game.</p>
+                <p className="text-xs mt-1">Try syncing props on the Prop Hub page.</p>
+            </div>
+        )
+    }
+  
+    return (
+        <div className="space-y-4">
+            {markets.length > 0 ? (
+                <div className="space-y-2">
+                    {markets.map(([marketType, marketProps]) => {
+                        const marketName = marketType.replace(/_/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
+                        // Group players within the market
+                        const playersInMarket = new Map<string, { playerName: string; props: PlayerProp[] }>();
+                        marketProps.forEach(prop => {
+                            if (!playersInMarket.has(prop.playerId)) {
+                                playersInMarket.set(prop.playerId, { playerName: prop.playerName, props: [] });
+                            }
+                            playersInMarket.get(prop.playerId)!.props.push(prop);
+                        });
+                        const sortedPlayers = Array.from(playersInMarket.values()).sort((a,b) => a.playerName.localeCompare(b.playerName));
+
+                        return (
+                            <details key={marketType} className="group bg-slate-900 rounded-lg overflow-hidden">
+                                <summary className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-800 transition-colors select-none">
+                                    <div className="flex items-center gap-3">
+                                        <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                                        <span className="font-bold text-base">{marketName}</span>
+                                    </div>
+                                    <Badge variant="secondary" className="text-xs">{sortedPlayers.length} players</Badge>
+                                </summary>
+                                <div className="px-4 pb-3 pt-1 space-y-2">
+                                    {sortedPlayers.map(playerData => (
+                                        <PlayerLines 
+                                            key={playerData.playerName}
+                                            playerName={playerData.playerName}
+                                            props={playerData.props}
+                                            game={game}
+                                        />
+                                    ))}
+                                </div>
+                            </details>
+                        );
+                    })}
+                </div>
+            ) : (
+                 <div className="text-center py-12 text-muted-foreground">
+                    <p>No player props found for this game.</p>
+                </div>
+            )}
+        </div>
+    );
 };
 
 export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps) {
