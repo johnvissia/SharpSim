@@ -264,34 +264,55 @@ export function gradeUserBets(
                 }
                 
                 // Get the actual stat value based on market
-                let actualValue: number;
-                switch (leg.market.toLowerCase()) {
+                let actualValue: number | undefined;
+                const market = leg.market.toLowerCase();
+                
+                switch (market) {
                     case 'points':
+                    case 'pts':
                         actualValue = playerStats.stats.points;
                         break;
                     case 'rebounds':
+                    case 'reb':
                         actualValue = playerStats.stats.rebounds;
                         break;
                     case 'assists':
+                    case 'ast':
                         actualValue = playerStats.stats.assists;
                         break;
                     case 'steals':
+                    case 'stl':
                         actualValue = playerStats.stats.steals;
                         break;
                     case 'blocks':
+                    case 'blk':
                         actualValue = playerStats.stats.blocks;
                         break;
                     case 'turnovers':
+                    case 'to':
                         actualValue = playerStats.stats.turnovers;
                         break;
                     case 'threes':
                     case 'three_pointers_made':
+                    case '3pt':
                         actualValue = playerStats.stats.threePointersMade;
+                        break;
+                    case 'pts+reb+ast':
+                        actualValue = (playerStats.stats.points || 0) + (playerStats.stats.rebounds || 0) + (playerStats.stats.assists || 0);
+                        break;
+                    case 'blk+stl':
+                        actualValue = (playerStats.stats.blocks || 0) + (playerStats.stats.steals || 0);
                         break;
                     default:
                         console.error(`[GRADING] Unknown player prop market: ${leg.market}`);
                         isBetFinalized = false;
                         return leg;
+                }
+                
+                if (actualValue === undefined) {
+                    console.log(`[GRADING] Could not determine actual value for market '${market}'.`);
+                    isBetFinalized = false;
+                    return leg;
                 }
                 
                 // Determine if it's an over or under bet

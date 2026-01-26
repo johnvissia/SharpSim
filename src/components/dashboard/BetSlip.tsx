@@ -160,15 +160,14 @@ export function BetSlip() {
       return;
     }
     
-    const hasOddsApiId = (pick: typeof picks[0]) => {
-      return pick.betType === 'player_prop' || (pick.game.oddsApiId !== undefined);
-    }
-
-    if (picks.some(p => !hasOddsApiId(p))) {
+    if (picks.some(p => 
+        (p.betType === 'player_prop' && !p.game.id) || 
+        (p.betType !== 'player_prop' && !p.game.oddsApiId)
+    )) {
         toast({
             variant: 'destructive',
             title: 'Bet Incomplete',
-            description: 'One or more games on your slip are missing odds data required for grading. Try syncing odds.',
+            description: 'One or more selections on your slip are missing a required game ID for grading. Try syncing game data.',
         });
         return;
     }
@@ -182,8 +181,15 @@ export function BetSlip() {
 
       if (picks.length === 1) {
         const pick = picks[0];
-        // Use oddsApiId for grading, fallback to regular id if not available
-        const gameIdForGrading = pick.game.oddsApiId || pick.game.id;
+        
+        let gameIdForGrading: string;
+        if (pick.betType === 'player_prop') {
+            // Player props are graded against ESPN stats, which use the ESPN game ID.
+            gameIdForGrading = pick.game.id!;
+        } else {
+            // Game lines are graded against Odds API data, which uses the Odds API game ID.
+            gameIdForGrading = pick.game.oddsApiId || pick.game.id!;
+        }
         
         const baseBet = {
           gameId: gameIdForGrading,
@@ -213,8 +219,15 @@ export function BetSlip() {
 
       } else { // Parlay
         const parlayLegs: ParlayLeg[] = picks.map(p => {
-          // Use oddsApiId for grading, fallback to regular id if not available
-          const gameIdForGrading = p.game.oddsApiId || p.game.id;
+          
+          let gameIdForGrading: string;
+          if (p.betType === 'player_prop') {
+              // Player props use ESPN game ID for grading
+              gameIdForGrading = p.game.id!;
+          } else {
+              // Other bets use Odds API game ID
+              gameIdForGrading = p.game.oddsApiId || p.game.id!;
+          }
           
           const leg: Partial<ParlayLeg> = {
             gameId: gameIdForGrading,
@@ -237,7 +250,12 @@ export function BetSlip() {
         });
 
         newBet = {
-          gameId: picks.map(p => p.game.oddsApiId || p.game.id).join(','),
+          gameId: picks.map(p => {
+              if (p.betType === 'player_prop') {
+                  return p.game.id!;
+              }
+              return p.game.oddsApiId || p.game.id!;
+          }).join(','),
           userId: user.uid,
           sport: picks[0].game.sport!,
           betType: 'parlay',
