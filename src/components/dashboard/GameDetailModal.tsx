@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import type { Game, UserProfile, PlayerProp } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Heart, Loader2, User, ChevronDown } from 'lucide-react';
+import { Heart, Loader2, User, ChevronDown, WandSparkles } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { sportIconMap } from '@/lib/team-logos';
@@ -11,12 +11,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '../ui/button';
 import { MainLinesView } from './MainLinesView';
 import { GameLeadersView } from './GameLeadersView';
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, updateDoc, arrayUnion, arrayRemove, query, collection, where } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBetSlip } from '@/context/BetSlipContext';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 interface GameDetailModalProps {
   game: Game | null;
@@ -134,7 +134,7 @@ const PlayerLines = ({ playerName, props, game }: { playerName: string; props: P
                 <div className="px-3 pb-3 space-y-2">
                     <div className="pt-2 border-t border-slate-700/50">
                         {alternateLines.map(prop => (
-                             <div key={prop.id} className="grid grid-cols-[200px_1fr] md:grid-cols-[250px_1fr] items-center gap-3 py-2">
+                             <div key={`${prop.playerId}-${prop.line}`} className="grid grid-cols-[200px_1fr] md:grid-cols-[250px_1fr] items-center gap-3 py-2">
                                 <div className="flex items-center gap-2">
                                     <div className="min-w-0 pl-6">
                                         <p className="text-primary font-bold text-lg">{prop.line}</p>
@@ -161,19 +161,44 @@ const PlayerLines = ({ playerName, props, game }: { playerName: string; props: P
 
 
 const PlayerPropsView = ({ game }: { game: Game }) => {
-    const firestore = useFirestore();
+    const [playerProps, setPlayerProps] = useState<PlayerProp[] | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const { toast } = useToast();
 
-    const propsQuery = useMemoFirebase(() => {
-        if (!firestore || !game?.oddsApiId) return null;
-        return query(
-            collection(firestore, 'player_props'),
-            where('gameId', '==', game.oddsApiId)
-        );
-    }, [firestore, game?.oddsApiId]);
+    const handleFetchProps = async () => {
+        if (!game.oddsApiId) {
+            const msg = "This game does not have the required ID to fetch props.";
+            setError(msg);
+            toast({ title: "Error", description: msg, variant: "destructive" });
+            return;
+        }
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetch(`/api/fetch-game-props?eventId=${game.oddsApiId}`);
+            const data = await response.json();
 
-    const { data: playerProps, isLoading: isLoadingProps } = useCollection<PlayerProp>(propsQuery);
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || data.error || "Failed to fetch props from the API.");
+            }
+
+            setPlayerProps(data.props);
+            
+            if (data.props.length === 0) {
+                toast({ title: "No Props Available", description: "Props for this game may not have been released yet." });
+            } else {
+                toast({ title: "Success", description: `Loaded ${data.count} player props.` });
+            }
+
+        } catch (e: any) {
+            setError(e.message);
+            toast({ title: "Fetch Failed", description: e.message, variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
+    };
     
-    // Group props by market type first
     const marketPropsMap = useMemo(() => {
         const map = new Map<string, PlayerProp[]>();
         if (!playerProps) return map;
@@ -188,23 +213,36 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
 
     const markets = useMemo(() => Array.from(marketPropsMap.entries()).sort((a, b) => a[0].localeCompare(b[0])), [marketPropsMap]);
 
-    if (isLoadingProps) {
+    if (isLoading) {
         return (
-            <div className="space-y-4">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
+            <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <h2 className="text-xl font-semibold text-foreground">Fetching Player Props...</h2>
+                <p className="text-muted-foreground">This may take a moment.</p>
+            </div>
+        );
+    }
+    
+    if (error) {
+        return (
+             <div className="text-center py-12 text-destructive flex flex-col items-center gap-4">
+                <p>Error fetching props:</p>
+                <p className="text-sm mt-1">{error}</p>
+                 <Button onClick={handleFetchProps} className="mt-4">Try Again</Button>
             </div>
         )
     }
 
-    if (!playerProps || playerProps.length === 0) {
+    if (!playerProps) {
         return (
-            <div className="text-center py-12 text-muted-foreground">
-                <p>No player props found for this game.</p>
-                <p className="text-xs mt-1">Try syncing props on the Prop Hub page.</p>
+            <div className="text-center py-12 text-muted-foreground flex flex-col items-center gap-4">
+                <p>Player props are not loaded for this game.</p>
+                <Button onClick={handleFetchProps} size="lg">
+                    <WandSparkles className="mr-2 h-5 w-5" />
+                    Load Player Props
+                </Button>
             </div>
-        )
+        );
     }
   
     return (
@@ -213,8 +251,6 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
                 <div className="space-y-2">
                     {markets.map(([marketType, marketProps]) => {
                         const marketName = marketType.replace(/_/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-
-                        // Group players within the market
                         const playersInMarket = new Map<string, { playerName: string; props: PlayerProp[] }>();
                         marketProps.forEach(prop => {
                             if (!playersInMarket.has(prop.playerId)) {
@@ -249,7 +285,7 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
                 </div>
             ) : (
                  <div className="text-center py-12 text-muted-foreground">
-                    <p>No player props found for this game.</p>
+                    <p>No player props are currently available for this game.</p>
                 </div>
             )}
         </div>
@@ -308,7 +344,6 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
           minute: '2-digit',
         });
   
-  // Only show player props tab for NBA games that can bet
   const showPlayerProps = game.sport === 'NBA' && canBet;
   
   return (

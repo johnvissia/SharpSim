@@ -30,7 +30,6 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const initialNavItems = [
     { href: '/', id: 'home', label: '🏠 Home' },
     { href: '/dashboard', id: 'dashboard', label: '🔥 Dashboard' },
-    { href: '/prop-hub', id: 'prop-hub', label: '👥 Prop Hub' },
     { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
     { href: '/stats', id: 'stats', label: '📊 Stats' },
     { href: '/data', id: 'data', label: '📈 Data' },
