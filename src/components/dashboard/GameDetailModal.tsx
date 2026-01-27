@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import type { Game, UserProfile, PlayerProp } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, Loader2, User, ChevronDown, WandSparkles } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -11,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '../ui/button';
 import { MainLinesView } from './MainLinesView';
 import { GameLeadersView } from './GameLeadersView';
+import { ModelCalculationView } from './ModelCalculationView';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
@@ -19,13 +21,13 @@ import { useBetSlip } from '@/context/BetSlipContext';
 import { useToast } from '@/hooks/use-toast';
 
 interface GameDetailModalProps {
-  game: Game | null;
-  isOpen: boolean;
-  onClose: () => void;
+    game: Game | null;
+    isOpen: boolean;
+    onClose: () => void;
 }
 
-const TeamHeader = ({ team, sport, isFavorite, onToggleFavorite, isUpdating }: { 
-    team: Game['homeTeam'], 
+const TeamHeader = ({ team, sport, isFavorite, onToggleFavorite, isUpdating }: {
+    team: Game['homeTeam'],
     sport: Game['sport'],
     isFavorite: boolean,
     onToggleFavorite: () => void,
@@ -34,24 +36,24 @@ const TeamHeader = ({ team, sport, isFavorite, onToggleFavorite, isUpdating }: {
     const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
     return (
         <div className="flex flex-col items-center text-center gap-2 w-48">
-             <Button variant="ghost" size="icon" onClick={onToggleFavorite} disabled={isUpdating} className="h-8 w-8 mb-2">
+            <Button variant="ghost" size="icon" onClick={onToggleFavorite} disabled={isUpdating} className="h-8 w-8 mb-2">
                 <Heart className={cn(
-                    "h-7 w-7 transition-all", 
+                    "h-7 w-7 transition-all",
                     isFavorite ? 'text-red-500 fill-red-500' : 'text-muted-foreground hover:text-red-400'
                 )} />
             </Button>
             <Link href={`/stats/${sport}/${team.name}?teamId=${team.id}`} className="flex flex-col items-center text-center gap-2 p-2 rounded-lg hover:bg-accent/10 transition-colors">
                 {team.logo ? (
                     <Image
-                    src={team.logo}
-                    alt={`${team.name} logo`}
-                    width={80}
-                    height={80}
-                    className="object-contain h-20 w-20"
+                        src={team.logo}
+                        alt={`${team.name} logo`}
+                        width={80}
+                        height={80}
+                        className="object-contain h-20 w-20"
                     />
                 ) : (
                     <div className="w-20 h-20 flex items-center justify-center bg-muted rounded-full">
-                    <FallbackIcon className="w-10 h-10 text-muted-foreground" />
+                        <FallbackIcon className="w-10 h-10 text-muted-foreground" />
                     </div>
                 )}
                 <h2 className="text-2xl font-bold h-16 flex items-center justify-center">
@@ -96,12 +98,12 @@ const PlayerLines = ({ playerName, props, game }: { playerName: string; props: P
         if (!pickInSlip) return false;
         return pickInSlip.pick.toLowerCase().includes(side);
     };
-    
+
     return (
         <div className="bg-slate-800/50 rounded-lg overflow-hidden transition-all duration-300">
-            <div 
-              className="grid grid-cols-[200px_1fr] md:grid-cols-[250px_1fr] items-center gap-3 p-3 cursor-pointer hover:bg-slate-700/50"
-              onClick={() => setIsOpen(!isOpen)}
+            <div
+                className="grid grid-cols-[200px_1fr] md:grid-cols-[250px_1fr] items-center gap-3 p-3 cursor-pointer hover:bg-slate-700/50"
+                onClick={() => setIsOpen(!isOpen)}
             >
                 <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -134,7 +136,7 @@ const PlayerLines = ({ playerName, props, game }: { playerName: string; props: P
                 <div className="px-3 pb-3 space-y-2">
                     <div className="pt-2 border-t border-slate-700/50">
                         {alternateLines.map(prop => (
-                             <div key={`${prop.playerId}-${prop.line}`} className="grid grid-cols-[200px_1fr] md:grid-cols-[250px_1fr] items-center gap-3 py-2">
+                            <div key={`${prop.playerId}-${prop.line}`} className="grid grid-cols-[200px_1fr] md:grid-cols-[250px_1fr] items-center gap-3 py-2">
                                 <div className="flex items-center gap-2">
                                     <div className="min-w-0 pl-6">
                                         <p className="text-primary font-bold text-lg">{prop.line}</p>
@@ -150,7 +152,7 @@ const PlayerLines = ({ playerName, props, game }: { playerName: string; props: P
                                         <span>{prop.underOdds > 0 ? `+${prop.underOdds}` : prop.underOdds}</span>
                                     </Button>
                                 </div>
-                             </div>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -184,7 +186,7 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
             }
 
             setPlayerProps(data.props);
-            
+
             if (data.props.length === 0) {
                 toast({ title: "No Props Available", description: "Props for this game may not have been released yet." });
             } else {
@@ -198,7 +200,7 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
             setIsLoading(false);
         }
     };
-    
+
     const marketPropsMap = useMemo(() => {
         const map = new Map<string, PlayerProp[]>();
         if (!playerProps) return map;
@@ -222,13 +224,13 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
             </div>
         );
     }
-    
+
     if (error) {
         return (
-             <div className="text-center py-12 text-destructive flex flex-col items-center gap-4">
+            <div className="text-center py-12 text-destructive flex flex-col items-center gap-4">
                 <p>Error fetching props:</p>
                 <p className="text-sm mt-1">{error}</p>
-                 <Button onClick={handleFetchProps} className="mt-4">Try Again</Button>
+                <Button onClick={handleFetchProps} className="mt-4">Try Again</Button>
             </div>
         )
     }
@@ -244,7 +246,7 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
             </div>
         );
     }
-  
+
     return (
         <div className="space-y-4">
             {markets.length > 0 ? (
@@ -258,7 +260,7 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
                             }
                             playersInMarket.get(prop.playerId)!.props.push(prop);
                         });
-                        const sortedPlayers = Array.from(playersInMarket.values()).sort((a,b) => a.playerName.localeCompare(b.playerName));
+                        const sortedPlayers = Array.from(playersInMarket.values()).sort((a, b) => a.playerName.localeCompare(b.playerName));
 
                         return (
                             <details key={marketType} className="group bg-slate-900 rounded-lg overflow-hidden">
@@ -271,7 +273,7 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
                                 </summary>
                                 <div className="px-4 pb-3 pt-1 space-y-2">
                                     {sortedPlayers.map(playerData => (
-                                        <PlayerLines 
+                                        <PlayerLines
                                             key={playerData.playerName}
                                             playerName={playerData.playerName}
                                             props={playerData.props}
@@ -284,7 +286,7 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
                     })}
                 </div>
             ) : (
-                 <div className="text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-muted-foreground">
                     <p>No player props are currently available for this game.</p>
                 </div>
             )}
@@ -293,119 +295,129 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
 };
 
 export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps) {
-  const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false);
-  const { user } = useUser();
-  const firestore = useFirestore();
+    const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false);
+    const { user } = useUser();
+    const firestore = useFirestore();
 
-  const userProfileRef = useMemoFirebase(
-    () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
-    [user, firestore]
-  );
-  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
-  const favoriteTeams = userProfile?.favoriteTeams || [];
-  
-  const handleToggleFavorite = async (teamName: string) => {
-    if (!userProfileRef) return;
-    setIsUpdatingFavorite(true);
-    const isCurrentlyFavorite = favoriteTeams.includes(teamName);
-    try {
-        await updateDoc(userProfileRef, {
-            favoriteTeams: isCurrentlyFavorite ? arrayRemove(teamName) : arrayUnion(teamName),
-        });
-    } catch (error) {
-        console.error("Failed to update favorites:", error);
-    } finally {
-        setIsUpdatingFavorite(false);
-    }
-  };
+    const userProfileRef = useMemoFirebase(
+        () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
+        [user, firestore]
+    );
+    const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+    const favoriteTeams = userProfile?.favoriteTeams || [];
 
-  if (!game) return null;
+    const handleToggleFavorite = async (teamName: string) => {
+        if (!userProfileRef) return;
+        setIsUpdatingFavorite(true);
+        const isCurrentlyFavorite = favoriteTeams.includes(teamName);
+        try {
+            await updateDoc(userProfileRef, {
+                favoriteTeams: isCurrentlyFavorite ? arrayRemove(teamName) : arrayUnion(teamName),
+            });
+        } catch (error) {
+            console.error("Failed to update favorites:", error);
+        } finally {
+            setIsUpdatingFavorite(false);
+        }
+    };
 
-  const gameDate = new Date(game.startTime);
-  const now = new Date();
-  
-  const isLive = game.statusState === 'in';
-  const isFinal = game.statusState === 'post';
-  const canBet = game.statusState === 'pre';
+    if (!game) return null;
 
-  const isToday =
-    now.getFullYear() === gameDate.getFullYear() &&
-    now.getMonth() === gameDate.getMonth() &&
-    now.getDate() === gameDate.getDate();
+    const gameDate = new Date(game.startTime);
+    const now = new Date();
 
-  const gameTimeOrStatus = isLive || isFinal
-    ? game.statusDetail
-    : isToday
-      ? gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-      : gameDate.toLocaleString([], {
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-        });
-  
-  const showPlayerProps = game.sport === 'NBA' && canBet;
-  
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-full max-w-4xl max-h-[90vh] flex flex-col p-0">
-            <DialogHeader className="p-6 pb-2">
-                 <DialogTitle className="sr-only">
-                    Game Details: {game.awayTeam.name} vs {game.homeTeam.name}
-                 </DialogTitle>
-                 <DialogDescription className="sr-only">
-                    View betting lines, player props, and game information for this matchup.
-                 </DialogDescription>
-                <div className="flex items-start justify-around pt-8">
-                    <TeamHeader 
-                        team={game.awayTeam} 
-                        sport={game.sport}
-                        isFavorite={favoriteTeams.includes(game.awayTeam.name)}
-                        onToggleFavorite={() => handleToggleFavorite(game.awayTeam.name)}
-                        isUpdating={isUpdatingFavorite}
-                    />
-                    <div className="flex flex-col items-center self-center text-center pt-10">
-                        <span className="text-4xl font-bold text-muted-foreground">VS</span>
-                         <div className="text-sm text-muted-foreground mt-2">{gameTimeOrStatus}</div>
-                        {isLive && (
-                            <Badge className="bg-red-600 hover:bg-red-600 text-white animate-pulse text-xs mt-2">
-                                LIVE
-                            </Badge>
-                        )}
+    const isLive = game.statusState === 'in';
+    const isFinal = game.statusState === 'post';
+    const canBet = game.statusState === 'pre';
+
+    const isToday =
+        now.getFullYear() === gameDate.getFullYear() &&
+        now.getMonth() === gameDate.getMonth() &&
+        now.getDate() === gameDate.getDate();
+
+    const gameTimeOrStatus = isLive || isFinal
+        ? game.statusDetail
+        : isToday
+            ? gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+            : gameDate.toLocaleString([], {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+            });
+
+    const showPlayerProps = game.sport === 'NBA' && canBet;
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="w-full max-w-4xl max-h-[90vh] flex flex-col p-0">
+                <DialogHeader className="p-6 pb-2">
+                    <DialogTitle className="sr-only">
+                        Game Details: {game.awayTeam.name} vs {game.homeTeam.name}
+                    </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        View betting lines, player props, and game information for this matchup.
+                    </DialogDescription>
+                    <div className="flex items-start justify-around pt-8">
+                        <TeamHeader
+                            team={game.awayTeam}
+                            sport={game.sport}
+                            isFavorite={favoriteTeams.includes(game.awayTeam.name)}
+                            onToggleFavorite={() => handleToggleFavorite(game.awayTeam.name)}
+                            isUpdating={isUpdatingFavorite}
+                        />
+                        <div className="flex flex-col items-center self-center text-center pt-10">
+                            <span className="text-4xl font-bold text-muted-foreground">VS</span>
+                            <div className="text-sm text-muted-foreground mt-2">{gameTimeOrStatus}</div>
+                            {isLive && (
+                                <Badge className="bg-red-600 hover:bg-red-600 text-white animate-pulse text-xs mt-2">
+                                    LIVE
+                                </Badge>
+                            )}
+                        </div>
+                        <TeamHeader
+                            team={game.homeTeam}
+                            sport={game.sport}
+                            isFavorite={favoriteTeams.includes(game.homeTeam.name)}
+                            onToggleFavorite={() => handleToggleFavorite(game.homeTeam.name)}
+                            isUpdating={isUpdatingFavorite}
+                        />
                     </div>
-                    <TeamHeader 
-                        team={game.homeTeam} 
-                        sport={game.sport}
-                        isFavorite={favoriteTeams.includes(game.homeTeam.name)}
-                        onToggleFavorite={() => handleToggleFavorite(game.homeTeam.name)}
-                        isUpdating={isUpdatingFavorite}
-                    />
-                </div>
-            </DialogHeader>
+                </DialogHeader>
 
-            <div className="px-6 pb-6 overflow-y-auto">
-                {canBet ? (
-                    showPlayerProps ? (
-                    <Tabs defaultValue="lines" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 mb-4">
-                        <TabsTrigger value="lines">Game Lines</TabsTrigger>
-                        <TabsTrigger value="props">Player Props</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="lines">
-                        <MainLinesView game={game} />
-                        </TabsContent>
-                        <TabsContent value="props">
-                        <PlayerPropsView game={game} />
-                        </TabsContent>
-                    </Tabs>
+                <div className="px-6 pb-6 overflow-y-auto">
+                    {canBet ? (
+                        showPlayerProps ? (
+                            <Tabs defaultValue="lines" className="w-full">
+                                <TabsList className="grid w-full grid-cols-3 mb-4">
+                                    <TabsTrigger value="lines">Game Lines</TabsTrigger>
+                                    <TabsTrigger value="props">Player Props</TabsTrigger>
+                                    <TabsTrigger value="model">Model Calc</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="lines">
+                                    <MainLinesView game={game} />
+                                </TabsContent>
+                                <TabsContent value="props">
+                                    <PlayerPropsView game={game} />
+                                </TabsContent>
+                                <TabsContent value="model">
+                                    <ModelCalculationView game={game} />
+                                </TabsContent>
+                            </Tabs>
+                        ) : (
+                            <MainLinesView game={game} />
+                        )
                     ) : (
-                    <MainLinesView game={game} />
-                    )
-                ) : (
-                    <GameLeadersView game={game} />
-                )}
-            </div>
-        </DialogContent>
-    </Dialog>
-  );
+                        <div className="space-y-6">
+                            <Card className="bg-slate-900 border-slate-800">
+                                <CardHeader><CardTitle>Model Retroactive Analysis</CardTitle></CardHeader>
+                                <CardContent><ModelCalculationView game={game} /></CardContent>
+                            </Card>
+                            <GameLeadersView game={game} />
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
 }

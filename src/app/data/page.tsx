@@ -81,7 +81,7 @@ export default function DataPage() {
       data = text ? JSON.parse(text) : {};
     } catch {
       throw new Error(
-        'Server returned an error page instead of data. Basketball Reference may be blocking requests. Use smaller batches and try again.'
+        'Server returned an error page. Please try again.'
       );
     }
     if (!response.ok) {
@@ -174,7 +174,7 @@ export default function DataPage() {
       const response = await fetch('/api/calculate-power-ratings', {
         method: 'POST',
       });
-      
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -230,11 +230,10 @@ export default function DataPage() {
     const hasInjuries = injuryValue > 0.1;
 
     return (
-      <div className={`p-4 rounded-lg border-2 ${
-        isTop 
-          ? 'bg-gradient-to-br from-green-950/40 to-green-900/20 border-green-500/50' 
+      <div className={`p-4 rounded-lg border-2 ${isTop
+          ? 'bg-gradient-to-br from-green-950/40 to-green-900/20 border-green-500/50'
           : 'bg-gradient-to-br from-red-950/40 to-red-900/20 border-red-500/50'
-      }`}>
+        }`}>
         <div className="flex justify-between items-start mb-3">
           <div className="flex items-center gap-2">
             <span className={`text-2xl font-bold ${isTop ? 'text-green-400' : 'text-red-400'}`}>
@@ -281,9 +280,9 @@ export default function DataPage() {
             <span>{tprValue > 0 ? '+' : ''}{tprValue.toFixed(1)}</span>
           </div>
           <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-            <div 
+            <div
               className={`h-full ${isTop ? 'bg-green-500' : 'bg-red-500'}`}
-              style={{ 
+              style={{
                 width: `${Math.min(Math.abs(tprValue) * 5, 100)}%`,
                 marginLeft: tprValue < 0 ? 'auto' : '0'
               }}
@@ -312,7 +311,7 @@ export default function DataPage() {
           <CardHeader>
             <CardTitle>🏀 Sync NBA Teams</CardTitle>
             <CardDescription>
-              Scrape game data from Basketball Reference. Use <strong>batches</strong> to avoid timeouts and blocking — each batch runs ~3–4 minutes.
+              Sync game data from ESPN API. Batches are available but syncing all is fast (~10s).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -432,9 +431,9 @@ export default function DataPage() {
               </ul>
             </div>
 
-            <Button 
-              onClick={handleCalculateRatings} 
-              disabled={calculatingRatings || syncingAll} 
+            <Button
+              onClick={handleCalculateRatings}
+              disabled={calculatingRatings || syncingAll}
               size="lg"
               className="w-full"
               variant="default"
@@ -498,11 +497,11 @@ export default function DataPage() {
                     </div>
                     <div className="space-y-3">
                       {ratingsResults.bottomTeams?.map((team: any, idx: number) => (
-                        <TeamRatingCard 
-                          key={idx} 
-                          team={team} 
-                          rank={30 - (4 - idx)} 
-                          isTop={false} 
+                        <TeamRatingCard
+                          key={idx}
+                          team={team}
+                          rank={30 - (4 - idx)}
+                          isTop={false}
                         />
                       ))}
                     </div>
@@ -561,7 +560,7 @@ export default function DataPage() {
         {/* Single Team Test Scraper */}
         <Card>
           <CardHeader>
-            <CardTitle>Basketball Reference Scraper (Single Team Test)</CardTitle>
+            <CardTitle>Team Scraper (Single Test)</CardTitle>
             <CardDescription>
               Test the scraper with schedule fatigue analysis
             </CardDescription>
@@ -641,7 +640,7 @@ export default function DataPage() {
                       <Battery className="h-5 w-5 text-orange-500" />
                       Schedule Fatigue Analysis
                     </h3>
-                    
+
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="bg-black/20 p-4 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
@@ -703,7 +702,7 @@ export default function DataPage() {
                           <p className="font-semibold text-red-400">Death Schedule Alert!</p>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          This team has played <span className="text-red-400 font-bold">{scraperData.scheduleStats.deathScheduleGames}</span> games 
+                          This team has played <span className="text-red-400 font-bold">{scraperData.scheduleStats.deathScheduleGames}</span> games
                           on brutal "4 in 5 nights" schedules. These are prime fade opportunities with -4.0 point penalties.
                         </p>
                       </div>
@@ -718,14 +717,12 @@ export default function DataPage() {
                     {scraperData.games.slice(-10).reverse().map((game: any, idx: number) => (
                       <div
                         key={idx}
-                        className={`p-3 rounded-lg flex justify-between items-center ${
-                          game.result === 'W' ? 'bg-green-900/20' : 'bg-red-900/20'
-                        }`}
+                        className={`p-3 rounded-lg flex justify-between items-center ${game.result === 'W' ? 'bg-green-900/20' : 'bg-red-900/20'
+                          }`}
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`font-bold text-lg ${
-                            game.result === 'W' ? 'text-green-500' : 'text-red-500'
-                          }`}>
+                          <span className={`font-bold text-lg ${game.result === 'W' ? 'text-green-500' : 'text-red-500'
+                            }`}>
                             {game.result}
                           </span>
                           <span className="text-sm text-muted-foreground">
@@ -738,9 +735,8 @@ export default function DataPage() {
                           <span className="text-sm">
                             {game.teamScore}-{game.opponentScore}
                           </span>
-                          <span className={`font-bold ${
-                            game.margin > 0 ? 'text-green-500' : 'text-red-500'
-                          }`}>
+                          <span className={`font-bold ${game.margin > 0 ? 'text-green-500' : 'text-red-500'
+                            }`}>
                             {game.margin > 0 ? '+' : ''}{game.margin}
                           </span>
                         </div>
