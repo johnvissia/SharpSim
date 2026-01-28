@@ -8,13 +8,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { UserBet, SportName } from '@/lib/types';
 import { BarChart3, TrendingUp, Coins, Target } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PerformanceChart } from '@/components/dashboard/PerformanceChart';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -59,435 +60,492 @@ type BreakdownStats = {
     betCount: number;
     totalWagered: number;
     netProfit: number;
-    totalOdds: number; 
-    totalLegs: number; 
+    totalOdds: number;
+    totalLegs: number;
 };
 
 export default function StatsPage() {
-  const { user, isUserLoading } = useUser();
-  const firestore = useFirestore();
-  const [filter, setFilter] = useState<BetFilter>('straights');
+    const { user, isUserLoading } = useUser();
+    const firestore = useFirestore();
+    const [filter, setFilter] = useState<BetFilter>('straights');
 
 
-  const betsQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return collection(firestore, 'users', user.uid, 'bets');
-  }, [user, firestore]);
+    const betsQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return collection(firestore, 'users', user.uid, 'bets');
+    }, [user, firestore]);
 
-  const { data: bets, isLoading: isLoadingBets } = useCollection<UserBet>(betsQuery);
+    const { data: bets, isLoading: isLoadingBets } = useCollection<UserBet>(betsQuery);
 
-  const loading = isUserLoading || isLoadingBets;
+    const loading = isUserLoading || isLoadingBets;
 
-  const stats = useMemo(() => {
-    const initialBreakdownStats = (): BreakdownStats => ({
-        wins: 0,
-        losses: 0,
-        pushes: 0,
-        pending: 0,
-        betCount: 0,
-        totalWagered: 0,
-        netProfit: 0,
-        totalOdds: 0, 
-        totalLegs: 0,
-    });
+    const stats = useMemo(() => {
+        const initialBreakdownStats = (): BreakdownStats => ({
+            wins: 0,
+            losses: 0,
+            pushes: 0,
+            pending: 0,
+            betCount: 0,
+            totalWagered: 0,
+            netProfit: 0,
+            totalOdds: 0,
+            totalLegs: 0,
+        });
 
-    const overall = {
-        wins: 0,
-        losses: 0,
-        pushes: 0,
-        pending: 0,
-        totalBets: 0,
-        totalWagered: 0,
-        netProfit: 0,
-    };
-    const breakdown: Record<string, BreakdownStats> = {};
+        const overall = {
+            wins: 0,
+            losses: 0,
+            pushes: 0,
+            pending: 0,
+            totalBets: 0,
+            totalWagered: 0,
+            netProfit: 0,
+        };
+        const breakdown: Record<string, BreakdownStats> = {};
 
-    if (!bets) {
-      return { overall, breakdown, winPercentage: 0 };
-    }
-
-    const filteredBets = bets.filter(bet => {
-        if (filter === 'straights') return ['moneyline', 'spread', 'total'].includes(bet.betType);
-        if (filter === 'parlays') return bet.betType === 'parlay';
-        if (filter === 'props') return bet.betType === 'player_prop';
-        return false;
-    });
-
-    overall.totalBets = filteredBets.length;
-
-    for (const bet of filteredBets) {
-        // Overall ticket-based calculations
-        overall.totalWagered += bet.stake;
-        if (bet.status === 'won') {
-            overall.wins++;
-            overall.netProfit += (bet.potentialWinnings - bet.stake);
-        } else if (bet.status === 'lost') {
-            overall.losses++;
-            overall.netProfit -= bet.stake;
-        } else if (bet.status === 'push') {
-            overall.pushes++;
-        } else {
-            overall.pending++;
+        if (!bets) {
+            return { overall, breakdown, winPercentage: 0 };
         }
 
-        // Breakdown calculations
-        if (filter === 'straights') {
-            const sport = bet.sport;
-            if (!breakdown[sport]) {
-                breakdown[sport] = initialBreakdownStats();
-            }
-            const sportStats = breakdown[sport]!;
+        const filteredBets = bets.filter(bet => {
+            if (filter === 'straights') return ['moneyline', 'spread', 'total'].includes(bet.betType);
+            if (filter === 'parlays') return bet.betType === 'parlay';
+            if (filter === 'props') return bet.betType === 'player_prop';
+            return false;
+        });
 
-            sportStats.betCount++;
-            sportStats.totalWagered += bet.stake;
-            sportStats.totalOdds += bet.odds;
+        overall.totalBets = filteredBets.length;
 
-            switch(bet.status) {
-                case 'won': 
-                    sportStats.wins++;
-                    sportStats.netProfit += (bet.potentialWinnings - bet.stake);
-                    break;
-                case 'lost': 
-                    sportStats.losses++; 
-                    sportStats.netProfit -= bet.stake;
-                    break;
-                case 'push': sportStats.pushes++; break;
-                case 'pending': sportStats.pending++; break;
-            }
-        } else if (filter === 'parlays') {
-            const involvedSports = new Set<SportName>();
-            if (bet.legs) {
-                bet.legs.forEach(leg => involvedSports.add(leg.sport));
+        for (const bet of filteredBets) {
+            // Overall ticket-based calculations
+            overall.totalWagered += bet.stake;
+            if (bet.status === 'won') {
+                overall.wins++;
+                overall.netProfit += (bet.potentialWinnings - bet.stake);
+            } else if (bet.status === 'lost') {
+                overall.losses++;
+                overall.netProfit -= bet.stake;
+            } else if (bet.status === 'push') {
+                overall.pushes++;
+            } else {
+                overall.pending++;
             }
 
-            if (involvedSports.size > 0) {
-              const profit = (bet.status === 'won' ? (bet.potentialWinnings - bet.stake) : (bet.status === 'lost' ? -bet.stake : 0));
-              const profitPerSport = profit / involvedSports.size;
-              const wagerPerSport = bet.stake / involvedSports.size;
+            // Breakdown calculations
+            if (filter === 'straights') {
+                const sport = bet.sport;
+                if (!breakdown[sport]) {
+                    breakdown[sport] = initialBreakdownStats();
+                }
+                const sportStats = breakdown[sport]!;
 
-              involvedSports.forEach(sport => {
-                  if (!breakdown[sport]) {
-                      breakdown[sport] = initialBreakdownStats();
-                  }
-                  const sportStats = breakdown[sport]!;
-                  sportStats.betCount++;
-                  sportStats.netProfit += profitPerSport;
-                  sportStats.totalWagered += wagerPerSport;
-                  sportStats.totalLegs += (bet.legs?.length || 0);
+                sportStats.betCount++;
+                sportStats.totalWagered += bet.stake;
+                sportStats.totalOdds += bet.odds;
 
-                  switch(bet.status) {
-                      case 'won': sportStats.wins++; break;
-                      case 'lost': sportStats.losses++; break;
-                      case 'push': sportStats.pushes++; break;
-                      case 'pending': sportStats.pending++; break;
-                  }
-              });
-            }
-        } else if (filter === 'props') {
-            const market = bet.market?.toUpperCase() || 'UNKNOWN';
-            if (!breakdown[market]) {
-                breakdown[market] = initialBreakdownStats();
-            }
-            const marketStats = breakdown[market]!;
+                switch (bet.status) {
+                    case 'won':
+                        sportStats.wins++;
+                        sportStats.netProfit += (bet.potentialWinnings - bet.stake);
+                        break;
+                    case 'lost':
+                        sportStats.losses++;
+                        sportStats.netProfit -= bet.stake;
+                        break;
+                    case 'push': sportStats.pushes++; break;
+                    case 'pending': sportStats.pending++; break;
+                }
+            } else if (filter === 'parlays') {
+                const involvedSports = new Set<SportName>();
+                if (bet.legs) {
+                    bet.legs.forEach(leg => involvedSports.add(leg.sport));
+                }
 
-            marketStats.betCount++;
-            marketStats.totalWagered += bet.stake;
-            marketStats.totalOdds += bet.odds;
+                if (involvedSports.size > 0) {
+                    const profit = (bet.status === 'won' ? (bet.potentialWinnings - bet.stake) : (bet.status === 'lost' ? -bet.stake : 0));
+                    const profitPerSport = profit / involvedSports.size;
+                    const wagerPerSport = bet.stake / involvedSports.size;
 
-            switch(bet.status) {
-                case 'won': 
-                    marketStats.wins++;
-                    marketStats.netProfit += (bet.potentialWinnings - bet.stake);
-                    break;
-                case 'lost': 
-                    marketStats.losses++; 
-                    marketStats.netProfit -= bet.stake;
-                    break;
-                case 'push': marketStats.pushes++; break;
-                case 'pending': marketStats.pending++; break;
+                    involvedSports.forEach(sport => {
+                        if (!breakdown[sport]) {
+                            breakdown[sport] = initialBreakdownStats();
+                        }
+                        const sportStats = breakdown[sport]!;
+                        sportStats.betCount++;
+                        sportStats.netProfit += profitPerSport;
+                        sportStats.totalWagered += wagerPerSport;
+                        sportStats.totalLegs += (bet.legs?.length || 0);
+
+                        switch (bet.status) {
+                            case 'won': sportStats.wins++; break;
+                            case 'lost': sportStats.losses++; break;
+                            case 'push': sportStats.pushes++; break;
+                            case 'pending': sportStats.pending++; break;
+                        }
+                    });
+                }
+            } else if (filter === 'props') {
+                const market = bet.market?.toUpperCase() || 'UNKNOWN';
+                if (!breakdown[market]) {
+                    breakdown[market] = initialBreakdownStats();
+                }
+                const marketStats = breakdown[market]!;
+
+                marketStats.betCount++;
+                marketStats.totalWagered += bet.stake;
+                marketStats.totalOdds += bet.odds;
+
+                switch (bet.status) {
+                    case 'won':
+                        marketStats.wins++;
+                        marketStats.netProfit += (bet.potentialWinnings - bet.stake);
+                        break;
+                    case 'lost':
+                        marketStats.losses++;
+                        marketStats.netProfit -= bet.stake;
+                        break;
+                    case 'push': marketStats.pushes++; break;
+                    case 'pending': marketStats.pending++; break;
+                }
             }
         }
-    }
 
-    const settledTicketCount = overall.wins + overall.losses;
-    const winPercentage = settledTicketCount > 0 ? (overall.wins / settledTicketCount) * 100 : 0;
-    
-    return { overall, breakdown, winPercentage };
-  }, [bets, filter]);
+        const settledTicketCount = overall.wins + overall.losses;
+        const winPercentage = settledTicketCount > 0 ? (overall.wins / settledTicketCount) * 100 : 0;
 
-  const sortedBreakdown = useMemo(() => {
-    return Object.entries(stats.breakdown).sort(([, a], [, b]) => {
-        if (!a || !b) return 0;
-        return b.betCount - a.betCount;
-    });
-  }, [stats.breakdown]);
-  
-  const filterTitle = useMemo(() => {
-    switch (filter) {
-        case 'straights': return 'Straights';
-        case 'parlays': return 'Parlays';
-        case 'props': return 'Player Props';
-        default: return 'Bets';
-    }
-  }, [filter]);
+        return { overall, breakdown, winPercentage };
+    }, [bets, filter]);
 
-  return (
-    <div className="p-4 md:p-8">
-        <header className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                <BarChart3 className="h-8 w-8 text-primary"/>
-                My Betting Stats
-            </h1>
-            <p className="text-muted-foreground">
-                An overview of your betting performance.
-            </p>
-        </header>
+    const chartData = useMemo(() => {
+        if (!bets) return [];
 
-        <Tabs value={filter} onValueChange={(value) => setFilter(value as BetFilter)} defaultValue="straights" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="straights">Straights</TabsTrigger>
-                <TabsTrigger value="parlays">Parlays</TabsTrigger>
-                <TabsTrigger value="props">Player Props</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="straights" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                     <StatCard
-                        title={`Total ${filterTitle}`}
-                        value={stats.overall.totalBets.toString()}
-                        icon={<Target className="h-4 w-4 text-muted-foreground" />}
-                        description={`${stats.overall.pending} pending`}
-                        loading={loading}
-                    />
-                    <StatCard
-                        title="Win Rate"
-                        value={`${stats.winPercentage.toFixed(1)}%`}
-                        icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
-                        description={`${stats.overall.wins}W - ${stats.overall.losses}L`}
-                        loading={loading}
-                    />
-                    <StatCard
-                        title="Total Wagered"
-                        value={`${stats.overall.totalWagered.toFixed(2)} coins`}
-                        icon={<Coins className="h-4 w-4 text-muted-foreground" />}
-                        description="Total amount staked."
-                        loading={loading}
-                    />
-                    <StatCard
-                        title="Net Profit / Loss"
-                        value={`${stats.overall.netProfit.toFixed(2)} coins`}
-                        icon={<Coins className={cn("h-4 w-4", stats.overall.netProfit >= 0 ? 'text-green-500' : 'text-destructive')} />}
-                        description={`Based on settled ${filterTitle.toLowerCase()}.`}
-                        loading={loading}
-                    />
-                </div>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Performance by Sport (Straights)</CardTitle>
-                        <CardDescription>A breakdown of your single bets. Click a sport for more details.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? (
-                            <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
-                        ) : sortedBreakdown.length === 0 ? (
-                            <p className="text-muted-foreground text-center">No straight bets placed yet.</p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Sport</TableHead>
-                                        <TableHead className="text-center">Record (W-L)</TableHead>
-                                        <TableHead className="text-right">Win %</TableHead>
-                                        <TableHead className="text-right">Avg. Odds</TableHead>
-                                        <TableHead className="text-right">Net Profit</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {sortedBreakdown.map(([sport, sportStats]) => {
-                                        if (!sportStats) return null;
-                                        const settledCount = sportStats.wins + sportStats.losses;
-                                        const winRate = settledCount > 0 ? (sportStats.wins / settledCount) * 100 : 0;
-                                        const avgOdds = sportStats.betCount > 0 ? (sportStats.totalOdds / sportStats.betCount) : 0;
-                                        return (
-                                            <TableRow key={sport}>
-                                                <TableCell className="font-medium">
-                                                  <Link href={`/stats/${sport}`} className="hover:underline text-primary">{sport}</Link>
-                                                </TableCell>
-                                                <TableCell className="text-center">{sportStats.wins}-{sportStats.losses}</TableCell>
-                                                <TableCell className="text-right">{winRate.toFixed(1)}%</TableCell>
-                                                <TableCell className="text-right">{avgOdds > 0 ? `+${avgOdds.toFixed(0)}` : avgOdds.toFixed(0)}</TableCell>
-                                                <TableCell className={cn("text-right font-semibold", sportStats.netProfit > 0 && "text-green-600", sportStats.netProfit < 0 && "text-destructive")}>
-                                                    {sportStats.netProfit.toFixed(2)} coins
-                                                </TableCell>
-                                            </TableRow>
-                                        )
-                                    })}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
-            </TabsContent>
+        const filtered = bets.filter(bet => {
+            if (filter === 'straights') return ['moneyline', 'spread', 'total'].includes(bet.betType);
+            if (filter === 'parlays') return bet.betType === 'parlay';
+            if (filter === 'props') return bet.betType === 'player_prop';
+            return false;
+        }).filter(bet => bet.status === 'won' || bet.status === 'lost');
 
-            <TabsContent value="parlays" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                     <StatCard
-                        title={`Total ${filterTitle}`}
-                        value={stats.overall.totalBets.toString()}
-                        icon={<Target className="h-4 w-4 text-muted-foreground" />}
-                        description={`${stats.overall.pending} pending`}
-                        loading={loading}
-                    />
-                    <StatCard
-                        title="Parlay Win Rate"
-                        value={`${stats.winPercentage.toFixed(1)}%`}
-                        icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
-                        description={`${stats.overall.wins}W - ${stats.overall.losses}L`}
-                        loading={loading}
-                    />
-                    <StatCard
-                        title="Total Wagered"
-                        value={`${stats.overall.totalWagered.toFixed(2)} coins`}
-                        icon={<Coins className="h-4 w-4 text-muted-foreground" />}
-                        description="Total amount staked."
-                        loading={loading}
-                    />
-                    <StatCard
-                        title="Net Profit / Loss"
-                        value={`${stats.overall.netProfit.toFixed(2)} coins`}
-                        icon={<Coins className={cn("h-4 w-4", stats.overall.netProfit >= 0 ? 'text-green-500' : 'text-destructive')} />}
-                        description={`Based on settled ${filterTitle.toLowerCase()}.`}
-                        loading={loading}
-                    />
-                </div>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Performance by Sport (Parlays)</CardTitle>
-                        <CardDescription>A breakdown of your parlay tickets involving each sport. Click a sport for more details.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? (
-                            <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
-                        ) : sortedBreakdown.length === 0 ? (
-                            <p className="text-muted-foreground text-center">No parlay bets placed yet.</p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Sport</TableHead>
-                                        <TableHead className="text-center">Ticket Record (W-L)</TableHead>
-                                        <TableHead className="text-right">Win %</TableHead>
-                                        <TableHead className="text-right">Avg. Legs</TableHead>
-                                        <TableHead className="text-right">Net Profit</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {sortedBreakdown.map(([sport, sportStats]) => {
-                                        if (!sportStats || sportStats.betCount === 0) return null;
-                                        const settledCount = sportStats.wins + sportStats.losses;
-                                        const winRate = settledCount > 0 ? (sportStats.wins / settledCount) * 100 : 0;
-                                        const avgLegs = sportStats.betCount > 0 ? (sportStats.totalLegs / sportStats.betCount) : 0;
-                                        return (
-                                            <TableRow key={sport}>
-                                                <TableCell className="font-medium">
-                                                  <Link href={`/stats/${sport}`} className="hover:underline text-primary">{sport}</Link>
-                                                </TableCell>
-                                                <TableCell className="text-center">{sportStats.wins}-{sportStats.losses}</TableCell>
-                                                <TableCell className="text-right">{winRate.toFixed(1)}%</TableCell>
-                                                <TableCell className="text-right">{avgLegs.toFixed(1)}</TableCell>
-                                                <TableCell className={cn("text-right font-semibold", sportStats.netProfit > 0 && "text-green-600", sportStats.netProfit < 0 && "text-destructive")}>
-                                                    {sportStats.netProfit.toFixed(2)} coins
-                                                </TableCell>
-                                            </TableRow>
-                                        )
-                                    })}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
-            </TabsContent>
-            
-            <TabsContent value="props" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                     <StatCard
-                        title={`Total ${filterTitle}`}
-                        value={stats.overall.totalBets.toString()}
-                        icon={<Target className="h-4 w-4 text-muted-foreground" />}
-                        description={`${stats.overall.pending} pending`}
-                        loading={loading}
-                    />
-                    <StatCard
-                        title="Prop Win Rate"
-                        value={`${stats.winPercentage.toFixed(1)}%`}
-                        icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
-                        description={`${stats.overall.wins}W - ${stats.overall.losses}L`}
-                        loading={loading}
-                    />
-                    <StatCard
-                        title="Total Wagered"
-                        value={`${stats.overall.totalWagered.toFixed(2)} coins`}
-                        icon={<Coins className="h-4 w-4 text-muted-foreground" />}
-                        description="Total amount staked."
-                        loading={loading}
-                    />
-                    <StatCard
-                        title="Net Profit / Loss"
-                        value={`${stats.overall.netProfit.toFixed(2)} coins`}
-                        icon={<Coins className={cn("h-4 w-4", stats.overall.netProfit >= 0 ? 'text-green-500' : 'text-destructive')} />}
-                        description={`Based on settled ${filterTitle.toLowerCase()}.`}
-                        loading={loading}
-                    />
-                </div>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Performance by Market (Player Props)</CardTitle>
-                        <CardDescription>A breakdown of your player prop bets by market type.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? (
-                            <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
-                        ) : sortedBreakdown.length === 0 ? (
-                            <p className="text-muted-foreground text-center">No player prop bets placed yet.</p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Market</TableHead>
-                                        <TableHead className="text-center">Record (W-L)</TableHead>
-                                        <TableHead className="text-right">Win %</TableHead>
-                                        <TableHead className="text-right">Avg. Odds</TableHead>
-                                        <TableHead className="text-right">Net Profit</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {sortedBreakdown.map(([market, marketStats]) => {
-                                        if (!marketStats) return null;
-                                        const settledCount = marketStats.wins + marketStats.losses;
-                                        const winRate = settledCount > 0 ? (marketStats.wins / settledCount) * 100 : 0;
-                                        const avgOdds = marketStats.betCount > 0 ? (marketStats.totalOdds / marketStats.betCount) : 0;
-                                        return (
-                                            <TableRow key={market}>
-                                                <TableCell className="font-medium">
-                                                  {market}
-                                                </TableCell>
-                                                <TableCell className="text-center">{marketStats.wins}-{marketStats.losses}</TableCell>
-                                                <TableCell className="text-right">{winRate.toFixed(1)}%</TableCell>
-                                                <TableCell className="text-right">{avgOdds > 0 ? `+${avgOdds.toFixed(0)}` : avgOdds.toFixed(0)}</TableCell>
-                                                <TableCell className={cn("text-right font-semibold", marketStats.netProfit > 0 && "text-green-600", marketStats.netProfit < 0 && "text-destructive")}>
-                                                    {marketStats.netProfit.toFixed(2)} coins
-                                                </TableCell>
-                                            </TableRow>
-                                        )
-                                    })}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
-            </TabsContent>
-        </Tabs>
-    </div>
-  );
+        const dailyMap = new Map<string, number>();
+        filtered.forEach(bet => {
+            const date = new Date(bet.placedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const profit = bet.status === 'won' ? (bet.potentialWinnings - bet.stake) : -bet.stake;
+            dailyMap.set(date, (dailyMap.get(date) || 0) + profit);
+        });
+
+        let cumulative = 0;
+        return Array.from(dailyMap.entries()).map(([date, dailyProfit]) => {
+            cumulative += dailyProfit;
+            return { date, units: Number(cumulative.toFixed(2)) };
+        });
+    }, [bets, filter]);
+
+    const sortedBreakdown = useMemo(() => {
+        return Object.entries(stats.breakdown).sort(([, a], [, b]) => {
+            if (!a || !b) return 0;
+            return b.betCount - a.betCount;
+        });
+    }, [stats.breakdown]);
+
+    const filterTitle = useMemo(() => {
+        switch (filter) {
+            case 'straights': return 'Straights';
+            case 'parlays': return 'Parlays';
+            case 'props': return 'Player Props';
+            default: return 'Bets';
+        }
+    }, [filter]);
+
+    return (
+        <div className="p-4 md:p-8">
+            <header className="mb-8">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                    <BarChart3 className="h-8 w-8 text-primary" />
+                    My Betting Stats
+                </h1>
+                <p className="text-muted-foreground">
+                    An overview of your betting performance.
+                </p>
+            </header>
+
+            <Tabs value={filter} onValueChange={(value) => setFilter(value as BetFilter)} defaultValue="straights" className="space-y-4">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="straights">Straights</TabsTrigger>
+                    <TabsTrigger value="parlays">Parlays</TabsTrigger>
+                    <TabsTrigger value="props">Player Props</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="straights" className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <StatCard
+                            title={`Total ${filterTitle}`}
+                            value={stats.overall.totalBets.toString()}
+                            icon={<Target className="h-4 w-4 text-muted-foreground" />}
+                            description={`${stats.overall.pending} pending`}
+                            loading={loading}
+                        />
+                        <StatCard
+                            title="Win Rate"
+                            value={`${stats.winPercentage.toFixed(1)}%`}
+                            icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+                            description={`${stats.overall.wins}W - ${stats.overall.losses}L`}
+                            loading={loading}
+                        />
+                        <StatCard
+                            title="Total Wagered"
+                            value={`${stats.overall.totalWagered.toFixed(2)} coins`}
+                            icon={<Coins className="h-4 w-4 text-muted-foreground" />}
+                            description="Total amount staked."
+                            loading={loading}
+                        />
+                        <StatCard
+                            title="Net Profit / Loss"
+                            value={`${stats.overall.netProfit.toFixed(2)} coins`}
+                            icon={<Coins className={cn("h-4 w-4", stats.overall.netProfit >= 0 ? 'text-green-500' : 'text-destructive')} />}
+                            description={`Based on settled ${filterTitle.toLowerCase()}.`}
+                            loading={loading}
+                        />
+                    </div>
+
+                    <Card className="bg-slate-900 border-slate-800">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-lg font-bold">Profit Over Time</CardTitle>
+                            <CardDescription>Cumulative coin growth from settled {filterTitle.toLowerCase()}.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <PerformanceChart data={chartData} />
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Performance by Sport (Straights)</CardTitle>
+                            <CardDescription>A breakdown of your single bets. Click a sport for more details.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+                            ) : sortedBreakdown.length === 0 ? (
+                                <p className="text-muted-foreground text-center">No straight bets placed yet.</p>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Sport</TableHead>
+                                            <TableHead className="text-center">Record (W-L)</TableHead>
+                                            <TableHead className="text-right">Win %</TableHead>
+                                            <TableHead className="text-right">Avg. Odds</TableHead>
+                                            <TableHead className="text-right">Net Profit</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {sortedBreakdown.map(([sport, sportStats]) => {
+                                            if (!sportStats) return null;
+                                            const settledCount = sportStats.wins + sportStats.losses;
+                                            const winRate = settledCount > 0 ? (sportStats.wins / settledCount) * 100 : 0;
+                                            const avgOdds = sportStats.betCount > 0 ? (sportStats.totalOdds / sportStats.betCount) : 0;
+                                            return (
+                                                <TableRow key={sport}>
+                                                    <TableCell className="font-medium">
+                                                        <Link href={`/stats/${sport}`} className="hover:underline text-primary">{sport}</Link>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">{sportStats.wins}-{sportStats.losses}</TableCell>
+                                                    <TableCell className="text-right">{winRate.toFixed(1)}%</TableCell>
+                                                    <TableCell className="text-right">{avgOdds > 0 ? `+${avgOdds.toFixed(0)}` : avgOdds.toFixed(0)}</TableCell>
+                                                    <TableCell className={cn("text-right font-semibold", sportStats.netProfit > 0 && "text-green-600", sportStats.netProfit < 0 && "text-destructive")}>
+                                                        {sportStats.netProfit.toFixed(2)} coins
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="parlays" className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <StatCard
+                            title={`Total ${filterTitle}`}
+                            value={stats.overall.totalBets.toString()}
+                            icon={<Target className="h-4 w-4 text-muted-foreground" />}
+                            description={`${stats.overall.pending} pending`}
+                            loading={loading}
+                        />
+                        <StatCard
+                            title="Parlay Win Rate"
+                            value={`${stats.winPercentage.toFixed(1)}%`}
+                            icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+                            description={`${stats.overall.wins}W - ${stats.overall.losses}L`}
+                            loading={loading}
+                        />
+                        <StatCard
+                            title="Total Wagered"
+                            value={`${stats.overall.totalWagered.toFixed(2)} coins`}
+                            icon={<Coins className="h-4 w-4 text-muted-foreground" />}
+                            description="Total amount staked."
+                            loading={loading}
+                        />
+                        <StatCard
+                            title="Net Profit / Loss"
+                            value={`${stats.overall.netProfit.toFixed(2)} coins`}
+                            icon={<Coins className={cn("h-4 w-4", stats.overall.netProfit >= 0 ? 'text-green-500' : 'text-destructive')} />}
+                            description={`Based on settled ${filterTitle.toLowerCase()}.`}
+                            loading={loading}
+                        />
+                    </div>
+
+                    <Card className="bg-slate-900 border-slate-800">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-lg font-bold">Profit Over Time</CardTitle>
+                            <CardDescription>Cumulative coin growth from settled {filterTitle.toLowerCase()}.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <PerformanceChart data={chartData} />
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Performance by Sport (Parlays)</CardTitle>
+                            <CardDescription>A breakdown of your parlay tickets involving each sport. Click a sport for more details.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+                            ) : sortedBreakdown.length === 0 ? (
+                                <p className="text-muted-foreground text-center">No parlay bets placed yet.</p>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Sport</TableHead>
+                                            <TableHead className="text-center">Ticket Record (W-L)</TableHead>
+                                            <TableHead className="text-right">Win %</TableHead>
+                                            <TableHead className="text-right">Avg. Legs</TableHead>
+                                            <TableHead className="text-right">Net Profit</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {sortedBreakdown.map(([sport, sportStats]) => {
+                                            if (!sportStats || sportStats.betCount === 0) return null;
+                                            const settledCount = sportStats.wins + sportStats.losses;
+                                            const winRate = settledCount > 0 ? (sportStats.wins / settledCount) * 100 : 0;
+                                            const avgLegs = sportStats.betCount > 0 ? (sportStats.totalLegs / sportStats.betCount) : 0;
+                                            return (
+                                                <TableRow key={sport}>
+                                                    <TableCell className="font-medium">
+                                                        <Link href={`/stats/${sport}`} className="hover:underline text-primary">{sport}</Link>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">{sportStats.wins}-{sportStats.losses}</TableCell>
+                                                    <TableCell className="text-right">{winRate.toFixed(1)}%</TableCell>
+                                                    <TableCell className="text-right">{avgLegs.toFixed(1)}</TableCell>
+                                                    <TableCell className={cn("text-right font-semibold", sportStats.netProfit > 0 && "text-green-600", sportStats.netProfit < 0 && "text-destructive")}>
+                                                        {sportStats.netProfit.toFixed(2)} coins
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="props" className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <StatCard
+                            title={`Total ${filterTitle}`}
+                            value={stats.overall.totalBets.toString()}
+                            icon={<Target className="h-4 w-4 text-muted-foreground" />}
+                            description={`${stats.overall.pending} pending`}
+                            loading={loading}
+                        />
+                        <StatCard
+                            title="Prop Win Rate"
+                            value={`${stats.winPercentage.toFixed(1)}%`}
+                            icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+                            description={`${stats.overall.wins}W - ${stats.overall.losses}L`}
+                            loading={loading}
+                        />
+                        <StatCard
+                            title="Total Wagered"
+                            value={`${stats.overall.totalWagered.toFixed(2)} coins`}
+                            icon={<Coins className="h-4 w-4 text-muted-foreground" />}
+                            description="Total amount staked."
+                            loading={loading}
+                        />
+                        <StatCard
+                            title="Net Profit / Loss"
+                            value={`${stats.overall.netProfit.toFixed(2)} coins`}
+                            icon={<Coins className={cn("h-4 w-4", stats.overall.netProfit >= 0 ? 'text-green-500' : 'text-destructive')} />}
+                            description={`Based on settled ${filterTitle.toLowerCase()}.`}
+                            loading={loading}
+                        />
+                    </div>
+
+                    <Card className="bg-slate-900 border-slate-800">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-lg font-bold">Profit Over Time</CardTitle>
+                            <CardDescription>Cumulative coin growth from settled {filterTitle.toLowerCase()}.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <PerformanceChart data={chartData} />
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Performance by Market (Player Props)</CardTitle>
+                            <CardDescription>A breakdown of your player prop bets by market type.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+                            ) : sortedBreakdown.length === 0 ? (
+                                <p className="text-muted-foreground text-center">No player prop bets placed yet.</p>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Market</TableHead>
+                                            <TableHead className="text-center">Record (W-L)</TableHead>
+                                            <TableHead className="text-right">Win %</TableHead>
+                                            <TableHead className="text-right">Avg. Odds</TableHead>
+                                            <TableHead className="text-right">Net Profit</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {sortedBreakdown.map(([market, marketStats]) => {
+                                            if (!marketStats) return null;
+                                            const settledCount = marketStats.wins + marketStats.losses;
+                                            const winRate = settledCount > 0 ? (marketStats.wins / settledCount) * 100 : 0;
+                                            const avgOdds = marketStats.betCount > 0 ? (marketStats.totalOdds / marketStats.betCount) : 0;
+                                            return (
+                                                <TableRow key={market}>
+                                                    <TableCell className="font-medium">
+                                                        {market}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">{marketStats.wins}-{marketStats.losses}</TableCell>
+                                                    <TableCell className="text-right">{winRate.toFixed(1)}%</TableCell>
+                                                    <TableCell className="text-right">{avgOdds > 0 ? `+${avgOdds.toFixed(0)}` : avgOdds.toFixed(0)}</TableCell>
+                                                    <TableCell className={cn("text-right font-semibold", marketStats.netProfit > 0 && "text-green-600", marketStats.netProfit < 0 && "text-destructive")}>
+                                                        {marketStats.netProfit.toFixed(2)} coins
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
 }
 

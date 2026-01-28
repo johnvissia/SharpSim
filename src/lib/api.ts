@@ -69,42 +69,63 @@ export async function syncGameLinesAndScores(firestore: Firestore) {
       }
       await delay(1500);
     }
-    
+
     console.log("Total Raw Upcoming Games Fetched:", allGames.length);
 
-    const dailyGamesBatch = writeBatch(firestore);
-    const dailyGamesCollectionRef = collection(firestore, 'daily_games');
-    
-    if (successfullyFetchedSportKeys.length > 0) {
-        const q = query(dailyGamesCollectionRef, where('sportKey', 'in', successfullyFetchedSportKeys));
-        const existingGamesSnapshot = await getDocs(q);
-        if (!existingGamesSnapshot.empty) {
-            console.log(`Deleting ${existingGamesSnapshot.size} existing games for successfully fetched sports.`);
-            existingGamesSnapshot.forEach(doc => {
-                dailyGamesBatch.delete(doc.ref);
-            });
-        }
+    // ============ SAVE TO FIRESTORE IN BATCHES ============
+    if (allGames.length === 0 && successfullyFetchedSportKeys.length === 0) {
+      console.log("No new games to save.");
+      return;
     }
-    
-    allGames.forEach(game => {
-      const gameData: DailyGame = {
-        id: game.id,
-        sportKey: game.sport_key,
-        commenceTime: game.commence_time,
-        homeTeam: game.home_team,
-        awayTeam: game.away_team,
-        bookmakerOdds: game.bookmakers?.map((b: any) => JSON.stringify(b)) || [],
-      };
-      const gameRef = doc(firestore, 'daily_games', gameData.id);
-      dailyGamesBatch.set(gameRef, gameData);
-    });
 
-    if (allGames.length > 0 || (successfullyFetchedSportKeys.length > 0 && allGames.length === 0)) {
-        await dailyGamesBatch.commit();
-        console.log(`${allGames.length} games saved to Firestore.`);
-    } else {
-        console.log("No new games to save and no old games to delete.");
+    const dailyGamesCollectionRef = collection(firestore, 'daily_games');
+
+    // 1. Delete existing games for sports we fetched
+    if (successfullyFetchedSportKeys.length > 0) {
+      const q = query(dailyGamesCollectionRef, where('sportKey', 'in', successfullyFetchedSportKeys));
+      const existingGamesSnapshot = await getDocs(q);
+
+      if (!existingGamesSnapshot.empty) {
+        console.log(`Deleting ${existingGamesSnapshot.size} existing games for: ${successfullyFetchedSportKeys.join(', ')}`);
+
+        // Process deletes in batches of 500
+        const docs = existingGamesSnapshot.docs;
+        for (let i = 0; i < docs.length; i += 500) {
+          const batch = writeBatch(firestore);
+          const chunk = docs.slice(i, i + 500);
+          chunk.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          console.log(`  Deleted batch of ${chunk.length} old games...`);
+        }
+      }
     }
+
+    // 2. Save new games in batches of 500
+    if (allGames.length > 0) {
+      console.log(`Saving ${allGames.length} new games...`);
+      for (let i = 0; i < allGames.length; i += 500) {
+        const batch = writeBatch(firestore);
+        const chunk = allGames.slice(i, i + 500);
+
+        chunk.forEach(game => {
+          const gameData: DailyGame = {
+            id: game.id,
+            sportKey: game.sport_key,
+            commenceTime: game.commence_time,
+            homeTeam: game.home_team,
+            awayTeam: game.away_team,
+            bookmakerOdds: game.bookmakers?.map((b: any) => JSON.stringify(b)) || [],
+          };
+          const gameRef = doc(dailyGamesCollectionRef, gameData.id);
+          batch.set(gameRef, gameData);
+        });
+
+        await batch.commit();
+        console.log(`  Saved batch of ${chunk.length} games...`);
+      }
+    }
+
+    console.log(`SUCCESS: ${allGames.length} games synced to Firestore across ${successfullyFetchedSportKeys.length} sports.`);
 
   } catch (error) {
     console.error('An unexpected error occurred during the Firestore daily games saving process:', error);
@@ -114,7 +135,7 @@ export async function syncGameLinesAndScores(firestore: Firestore) {
   // ============ FETCH COMPLETED GAME SCORES ============
   const allCompletedGames: CompletedGame[] = [];
   const gameIdsWithScores = new Set<string>();
-  
+
   try {
     console.log("Fetching completed game scores...");
     for (const sport of sportsMap) {
@@ -123,47 +144,47 @@ export async function syncGameLinesAndScores(firestore: Firestore) {
         // Fetch scores from the last 3 days to catch all recently completed games
         const res = await fetch(`https://api.the-odds-api.com/v4/sports/${sport.key}/scores/?apiKey=${API_KEY}&daysFrom=3`);
         if (!res.ok) {
-            const text = await res.text();
-            throw new Error(`HTTP error ${res.status} for ${sport.label} scores: ${text}`);
+          const text = await res.text();
+          throw new Error(`HTTP error ${res.status} for ${sport.label} scores: ${text}`);
         }
         const data = await res.json();
-        
+
         console.log(`  Found ${data.length} games with potential scores for ${sport.label}`);
-        
+
         // Process ALL games that have scores (completed or not)
         data.forEach((game: any) => {
-            // Only process if scores exist
-            if (!game.scores || game.scores.length === 0) {
-                return;
-            }
+          // Only process if scores exist
+          if (!game.scores || game.scores.length === 0) {
+            return;
+          }
 
-            const homeScoreStr = game.scores.find((s: any) => s.name === game.home_team)?.score;
-            const awayScoreStr = game.scores.find((s: any) => s.name === game.away_team)?.score;
-    
-            // Only add if both scores are valid
-            if (homeScoreStr !== undefined && awayScoreStr !== null && 
-                awayScoreStr !== undefined && homeScoreStr !== null) {
-              
-              const homeScore = parseInt(homeScoreStr, 10);
-              const awayScore = parseInt(awayScoreStr, 10);
-              
-              // Only add valid numeric scores
-              if (!isNaN(homeScore) && !isNaN(awayScore)) {
-                allCompletedGames.push({
-                  id: game.id,
-                  sportKey: game.sport_key,
-                  commenceTime: game.commence_time,
-                  homeTeam: game.home_team,
-                  awayTeam: game.away_team,
-                  homeScore: homeScore,
-                  awayScore: awayScore,
-                  completed: game.completed === true, // Explicitly check for true
-                });
-                gameIdsWithScores.add(game.id);
-                
-                console.log(`  ✓ Added: ${game.away_team} @ ${game.home_team} (${awayScore}-${homeScore}) [completed: ${game.completed}]`);
-              }
+          const homeScoreStr = game.scores.find((s: any) => s.name === game.home_team)?.score;
+          const awayScoreStr = game.scores.find((s: any) => s.name === game.away_team)?.score;
+
+          // Only add if both scores are valid
+          if (homeScoreStr !== undefined && awayScoreStr !== null &&
+            awayScoreStr !== undefined && homeScoreStr !== null) {
+
+            const homeScore = parseInt(homeScoreStr, 10);
+            const awayScore = parseInt(awayScoreStr, 10);
+
+            // Only add valid numeric scores
+            if (!isNaN(homeScore) && !isNaN(awayScore)) {
+              allCompletedGames.push({
+                id: game.id,
+                sportKey: game.sport_key,
+                commenceTime: game.commence_time,
+                homeTeam: game.home_team,
+                awayTeam: game.away_team,
+                homeScore: homeScore,
+                awayScore: awayScore,
+                completed: game.completed === true, // Explicitly check for true
+              });
+              gameIdsWithScores.add(game.id);
+
+              console.log(`  ✓ Added: ${game.away_team} @ ${game.home_team} (${awayScore}-${homeScore}) [completed: ${game.completed}]`);
             }
+          }
         });
 
       } catch (err) {
@@ -182,13 +203,13 @@ export async function syncGameLinesAndScores(firestore: Firestore) {
 
       // Save all games with scores
       allCompletedGames.forEach((game) => {
-          const gameRef = doc(completedGamesRef, game.id);
-          scoresBatch.set(gameRef, game, { merge: true });
+        const gameRef = doc(completedGamesRef, game.id);
+        scoresBatch.set(gameRef, game, { merge: true });
       });
 
       await scoresBatch.commit();
       console.log(`✓ ${allCompletedGames.length} games with scores saved/updated in Firestore completed_games collection.`);
-      
+
       // Log some example game IDs for debugging
       const exampleIds = Array.from(gameIdsWithScores).slice(0, 5);
       console.log(`\nExample game IDs in completed_games:`, exampleIds);
@@ -198,7 +219,7 @@ export async function syncGameLinesAndScores(firestore: Firestore) {
   } catch (error) {
     console.error('An unexpected error occurred during the Firestore scores saving process:', error);
   }
-  
+
   console.log("\n✓ Game sync complete!");
 }
 
@@ -208,9 +229,9 @@ export async function syncGameLinesAndScores(firestore: Firestore) {
  */
 export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number = 3) {
   console.log(`[PLAYER STATS] Starting NBA player stats sync for last ${daysBack} days...`);
-  
+
   const allPlayerStats: CompletedPlayerStats[] = [];
-  
+
   try {
     const dates: string[] = [];
     for (let i = 0; i <= daysBack; i++) {
@@ -218,56 +239,56 @@ export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number 
       date.setDate(date.getDate() - i);
       dates.push(date.toISOString().split('T')[0].replace(/-/g, ''));
     }
-    
+
     console.log(`[PLAYER STATS] Fetching stats for dates:`, dates);
-    
+
     for (const dateStr of dates) {
       try {
         console.log(`[PLAYER STATS] Fetching games for ${dateStr}...`);
-        
+
         const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`;
         const scoreboardRes = await fetch(scoreboardUrl);
-        
+
         if (!scoreboardRes.ok) {
           console.error(`[PLAYER STATS] Failed to fetch scoreboard for ${dateStr}`);
           await delay(500);
           continue;
         }
-        
+
         const scoreboardData = await scoreboardRes.json();
         const games = scoreboardData.events || [];
-        
+
         console.log(`[PLAYER STATS] Found ${games.length} games on ${dateStr}`);
-        
+
         for (const game of games) {
           if (game.status?.type?.state !== 'post') {
             continue;
           }
-          
+
           const gameId = game.id;
           const gameDate = game.date;
-          
+
           try {
             console.log(`[PLAYER STATS] Fetching box score for game ${gameId}...`);
-            
+
             const boxScoreUrl = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gameId}`;
             const boxScoreRes = await fetch(boxScoreUrl);
-            
+
             if (!boxScoreRes.ok) {
               console.error(`[PLAYER STATS] Failed to fetch box score for game ${gameId}`);
               await delay(500);
               continue;
             }
-            
+
             const boxScoreData = await boxScoreRes.json();
             const teamsData = boxScoreData.boxscore?.players || [];
-            
+
             for (const team of teamsData) {
               const labels: string[] = team.statistics?.[0]?.labels || [];
               const athletes = team.statistics?.[0]?.athletes || [];
 
               if (labels.length === 0 || athletes.length === 0) continue;
-              
+
               for (const player of athletes) {
                 const stats: string[] = player.stats || [];
                 const statsMap = new Map(labels.map((label, index) => [label.toLowerCase(), stats[index]]));
@@ -277,9 +298,9 @@ export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number 
                 // Handle DNP - Did Not Play
                 const minutes = statsMap.get('min');
                 if (!minutes || minutes === '0' || minutes === '0:00') {
-                    continue; // Skip players who didn't play
+                  continue; // Skip players who didn't play
                 }
-                
+
                 const points = getStat('pts');
                 const rebounds = getStat('reb');
                 const assists = getStat('ast');
@@ -290,12 +311,12 @@ export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number 
                 // 3PM-A is like "2-5", so we need to parse it
                 const threePointStr = statsMap.get('3pm-a') || '0-0';
                 const threePointersMade = parseFloat(threePointStr.split('-')[0]) || 0;
-                
+
                 const playerName = player.athlete?.displayName || 'Unknown';
                 const playerId = player.athlete?.id || player.athlete?.displayName?.replace(/\s+/g, '_');
-                
+
                 if (!playerId) continue;
-                
+
                 const completedStat: CompletedPlayerStats = {
                   id: `${gameId}_${playerId}`,
                   gameId: gameId,
@@ -313,42 +334,42 @@ export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number 
                   },
                   completed: true,
                 };
-                
+
                 allPlayerStats.push(completedStat);
                 console.log(`[PLAYER STATS] ✓ ${playerName}: ${points} PTS, ${rebounds} REB, ${assists} AST`);
               }
             }
-            
+
             await delay(500);
-            
+
           } catch (err) {
             console.error(`[PLAYER STATS] Error processing game ${gameId}:`, err);
             await delay(500);
           }
         }
-        
+
         await delay(1000);
-        
+
       } catch (err) {
         console.error(`[PLAYER STATS] Error fetching date ${dateStr}:`, err);
         await delay(1000);
       }
     }
-    
+
     console.log(`[PLAYER STATS] Total player stats collected: ${allPlayerStats.length}`);
-    
+
     if (allPlayerStats.length > 0) {
       let batch = writeBatch(firestore);
       const playerStatsRef = collection(firestore, 'completed_player_stats');
-      
+
       let batchCount = 0;
       const maxBatchSize = 500;
-      
+
       for (const stat of allPlayerStats) {
         const statRef = doc(playerStatsRef, stat.id);
         batch.set(statRef, stat, { merge: true });
         batchCount++;
-        
+
         if (batchCount >= maxBatchSize) {
           await batch.commit();
           console.log(`[PLAYER STATS] Committed batch of ${batchCount} stats`);
@@ -356,21 +377,21 @@ export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number 
           batchCount = 0;
         }
       }
-      
+
       if (batchCount > 0) {
         await batch.commit();
         console.log(`[PLAYER STATS] Committed final batch of ${batchCount} stats`);
       }
-      
+
       console.log(`[PLAYER STATS] ✓ ${allPlayerStats.length} player stats saved to Firestore`);
     } else {
       console.log(`[PLAYER STATS] No player stats to save`);
     }
-    
+
   } catch (error) {
     console.error('[PLAYER STATS] Unexpected error:', error);
     throw error;
   }
-  
+
   console.log('[PLAYER STATS] ✓ NBA player stats sync complete!');
 }
