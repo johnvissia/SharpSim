@@ -395,3 +395,81 @@ export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number 
 
   console.log('[PLAYER STATS] ✓ NBA player stats sync complete!');
 }
+/**
+ * Fetches player prop odds (Points) from The Odds API and saves them to Firestore.
+ */
+export async function syncPlayerProps(firestore: Firestore) {
+  const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
+  if (!API_KEY) throw new Error('Odds API Key missing');
+
+  console.log("[PROPS] Starting Player Props sync...");
+
+  try {
+    const res = await fetch(`https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${API_KEY}&regions=us&markets=player_points&oddsFormat=american&bookmakers=pinnacle,draftkings,fanduel`);
+    if (!res.ok) throw new Error(`Odds API error: ${res.status}`);
+
+    const data = await res.json();
+    console.log(`[PROPS] Fetched ${data.length} games with potential props`);
+
+    const propsCollectionRef = collection(firestore, 'player_props');
+    let batch = writeBatch(firestore);
+    let count = 0;
+
+    for (const game of data) {
+      if (!game.bookmakers || game.bookmakers.length === 0) continue;
+
+      // Extract props from bookmakers (prefer Pinnacle/DraftKings)
+      const bookmaker = game.bookmakers.find((b: any) => b.key === 'pinnacle') || game.bookmakers[0];
+      const market = bookmaker.markets.find((m: any) => m.key === 'player_points');
+
+      if (!market || !market.outcomes) continue;
+
+      // Group outcomes by player name to create O/U pairs
+      const playerMap = new Map<string, any>();
+
+      market.outcomes.forEach((outcome: any) => {
+        const playerName = outcome.description;
+        if (!playerMap.has(playerName)) {
+          playerMap.set(playerName, {
+            id: `${game.id}_${playerName.replace(/\s+/g, '_')}`,
+            gameId: game.id,
+            playerName: playerName,
+            teamName: outcome.name === 'Over' ? 'TBD' : 'TBD', // We'll infer from context if possible
+            matchup: `${game.away_team} @ ${game.home_team}`,
+            commenceTime: game.commence_time,
+            market: 'Points',
+          });
+        }
+
+        const prop = playerMap.get(playerName);
+        if (outcome.name === 'Over') {
+          prop.line = outcome.point;
+          prop.overOdds = outcome.price;
+        } else if (outcome.name === 'Under') {
+          prop.line = outcome.point;
+          prop.underOdds = outcome.price;
+        }
+      });
+
+      // Add to batch
+      for (const prop of playerMap.values()) {
+        if (!prop.line || !prop.overOdds || !prop.underOdds) continue;
+        const propRef = doc(propsCollectionRef, prop.id);
+        batch.set(propRef, prop, { merge: true });
+        count++;
+
+        if (count % 500 === 0) {
+          await batch.commit();
+          batch = writeBatch(firestore);
+        }
+      }
+    }
+
+    await batch.commit();
+    console.log(`[PROPS] Successfully synced ${count} player props`);
+
+  } catch (err) {
+    console.error('[PROPS] Sync Failed:', err);
+    throw err;
+  }
+}

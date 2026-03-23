@@ -30,27 +30,47 @@ service cloud.firestore {
     // Public Collections
     // ------------------------------------------------------------------------
     match /daily_games/{gameId} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isSignedIn();
     }
 
     match /completed_games/{gameId} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isSignedIn();
     }
 
     match /system/{statusId} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isSignedIn();
     }
 
     match /rankings/{teamName} {
-      allow read: if true;
-      allow write: if isSignedIn(); // Allow authenticated users (admins) to update rankings
+      allow get, list: if true;
+      allow write: if isSignedIn();
     }
 
     match /player_props/{propId} {
-      allow read: if true;
+      allow get, list: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /model_predictions/{predictionId} {
+      allow get, list: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /nba_team_stats/{teamId} {
+      allow get, list: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /ncaam_team_stats/{teamId} {
+      allow get, list: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /completed_player_stats/{statId} {
+      allow get, list: if true;
       allow write: if isSignedIn();
     }
     

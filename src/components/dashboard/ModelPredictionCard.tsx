@@ -2,34 +2,38 @@
 
 import { useEffect, useState } from 'react';
 import { Game } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, TrendingUp, AlertTriangle, Activity, ArrowRight, DollarSign, Trophy } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Loader2, ChevronDown } from 'lucide-react';
+import { GameDetailSheet } from '@/components/dashboard/GameDetailSheet';
 
 interface PredictionData {
-    homeTeam: string;
-    awayTeam: string;
-    homeBaseline: number;
-    awayBaseline: number;
-    homeInjuries: Array<{ name: string; status: string; impact: number; tier: string }>;
-    awayInjuries: Array<{ name: string; status: string; impact: number; tier: string }>;
-    homeTotalPenalty: number;
-    awayTotalPenalty: number;
-    homeFinalTPR: number;
-    awayFinalTPR: number;
-    projectedSpread: number;
-    marketSpread: number;
-    edge: number;
-    valueTier: 'High' | 'Medium' | 'Low' | 'None';
-    recommendation: string;
-    hca: number;
+    matchup: string;
+    prediction: {
+        projectedSpread: number;
+        marketSpread: number;
+        zScore: number;
+        betSignal: string;
+        recommendedSide: string | null;
+        confidence: string;
+    };
+    components: {
+        home: { baseRating: number; injuryPenalty: number; finalTPR: number };
+        away: { baseRating: number; injuryPenalty: number; finalTPR: number };
+        hca: { total: number; breakdown: any };
+    };
+    injuries: {
+        home: Array<{ name: string; status: string; impact: string }>;
+        away: Array<{ name: string; status: string; impact: string }>;
+    };
+    trace?: any;
 }
 
-export function ModelPredictionCard({ game, compact = false, preloadedData }: { game: Game; compact?: boolean, preloadedData?: PredictionData }) {
+export function ModelPredictionCard({ game, compact = false, preloadedData }: { game: Game; compact?: boolean, preloadedData?: any }) {
     const [data, setData] = useState<PredictionData | null>(preloadedData || null);
     const [loading, setLoading] = useState(!preloadedData);
     const [error, setError] = useState<string | null>(null);
+    const [showDetail, setShowDetail] = useState(false);
 
     useEffect(() => {
         if (preloadedData) {
@@ -41,7 +45,6 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
         async function fetchModelData() {
             setLoading(true);
             try {
-                // Get Market Spread Points
                 let spreadPoints = game.odds?.spread?.points || 0;
                 if (!spreadPoints && game.odds?.spread?.home) {
                     spreadPoints = game.odds.spread.home;
@@ -75,133 +78,154 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
         );
     }
 
-    if (error || !data) {
+    if (error || !data || !data.prediction) {
         return (
             <Card className="bg-red-950/20 border-red-900/50 p-4 flex items-center justify-center">
-                <span className="text-red-400 text-sm">Unavailable: {error}</span>
+                <span className="text-red-400 text-sm">Unavailable: {error || "Invalid Data"}</span>
             </Card>
         );
     }
 
-    // Determine Pick Side
-    const pickSide = data.projectedSpread < data.marketSpread ? data.homeTeam : data.awayTeam;
-    const pickLogo = pickSide === data.homeTeam ? game.homeTeam.logo : game.awayTeam.logo;
-    const isHomePick = pickSide === data.homeTeam;
+    const { prediction, injuries = { home: [], away: [] } } = data;
+    const isHomePick = prediction.recommendedSide === game.homeTeam.name;
+    const pickSide = prediction.recommendedSide || "No Play";
+    const pickLogo = isHomePick ? game.homeTeam.logo : game.awayTeam.logo;
 
-    // Tier Colors
-    const tierColors = {
-        'High': 'text-green-400 bg-green-950/40 border-green-500/50',
-        'Medium': 'text-yellow-400 bg-yellow-950/40 border-yellow-500/50',
-        'Low': 'text-blue-400 bg-blue-950/40 border-blue-500/50',
-        'None': 'text-slate-400 bg-slate-900 border-slate-700'
-    };
-    const activeColor = tierColors[data.valueTier || 'None'];
-
-    // Formatted Spreads
-    const marketFormat = data.marketSpread > 0 ? `+${data.marketSpread}` : data.marketSpread;
-    const projFormat = data.projectedSpread > 0 ? `+${(-data.projectedSpread).toFixed(1)}` : `${(-data.projectedSpread).toFixed(1)}`;
-    // Note: projectedSpread in backend is -(Home-Away). So if Home is -10 (favored), Proj is -10.
-    // Display standard: Home -10. 
+    const marketSpread = prediction.marketSpread;
+    const projectedSpread = prediction.projectedSpread;
 
     const pickSpreadDisplay = isHomePick
-        ? (data.marketSpread > 0 ? `+${data.marketSpread}` : data.marketSpread)
-        : (data.marketSpread * -1 > 0 ? `+${data.marketSpread * -1}` : data.marketSpread * -1);
+        ? (marketSpread > 0 ? `+${marketSpread}` : (marketSpread === 0 ? 'PK' : marketSpread))
+        : (marketSpread * -1 > 0 ? `+${marketSpread * -1}` : (marketSpread === 0 ? 'PK' : marketSpread * -1));
+
+    const projOnPick = isHomePick ? projectedSpread : -projectedSpread;
+    const projDisplay = projOnPick > 0 ? `+${projOnPick.toFixed(1)}` : projOnPick.toFixed(1);
+
+    const signalColors: Record<string, string> = {
+        'ELITE VALUE': 'text-green-400 bg-green-950/40 border-green-500/50',
+        'STRONG VALUE': 'text-emerald-400 bg-emerald-950/40 border-emerald-500/50',
+        'PLAYABLE': 'text-yellow-400 bg-yellow-950/40 border-yellow-500/50',
+        'No Play': 'text-slate-400 bg-slate-900 border-slate-700'
+    };
+    const activeColor = signalColors[prediction.betSignal] || signalColors['No Play'];
 
     return (
-        <Card className={`overflow-hidden border-slate-800 bg-slate-900 ${compact ? '' : 'h-full'}`}>
-            {/* Header: Matchup & Date */}
-            <div className="bg-slate-950 px-4 py-3 border-b border-slate-800 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                    <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+        <>
+            <Card className={`overflow-hidden border-slate-800 bg-slate-900 ${compact ? '' : 'h-full'}`}>
+                {/* Header */}
+                <div className="bg-slate-950 px-4 py-3 border-b border-slate-800 flex justify-between items-center text-white">
+                    <div className="text-xs font-bold uppercase tracking-wider">
                         {game.awayTeam.name} @ {game.homeTeam.name}
                     </div>
+                    {prediction.betSignal !== 'No Play' && (
+                        <Badge variant="outline" className={`${prediction.betSignal.includes('ELITE') ? 'bg-green-600/20 text-green-400 border-green-500/30' : 'bg-yellow-600/20 text-yellow-400 border-yellow-500/30'} text-[10px] font-bold uppercase py-0 px-2`}>
+                            {prediction.betSignal}
+                        </Badge>
+                    )}
                 </div>
-                {(data.valueTier === 'High' || data.valueTier === 'Medium') && (
-                    <Badge variant="outline" className={`${data.valueTier === 'High' ? 'bg-green-900 text-green-300 border-green-700' : 'bg-yellow-900 text-yellow-300 border-yellow-700'} text-xs`}>
-                        {data.valueTier} Value
-                    </Badge>
-                )}
-            </div>
 
-            <CardContent className="p-0">
-                <div className="p-5 flex flex-col gap-5">
+                <CardContent className="p-0">
+                    <div className="p-5 flex flex-col gap-5">
 
-                    {/* Visual Recommendation Box */}
-                    <div className={`p-4 rounded-xl border ${activeColor} relative overflow-hidden`}>
-                        <div className="flex justify-between items-center z-10 relative">
-                            <div>
-                                <div className="text-[10px] uppercase opacity-80 font-bold mb-1">Recommended Pick</div>
-                                <div className="flex items-center gap-3">
-                                    {pickLogo && (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={pickLogo} alt={pickSide} className="w-10 h-10 object-contain" />
-                                    )}
-                                    <div className="text-2xl font-black">
-                                        {pickSide} <span className="opacity-80">{pickSpreadDisplay}</span>
+                        {/* Recommendation Box */}
+                        <div className={`p-4 rounded-xl border ${activeColor} relative overflow-hidden`}>
+                            <div className="flex justify-between items-center z-10 relative">
+                                <div>
+                                    <div className="text-[10px] uppercase opacity-80 font-bold mb-1">Recommended Pick</div>
+                                    <div className="flex items-center gap-3">
+                                        {pickLogo && prediction.recommendedSide && (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={pickLogo} alt={pickSide} className="w-10 h-10 object-contain drop-shadow-lg" />
+                                        )}
+                                        <div className="text-2xl font-black text-white">
+                                            {pickSide} <span className="opacity-80 font-mono text-lg">{prediction.recommendedSide ? pickSpreadDisplay : ''}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-[10px] uppercase opacity-80 font-bold mb-1">Z-Score</div>
+                                    <div className="text-3xl font-black text-white">
+                                        {prediction.zScore.toFixed(2)}
                                     </div>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <div className="text-[10px] uppercase opacity-80 font-bold mb-1">Edge</div>
-                                <div className="text-3xl font-black">
-                                    {data.edge.toFixed(1)}
+                        </div>
+
+                        {/* Vegas vs Model */}
+                        <div className="flex items-center justify-between text-sm px-1">
+                            <div className="text-center w-[45%]">
+                                <div className="text-[10px] text-slate-500 uppercase font-black mb-1">Vegas Line</div>
+                                <div className="text-sm font-mono font-bold bg-slate-800 text-slate-300 px-3 py-2 rounded flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap">
+                                    <span className="opacity-60">{isHomePick ? game.homeTeam.name : game.awayTeam.name}</span>
+                                    <span>{pickSpreadDisplay}</span>
+                                </div>
+                            </div>
+                            <div className="text-slate-700 font-black text-[10px]">VS</div>
+                            <div className="text-center w-[45%]">
+                                <div className="text-[10px] text-indigo-400 uppercase font-black mb-1">Model Proj</div>
+                                <div className="text-sm font-mono font-bold bg-indigo-950/30 text-indigo-300 border border-indigo-500/30 px-3 py-2 rounded flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap">
+                                    <span className="opacity-60">{isHomePick ? game.homeTeam.name : game.awayTeam.name}</span>
+                                    <span>{projDisplay}</span>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Comparison Bar */}
-                    <div className="flex items-center justify-between text-sm px-1">
-                        <div className="text-center">
-                            <div className="text-xs text-slate-500 uppercase font-bold mb-1">Vegas Line</div>
-                            <div className="text-lg font-mono font-bold bg-slate-800 px-3 py-1 rounded">
-                                {data.homeTeam} {marketFormat}
-                            </div>
-                        </div>
-                        <div className="text-slate-600 font-bold">VS</div>
-                        <div className="text-center">
-                            <div className="text-xs text-indigo-400 uppercase font-bold mb-1">Model Proj</div>
-                            <div className="text-lg font-mono font-bold bg-indigo-950/30 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded">
-                                {data.homeTeam} {
-                                    (() => {
-                                        const displayVal = -data.projectedSpread;
-                                        return displayVal > 0 ? `+${displayVal.toFixed(1)}` : displayVal.toFixed(1);
-                                    })()
-                                }
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Impact Injuries List */}
-                    <div className="bg-slate-950/50 rounded-lg p-3 border border-slate-800">
-                        <div className="text-xs text-slate-500 uppercase font-bold mb-3 flex items-center gap-2">
-                            <AlertTriangle className="w-3 h-3" />
-                            High Impact Injuries
-                        </div>
-                        <div className="space-y-2">
-                            {[...data.homeInjuries, ...data.awayInjuries]
-                                .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
-                                .slice(0, 3) // Show top 3 only
-                                .map((inj, idx) => (
-                                    <div key={idx} className="flex justify-between items-center text-xs">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`w-1.5 h-1.5 rounded-full ${data.homeInjuries.includes(inj) ? 'bg-blue-400' : 'bg-red-400'}`}></span>
-                                            <span className="text-slate-300">{inj.name}</span>
-                                            <span className="text-slate-600">({inj.status})</span>
-                                        </div>
-                                        <div className="font-mono text-red-400">
-                                            {inj.impact.toFixed(1)} pts
-                                        </div>
+                        {/* Injuries Grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                            {[
+                                { label: game.awayTeam.name, list: injuries.away },
+                                { label: game.homeTeam.name, list: injuries.home },
+                            ].map(({ label, list }) => (
+                                <div key={label} className="bg-slate-950/40 rounded-lg p-3 border border-slate-800/50">
+                                    <div className="text-[9px] text-slate-500 uppercase font-black mb-3 flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
+                                        <div className="w-2 h-2 rounded-full bg-slate-700 shrink-0" />
+                                        <span>{label} Injuries</span>
                                     </div>
-                                ))}
-                            {[...data.homeInjuries, ...data.awayInjuries].length === 0 && (
-                                <div className="text-xs text-green-500/70 italic text-center py-1">Full Strength</div>
-                            )}
+                                    <div className="space-y-2">
+                                        {list.length > 0 ? (
+                                            list.map((inj, idx) => (
+                                                <div key={idx} className="flex justify-between items-center text-[10px]">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-slate-300 font-bold truncate max-w-[80px]">{inj.name}</span>
+                                                        <span className="text-slate-600 text-[9px] uppercase">{inj.status}</span>
+                                                    </div>
+                                                    <div className="font-mono text-red-400/80 font-bold">{inj.impact}</div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="text-[10px] text-green-500/40 italic font-medium py-1">Healthy</div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    </div>
 
-                </div>
-            </CardContent>
-        </Card >
+                        {/* See Details Button */}
+                        {data.trace && (
+                            <button
+                                onClick={() => setShowDetail(true)}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-indigo-500/30 bg-indigo-950/20 text-indigo-400 text-xs font-bold hover:bg-indigo-950/40 hover:border-indigo-400/50 transition-all group"
+                            >
+                                <span>See Full Computation Breakdown</span>
+                                <ChevronDown className="h-3.5 w-3.5 group-hover:translate-y-0.5 transition-transform" />
+                            </button>
+                        )}
+
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Computation Detail Sheet */}
+            {data.trace && (
+                <GameDetailSheet
+                    open={showDetail}
+                    onOpenChange={setShowDetail}
+                    matchup={data.matchup || `${game.awayTeam.name} @ ${game.homeTeam.name}`}
+                    trace={data.trace}
+                    homeLogo={game.homeTeam.logo}
+                    awayLogo={game.awayTeam.logo}
+                />
+            )}
+        </>
     );
 }

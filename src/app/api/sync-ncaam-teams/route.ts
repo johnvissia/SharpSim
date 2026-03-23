@@ -1,30 +1,10 @@
 // src/app/api/sync-ncaam-teams/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { db } from '@/lib/firebase';
 import { ncaamPower4Ids } from '@/lib/ncaam-teams';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes
-
-// Initialize Firebase Admin
-if (!getApps().length) {
-    try {
-        if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
-            initializeApp({
-                credential: cert({
-                    projectId: process.env.FIREBASE_PROJECT_ID,
-                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-                }),
-            });
-        }
-    } catch (e) {
-        console.error('Failed to initialize firebase', e);
-    }
-}
-
-const db = getFirestore();
 
 interface BoxScore {
     FGA: number;

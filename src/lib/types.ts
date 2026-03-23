@@ -11,7 +11,7 @@ export type Player = {
 };
 
 export type Team = {
-  id:string;
+  id: string;
   name: string;
   logo: string; // URL to logo
   players: Player[];
@@ -68,6 +68,7 @@ export interface ParlayLeg {
   sport: SportName;
   // Player prop specific fields
   playerId?: string;
+  playerName?: string;
   market?: string;
   line?: number;
 }
@@ -98,6 +99,7 @@ export interface UserBet {
   legs?: ParlayLeg[];
   // Player prop specific fields
   playerId?: string;
+  playerName?: string;
   market?: string;
   line?: number;
 };

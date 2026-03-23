@@ -2,10 +2,17 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Download, Loader2, Zap, Activity, ShieldCheck, Database, BarChart3 } from 'lucide-react';
+import { LineChart, Download, Loader2, Zap, Activity, ShieldCheck, Database, BarChart3, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import Image from 'next/image';
 
 export default function DataPage() {
   const [loading, setLoading] = useState<string | null>(null);
@@ -65,6 +72,11 @@ export default function DataPage() {
       }
 
       toast({ title: 'NBA Sync Complete', description: `All ${totalSynced} teams synced successfully.` });
+
+      // After games are synced, update injuries automatically
+      toast({ title: 'Updating Injuries', description: 'Fetching latest NBA injury report...' });
+      await fetch('/api/update-injuries', { method: 'POST' });
+      toast({ title: 'Injuries Updated', description: 'Latest injury data is now applied.' });
     } catch (error: any) {
       toast({ title: 'NBA Sync Failed', description: error.message, variant: 'destructive' });
     } finally {
@@ -102,6 +114,23 @@ export default function DataPage() {
       toast({ title: 'NCAAM Sync Complete', description: `Successfully synced ${totalSynced} teams.` });
     } catch (error: any) {
       toast({ title: 'NCAAM Sync Failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleSyncProps = async () => {
+    setLoading('sync-props');
+    try {
+      toast({ title: 'Syncing Props', description: 'Fetching player points lines from Odds API...' });
+      const res = await fetch('/api/sync-player-props', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Prop sync failed');
+
+      setResults(prev => ({ ...prev, 'sync-props': data }));
+      toast({ title: 'Prop Sync Complete', description: `Successfully synced ${data.count} player props.` });
+    } catch (error: any) {
+      toast({ title: 'Prop Sync Failed', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(null);
     }
@@ -162,15 +191,21 @@ export default function DataPage() {
 
         {result && (
           <div className="mt-4 p-4 bg-slate-950 rounded-xl border border-slate-800">
-            <div className="flex items-center gap-2 mb-3">
-              <ShieldCheck className="h-4 w-4 text-green-500" />
-              <span className="text-xs font-bold text-slate-300">Process Status</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-green-500" />
+                <span className="text-xs font-bold text-slate-300">Process Status</span>
+              </div>
+              {result.topTeams && (
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">Top 10 Preview</span>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <p className="text-[10px] text-slate-500 uppercase">Teams Processed</p>
                 <p className="text-lg font-black text-white">
-                  {result.successCount ?? result.synced?.length ?? '...'}
+                  {result.successCount ?? result.synced?.length ?? result.topTeams?.length ?? '...'}
                   {result.totalTeams ? <span className="text-xs text-slate-500 font-medium"> / {result.totalTeams}</span> : ''}
                 </p>
               </div>
@@ -181,6 +216,97 @@ export default function DataPage() {
                 </p>
               </div>
             </div>
+
+            {result.topTeams && (
+              <div className="pt-4 border-t border-slate-800/50">
+                <div className="flex flex-wrap gap-2 justify-center mb-6">
+                  <TooltipProvider>
+                    {result.topTeams.map((team: any, i: number) => (
+                      <Tooltip key={team.abbreviation || i}>
+                        <TooltipTrigger asChild>
+                          <div className="relative group cursor-help">
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 rounded-full flex items-center justify-center z-10 border border-slate-900 shadow-lg">
+                              <span className="text-[8px] font-black text-white">{i + 1}</span>
+                            </div>
+                            <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center p-1.5 border border-slate-800 group-hover:border-indigo-500/50 transition-colors">
+                              <img
+                                src={team.logo}
+                                alt={team.team}
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://a.espncdn.com/i/teamlogos/default-team-logo-500.png';
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="bg-slate-900 border-slate-800 text-slate-200">
+                          <div className="text-xs font-bold">{team.team}</div>
+                          <div className="text-[10px] text-indigo-400 font-mono">Rating: {team.tpr || team.rating}</div>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </TooltipProvider>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border border-slate-800">
+                  <table className="w-full text-[10px] text-left">
+                    <thead className="bg-slate-900 text-slate-400 uppercase tracking-wider font-bold">
+                      {sport === 'NBA' ? (
+                        <tr>
+                          <th className="px-3 py-2">Team</th>
+                          <th className="px-2 py-2 text-right">TPR</th>
+                          <th className="px-2 py-2 text-right">SRS</th>
+                          <th className="px-2 py-2 text-right">Recent</th>
+                          <th className="px-2 py-2 text-right">Inj</th>
+                          <th className="px-2 py-2 text-right">Rest</th>
+                          <th className="px-2 py-2 text-right">Pace</th>
+                        </tr>
+                      ) : (
+                        <tr>
+                          <th className="px-3 py-2">Team</th>
+                          <th className="px-2 py-2 text-right">Blended</th>
+                          <th className="px-2 py-2 text-right">SRS</th>
+                          <th className="px-2 py-2 text-right">Recent</th>
+                          <th className="px-2 py-2 text-right">ORB%</th>
+                          <th className="px-2 py-2 text-right">DRB%</th>
+                          <th className="px-2 py-2 text-right">Pace</th>
+                        </tr>
+                      )}
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {result.topTeams.map((team: any) => (
+                        <tr key={team.abbreviation} className="hover:bg-indigo-500/5 transition-colors">
+                          <td className="px-3 py-2 font-bold text-slate-200 flex items-center gap-2">
+                            <span className="w-4 text-slate-500">{team.abbreviation}</span>
+                            <span className="truncate max-w-[80px]">{team.team}</span>
+                          </td>
+                          {sport === 'NBA' ? (
+                            <>
+                              <td className="px-2 py-2 text-right font-black text-indigo-400">{team.tpr}</td>
+                              <td className="px-2 py-2 text-right text-slate-400">{team.srs}</td>
+                              <td className="px-2 py-2 text-right text-slate-400">{team.recency}</td>
+                              <td className={`px-2 py-2 text-right ${parseFloat(team.injuries) < 0 ? 'text-red-400' : 'text-slate-500'}`}>{team.injuries}</td>
+                              <td className={`px-2 py-2 text-right ${parseFloat(team.rest) < 0 ? 'text-amber-400' : 'text-slate-500'}`}>{team.rest}</td>
+                              <td className="px-2 py-2 text-right text-slate-500">{team.pace}</td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-2 py-2 text-right font-black text-indigo-400">{team.rating}</td>
+                              <td className="px-2 py-2 text-right text-slate-400">{team.srs}</td>
+                              <td className="px-2 py-2 text-right text-slate-400">{team.recency}</td>
+                              <td className="px-2 py-2 text-right text-slate-500">{team.orb}%</td>
+                              <td className="px-2 py-2 text-right text-slate-500">{team.drb}%</td>
+                              <td className="px-2 py-2 text-right text-slate-500">{team.pace}</td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -211,7 +337,7 @@ export default function DataPage() {
           onCalculate={() => handleAction('/api/calculate-power-ratings', 'calc-nba', 'NBA Ratings Calculated')}
           syncLoading={loading === 'sync-nba'}
           calcLoading={loading === 'calc-nba'}
-          result={results['sync-nba'] || results['calc-nba']}
+          result={results['calc-nba'] || results['sync-nba']}
         />
 
         <AdminCard
@@ -223,8 +349,42 @@ export default function DataPage() {
           onCalculate={() => handleAction('/api/calculate-ncaam-ratings', 'calc-ncaam', 'NCAAM Ratings Calculated')}
           syncLoading={loading === 'sync-ncaam'}
           calcLoading={loading === 'calc-ncaam'}
-          result={results['sync-ncaam'] || results['calc-ncaam']}
+          result={results['calc-ncaam'] || results['sync-ncaam']}
         />
+
+        <Card className="border-indigo-500/30 bg-indigo-950/10 md:col-span-2">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-500/20 rounded-lg">
+                <BarChart3 className="h-6 w-6 text-indigo-400" />
+              </div>
+              <div>
+                <CardTitle>Player Prop Engine</CardTitle>
+                <CardDescription>Market lines for NBA player points totals.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between">
+            <div className="text-sm text-slate-400">
+              Fetch active over/under lines for tonight's NBA slate.
+            </div>
+            <Button
+              onClick={handleSyncProps}
+              disabled={!!loading}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-black"
+            >
+              {loading === 'sync-props' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Sync Player Props
+            </Button>
+          </CardContent>
+          {results['sync-props'] && (
+            <CardContent className="pt-0">
+              <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/20">
+                ✓ {results['sync-props'].count} Props Synced
+              </Badge>
+            </CardContent>
+          )}
+        </Card>
       </div>
 
       <footer className="pt-8 border-t border-slate-800">

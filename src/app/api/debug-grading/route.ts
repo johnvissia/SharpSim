@@ -1,21 +1,7 @@
 
 import { NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
+import { db } from '@/lib/firebase';
 import type { UserBet } from '@/lib/types';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
-
-
-// Initialize Firebase Admin SDK if not already initialized
-if (!admin.apps.length) {
-    try {
-        // Use application default credentials in a GCP environment.
-        // initializeApp() will automatically use them.
-        admin.initializeApp();
-    } catch (e) {
-        console.error('Firebase admin initialization error', e);
-    }
-}
-const db = admin.firestore();
 
 // Helper types for API responses
 interface Tank01PlayerStats {
@@ -89,22 +75,22 @@ export async function GET(request: Request) {
             method: 'GET',
             headers: { 'X-RapidAPI-Key': rapidApiKey, 'X-RapidAPI-Host': rapidApiHost }
         };
-        
+
         const apiResponse = await fetch(url, options);
         if (!apiResponse.ok) {
             const errorText = await apiResponse.text();
             throw new Error(`Tank01 API Error ${apiResponse.status}: ${errorText}`);
         }
-        
+
         const boxScoreData: Tank01BoxScoreResponse = await apiResponse.json();
 
         if (boxScoreData.message || !boxScoreData.body?.playerStats) {
-             return NextResponse.json({
+            return NextResponse.json({
                 message: "Could not retrieve valid box score data from Tank01.",
                 apiResponse: boxScoreData
             });
         }
-        
+
         const gameStatus = boxScoreData.body.gameStatus || 'Unknown';
         const playerStats = boxScoreData.body.playerStats.find(p => p.PlayerID.toString() === playerId.toString());
 
@@ -126,7 +112,7 @@ export async function GET(request: Request) {
                     const statValue = playerStats[key];
                     return sum + (typeof statValue === 'number' ? statValue : 0);
                 }, 0);
-                
+
                 if (actualStat === line) {
                     verdict = `PUSH: Actual stat (${actualStat}) equals line (${line}). Would mark as PUSH.`;
                 } else if (pick.toLowerCase().includes('over')) {
@@ -136,7 +122,7 @@ export async function GET(request: Request) {
                         verdict = `LOST: Actual stat (${actualStat}) is not greater than line (${line}). Would mark as LOST.`;
                     }
                 } else if (pick.toLowerCase().includes('under')) {
-                     if (actualStat < line) {
+                    if (actualStat < line) {
                         verdict = `WON: Actual stat (${actualStat}) is less than line (${line}). Would mark as WON.`;
                     } else {
                         verdict = `LOST: Actual stat (${actualStat}) is not less than line (${line}). Would mark as LOST.`;
@@ -146,7 +132,7 @@ export async function GET(request: Request) {
                 }
             }
         }
-        
+
         return NextResponse.json({
             betDetails,
             gameStatus,

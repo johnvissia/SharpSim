@@ -9,7 +9,7 @@ import { syncGameLinesAndScores, syncNBAPlayerStats } from '@/lib/api';
 import { fetchEspnSchedule } from '@/lib/espn';
 import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader, RefreshCw, Users } from 'lucide-react';
+import { Loader, RefreshCw, Users, Activity } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { BetSlip } from '@/components/dashboard/BetSlip';
 import { GameDetailModal } from '@/components/dashboard/GameDetailModal';
@@ -192,6 +192,34 @@ export default function DashboardPage() {
             });
         } finally {
             setIsSyncingLines(false);
+        }
+    };
+
+    const [isUpdatingInjuries, setIsUpdatingInjuries] = useState(false);
+
+    const handleUpdateInjuries = async () => {
+        setIsUpdatingInjuries(true);
+        try {
+            const res = await fetch('/api/update-injuries', { method: 'POST' });
+            const data = await res.json();
+
+            if (data.success) {
+                toast({
+                    title: 'Injuries Updated',
+                    description: data.message,
+                });
+            } else {
+                throw new Error(data.error);
+            }
+        } catch (error: any) {
+            console.error('Failed to update injuries:', error);
+            toast({
+                title: 'Update Failed',
+                description: error.message || 'Could not update injury data.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsUpdatingInjuries(false);
         }
     };
 
@@ -471,6 +499,14 @@ export default function DashboardPage() {
                             ))}
                         </div>
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleUpdateInjuries}
+                                disabled={isUpdatingInjuries}
+                                className="flex items-center gap-2 bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-rose-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Activity className={`w-4 h-4 ${isUpdatingInjuries ? 'animate-pulse' : ''}`} />
+                                {isUpdatingInjuries ? 'Updating...' : 'Update Injuries'}
+                            </button>
                             <button
                                 onClick={handleSyncLines}
                                 disabled={isSyncingLines}

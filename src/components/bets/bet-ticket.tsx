@@ -17,25 +17,25 @@ const getBetStatusBadge = (status: UserBet['status']) => {
 };
 
 const LegProgressBadge = ({ legs }: { legs: ParlayLeg[] }) => {
-    const totalLegs = legs.length;
-    const wonLegs = legs.filter(leg => leg.status === 'won').length;
+  const totalLegs = legs.length;
+  const wonLegs = legs.filter(leg => leg.status === 'won').length;
 
-    const isPerfect = wonLegs === totalLegs;
-    const isHeartbreaker = wonLegs === totalLegs - 1 && totalLegs > 1;
+  const isPerfect = wonLegs === totalLegs;
+  const isHeartbreaker = wonLegs === totalLegs - 1 && totalLegs > 1;
 
-    let badgeClass = "bg-secondary text-secondary-foreground hover:bg-secondary/80"; // Gray/Neutral
+  let badgeClass = "bg-secondary text-secondary-foreground hover:bg-secondary/80"; // Gray/Neutral
 
-    if (isPerfect && totalLegs > 0) {
-        badgeClass = "bg-yellow-400 text-black hover:bg-yellow-400/80"; // Gold
-    } else if (isHeartbreaker) {
-        badgeClass = "bg-orange-500 text-white hover:bg-orange-500/80"; // Orange
-    }
+  if (isPerfect && totalLegs > 0) {
+    badgeClass = "bg-yellow-400 text-black hover:bg-yellow-400/80"; // Gold
+  } else if (isHeartbreaker) {
+    badgeClass = "bg-orange-500 text-white hover:bg-orange-500/80"; // Orange
+  }
 
-    return (
-        <Badge className={cn("border-transparent", badgeClass)}>
-            {wonLegs}/{totalLegs} Hit
-        </Badge>
-    );
+  return (
+    <Badge className={cn("border-transparent", badgeClass)}>
+      {wonLegs}/{totalLegs} Hit
+    </Badge>
+  );
 };
 
 
@@ -63,12 +63,16 @@ export function BetTicket({ bet }: { bet: UserBet }) {
         odds: bet.odds, // The odds for this single leg are the overall ticket odds.
         status: bet.status,
         sport: bet.sport,
+        playerId: bet.playerId,
+        playerName: bet.playerName,
+        market: bet.market,
+        line: bet.line,
       },
     ];
   }, [bet, isParlay]);
 
   const ticketLabel = isParlay ? bet.pick : 'Single Bet';
-  
+
   const toWinLabel = useMemo(() => {
     switch (bet.status) {
       case 'won':
@@ -136,11 +140,11 @@ export function BetTicket({ bet }: { bet: UserBet }) {
                       </p>
                     </div>
                     <div className="flex items-center gap-x-2 flex-wrap text-xs text-muted-foreground">
-                        <span className="truncate">{leg.matchup}</span>
-                        <span className="text-muted-foreground/50">•</span>
-                        <span>{gameTime}</span>
-                        <span className="text-muted-foreground/50">•</span>
-                        <span className="uppercase tracking-wider">{leg.betType}</span>
+                      <span className="truncate">{leg.matchup}</span>
+                      <span className="text-muted-foreground/50">•</span>
+                      <span>{gameTime}</span>
+                      <span className="text-muted-foreground/50">•</span>
+                      <span className="uppercase tracking-wider">{leg.betType}</span>
                     </div>
                   </div>
                 </div>
@@ -154,7 +158,7 @@ export function BetTicket({ bet }: { bet: UserBet }) {
           <div className="flex justify-between items-center font-bold text-base">
             <p>{ticketLabel}</p>
             <div className="flex items-center gap-4">
-              <p className="font-semibold font-mono tabular-nums">{ticketOdds > 0 ? `+${ticketOdds}`: ticketOdds}</p>
+              <p className="font-semibold font-mono tabular-nums">{ticketOdds > 0 ? `+${ticketOdds}` : ticketOdds}</p>
               <div className="flex items-center gap-2">
                 {isParlay && bet.status !== 'pending' && <LegProgressBadge legs={legs} />}
                 {getBetStatusBadge(bet.status)}
@@ -166,7 +170,7 @@ export function BetTicket({ bet }: { bet: UserBet }) {
               <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">Risk</span>
               <span className="text-lg font-bold text-white font-mono tabular-nums">${bet.stake.toFixed(2)}</span>
             </div>
-            
+
             <div className="text-right flex flex-col">
               <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">{toWinLabel}</span>
               <span className="text-xl font-black text-emerald-400 drop-shadow-sm font-mono tabular-nums">

@@ -1,34 +1,26 @@
 // src/app/api/calculate-power-ratings/route.ts
 import { NextResponse } from 'next/server';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { db } from '@/lib/firebase';
+import {
+  applyBayesianShrinkage,
+  calculateDecayWeight,
+  calculateAdjustedMargin,
+  getRecencyWeight,
+} from '@/lib/math-utils';
 
 export const dynamic = 'force-dynamic';
-
-// Initialize Firebase Admin
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
-}
-
-const db = getFirestore();
 
 // ============================================================================
 // GLOBAL CONSTANTS (UPDATED WITH IMPROVEMENTS)
 // ============================================================================
-const HCA_PTS = 2.3;  // UPDATED: Modern NBA travel reduced HCA
-const HCA_NET = 2.3;  // UPDATED: From 2.5 to 2.3
+const HCA_BASE = 1.8;  // UPDATED: Lowered base HCA for dynamic calculation
+const HCA_NET = 1.8;   // UPDATED: Base value, will be adjusted dynamically
 const STD_DEV = 11.0;
 const INJURY_DAMPING = 0.75;
-const WEIGHT_SEASON = 0.70;
-const WEIGHT_RECENCY = 0.30;
+// WEIGHT_SEASON and WEIGHT_RECENCY are now DYNAMIC - see getRecencyWeight()
 const SRS_CONVERGENCE_THRESHOLD = 0.01;
 const MAX_ITERATIONS = 100;
+const BAYESIAN_PADDING_GAMES = 10; // For early-season stabilization
 
 // TIERED REPLACEMENT SYSTEM (accounts for player quality)
 const REPLACEMENT_BPM_STAR = 0;    // Star players replaced by decent backups
@@ -101,6 +93,7 @@ interface TeamStats {
     scheduleAdjustedMOV?: number;
     avgPace?: number;
   };
+  injuries?: any[]; // Added to support stored injuries from Firestore
 }
 
 interface PlayerInjury {
@@ -121,6 +114,7 @@ interface TeamWithRating extends TeamStats {
   finalTPR: number;
   injuries: PlayerInjury[];
   avgPace: number;
+  teamHCA: number;
 }
 
 // ============================================================================
@@ -132,12 +126,14 @@ interface TeamWithRating extends TeamStats {
  * P = 0.5 × ((Tm_FGA + 0.4·Tm_FTA - 1.07·(Tm_ORB/(Tm_ORB + Opp_DRB))·(Tm_FGA - Tm_FG) + Tm_TOV) + (Opp_FGA + ...))
  */
 function calculatePossessions(box: BoxScore): number {
-  const orbFactor = box.ORB / (box.ORB + box.oppDRB);
+  const teamRebounds = box.ORB + box.oppDRB;
+  const orbFactor = teamRebounds === 0 ? 0 : box.ORB / teamRebounds;
   const teamPoss = box.FGA + 0.4 * box.FTA - 1.07 * orbFactor * (box.FGA - box.FG) + box.TOV;
-  
-  const oppOrbFactor = box.oppORB / (box.oppORB + box.teamDRB);
+
+  const oppRebounds = box.oppORB + box.teamDRB;
+  const oppOrbFactor = oppRebounds === 0 ? 0 : box.oppORB / oppRebounds;
   const oppPoss = box.oppFGA + 0.4 * box.oppFTA - 1.07 * oppOrbFactor * (box.oppFGA - box.oppFG) + box.oppTOV;
-  
+
   return 0.5 * (teamPoss + oppPoss);
 }
 
@@ -153,11 +149,13 @@ function calculatePossessionsFallback(box: Partial<BoxScore>): number {
 }
 
 /**
- * Calculate Raw Net Rating
- * NR_raw = 100 × (PointsScored - PointsAllowed) / Possessions
+ * Calculate Raw Net Rating with Soft Cap for Blowouts
+ * NR_raw = 100 × (CappedPointsDiff) / Possessions
  */
 function calculateRawNetRating(pointsScored: number, pointsAllowed: number, possessions: number): number {
-  return 100 * (pointsScored - pointsAllowed) / possessions;
+  const diff = pointsScored - pointsAllowed;
+  const cappedDiff = calculateAdjustedMargin(diff); // Apply soft cap at 25 points
+  return 100 * (cappedDiff) / possessions;
 }
 
 /**
@@ -175,7 +173,7 @@ function adjustForLocation(rawNetRating: number, isHome: boolean): number {
 
 function calculateSRS(teams: TeamWithRating[]): number {
   const teamMap = new Map<string, TeamWithRating>();
-  teams.forEach(team => teamMap.set(team.teamName, team));
+  teams.forEach(team => teamMap.set(team.abbreviation, team));
 
   let iteration = 0;
   let maxChange = Infinity;
@@ -210,7 +208,14 @@ function calculateSRS(teams: TeamWithRating[]): number {
     });
 
     updates.forEach(({ team, newSRS }) => {
-      team.srsRating = newSRS;
+      // Apply Bayesian shrinkage to stabilize early-season ratings
+      const shrunkSRS = applyBayesianShrinkage(
+        newSRS,
+        team.games.length,
+        0, // League average net rating
+        BAYESIAN_PADDING_GAMES
+      );
+      team.srsRating = shrunkSRS;
     });
   }
 
@@ -222,33 +227,36 @@ function calculateSRS(teams: TeamWithRating[]): number {
 // ============================================================================
 
 /**
- * Calculate recency rating with BLOWOUT DAMPENING
- * Games with 20+ point margins are weighted at 50% to avoid garbage time
- * R_recent = Σ(NR_adj_i · W_i · BlowoutWeight_i) / Σ(W_i · BlowoutWeight_i)
- * Weights: 1.0 → 0.1
+ * Calculate recency rating with EXPONENTIAL DECAY and SOFT MARGIN CAP
+ * Uses exponential decay for smoother weighting and logarithmic blowout dampening
+ * R_recent = Σ(NR_adj_i · exp(-λ·i)) / Σ(exp(-λ·i))
  */
 function calculateRecencyRating(netRatings: number[], games: GameData[]): number {
   const last10Games = games.slice(-10);
   const last10Ratings = netRatings.slice(-10);
-  const weights = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1];
-  
+
   let weightedSum = 0;
   let totalWeight = 0;
-  
+
   last10Ratings.forEach((nr, idx) => {
     const game = last10Games[idx];
-    const baseWeight = weights[last10Ratings.length - 1 - idx] || 0.1;
-    
-    // Apply blowout dampening
-    const isBlowout = Math.abs(game.margin) > BLOWOUT_MARGIN;
-    const blowoutWeight = isBlowout ? BLOWOUT_WEIGHT : 1.0;
-    
-    const finalWeight = baseWeight * blowoutWeight;
-    
-    weightedSum += nr * finalWeight;
-    totalWeight += finalWeight;
+
+    // Use exponential decay instead of linear weights
+    const gamesAgo = last10Ratings.length - 1 - idx;
+    const decayWeight = calculateDecayWeight(gamesAgo);
+
+    // Apply soft margin cap to the net rating itself
+    const adjustedMargin = calculateAdjustedMargin(game.margin);
+
+    // Recalculate net rating with adjusted margin
+    // This is an approximation - we're adjusting the margin component
+    const marginDiff = adjustedMargin - game.margin;
+    const adjustedNR = nr + marginDiff; // Approximate adjustment
+
+    weightedSum += adjustedNR * decayWeight;
+    totalWeight += decayWeight;
   });
-  
+
   return totalWeight > 0 ? weightedSum / totalWeight : 0;
 }
 
@@ -262,12 +270,16 @@ function calculateRecencyRating(netRatings: number[], games: GameData[]): number
  */
 function calculateInjuryAdjustment(injuries: PlayerInjury[]): number {
   let adjustment = 0;
-  
+
   injuries.forEach(injury => {
-    if (injury.status.toUpperCase() === 'OUT' && injury.bpm && injury.mpg) {
+    const status = injury.status?.toUpperCase() || '';
+    if (
+      (status.includes('OUT') || status.includes('INJURED') || status.includes('DOUBTFUL') || status.includes('QUESTIONABLE')) &&
+      injury.bpm && injury.mpg
+    ) {
       // Determine replacement tier based on player quality
       let replacementBPM: number;
-      
+
       if (injury.bpm > 5) {
         replacementBPM = REPLACEMENT_BPM_STAR;  // Stars get decent backups
       } else if (injury.bpm >= 0) {
@@ -275,12 +287,12 @@ function calculateInjuryAdjustment(injuries: PlayerInjury[]): number {
       } else {
         replacementBPM = REPLACEMENT_BPM_BENCH;  // Bench gets deep bench
       }
-      
+
       const impact = (injury.bpm - replacementBPM) * (injury.mpg / 48);
       adjustment += impact;
     }
   });
-  
+
   return adjustment * INJURY_DAMPING;
 }
 
@@ -296,17 +308,17 @@ function calculateRestAdjustment(game: GameData): number {
   if (game.gamesInLast5Days && game.gamesInLast5Days >= 4) {
     return REST_4_IN_5;
   }
-  
+
   // Check for 3 in 4 nights
   if (game.gamesInLast4Days && game.gamesInLast4Days >= 3) {
     return REST_3_IN_4;
   }
-  
+
   // Check for back-to-back
   if (game.isBackToBack || game.daysRest === 0) {
     return game.isHome ? REST_B2B_HOME : REST_B2B_AWAY;
   }
-  
+
   return 0;
 }
 
@@ -316,7 +328,7 @@ function calculateRestAdjustment(game: GameData): number {
 function calculateAveragePace(games: GameData[]): number {
   let totalPace = 0;
   let count = 0;
-  
+
   games.forEach(game => {
     if (game.boxScore) {
       const possessions = calculatePossessions(game.boxScore);
@@ -324,8 +336,31 @@ function calculateAveragePace(games: GameData[]): number {
       count++;
     }
   });
-  
+
   return count > 0 ? totalPace / count : 100; // Default to 100 if no data
+}
+
+/**
+ * Calculate team-specific Home Court Advantage
+ * HCA_team = Home Net Rating - Away Net Rating
+ * Clamped between 0.5 and 3.5 points
+ */
+function calculateTeamSpecificHCA(games: GameData[]): number {
+  const homeGames = games.filter(g => g.isHome);
+  const awayGames = games.filter(g => !g.isHome);
+
+  if (homeGames.length < 3 || awayGames.length < 3) {
+    return HCA_NET; // Default if insufficient data
+  }
+
+  // Calculate average margin at home vs away
+  const homeMargin = homeGames.reduce((sum, g) => sum + g.margin, 0) / homeGames.length;
+  const awayMargin = awayGames.reduce((sum, g) => sum + g.margin, 0) / awayGames.length;
+
+  const teamHCA = homeMargin - awayMargin;
+
+  // Clamp between 0.5 and 3.5
+  return Math.max(0.5, Math.min(3.5, teamHCA));
 }
 
 // ============================================================================
@@ -410,10 +445,10 @@ function calculateKellyStake(coverProb: number, decimalOdds: number, useConserva
   const denominator = decimalOdds - 1;
   const fullKelly = numerator / denominator;
   const quarterKelly = fullKelly * 0.25;
-  
+
   // Apply hard cap
   const maxBet = useConservative ? RECOMMENDED_MAX_BET : MAX_BET_SIZE;
-  
+
   return Math.max(0, Math.min(quarterKelly, maxBet));
 }
 
@@ -428,7 +463,7 @@ export async function POST() {
     // Step 1: Fetch all teams from Firestore
     console.log('📥 Fetching teams from Firestore...');
     const teamsSnapshot = await db.collection('nba_team_stats').get();
-    
+
     if (teamsSnapshot.empty) {
       throw new Error('No team data found. Please run "Sync All Teams" first.');
     }
@@ -440,26 +475,26 @@ export async function POST() {
     // PHASE 1: DATA NORMALIZATION
     // ========================================================================
     console.log('\n📊 PHASE 1: Calculating Net Ratings with Possessions...');
-    
+
     const teamsWithNetRatings: TeamWithRating[] = teams.map(team => {
       const netRatings: number[] = [];
-      
+
       team.games.forEach(game => {
         // Calculate possessions (use fallback if boxScore missing)
-        const possessions = game.boxScore 
+        const possessions = game.boxScore
           ? calculatePossessions(game.boxScore)
           : calculatePossessionsFallback(game.boxScore || {});
-        
+
         // Calculate raw net rating
         const rawNetRating = calculateRawNetRating(
-          game.teamScore, 
-          game.opponentScore, 
+          game.teamScore,
+          game.opponentScore,
           possessions
         );
-        
+
         // Apply location adjustment
         const adjustedNetRating = adjustForLocation(rawNetRating, game.isHome);
-        
+
         netRatings.push(adjustedNetRating);
       });
 
@@ -469,6 +504,9 @@ export async function POST() {
 
       // Calculate average pace
       const avgPace = calculateAveragePace(team.games);
+
+      // Calculate team-specific HCA
+      const teamHCA = calculateTeamSpecificHCA(team.games);
 
       return {
         ...team,
@@ -482,6 +520,7 @@ export async function POST() {
         finalTPR: 0,
         injuries: [],
         avgPace,
+        teamHCA,
       };
     });
 
@@ -491,7 +530,7 @@ export async function POST() {
     // PHASE 2: RECURSIVE SRS CALCULATION
     // ========================================================================
     console.log('\n🔄 PHASE 2: Running Recursive SRS Algorithm...');
-    
+
     const convergence = calculateSRS(teamsWithNetRatings);
     console.log(`✅ SRS converged (max change: ${convergence.toFixed(6)})`);
 
@@ -499,54 +538,75 @@ export async function POST() {
     // PHASE 3: CONTEXTUAL ADJUSTMENTS
     // ========================================================================
     console.log('\n🎯 PHASE 3: Calculating Contextual Adjustments...');
-    
-    // Fetch injury data from ESPN
-    console.log('🏥 Fetching injury data from ESPN...');
+
+    // Fetch injury data from Firestore (already loaded in step 1)
+    console.log('🏥 Using stored injury data from Firestore...');
     const injuryData: Map<string, PlayerInjury[]> = new Map();
-    
-    try {
-      const injuryResponse = await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams?enable=injuries');
-      
-      if (injuryResponse.ok) {
-        const data = await injuryResponse.json();
-        
-        data.sports?.[0]?.leagues?.[0]?.teams?.forEach((teamData: any) => {
-          const team = teamData.team;
-          const injuries = team.injuries || [];
-          
-          const outPlayers: PlayerInjury[] = injuries
-            .filter((inj: any) => inj.status?.toUpperCase() === 'OUT')
-            .map((inj: any) => ({
-              name: inj.athlete?.displayName || 'Unknown',
-              status: inj.status,
-              bpm: inj.bpm,
-              mpg: inj.mpg,
-            }));
-          
-          if (outPlayers.length > 0) {
-            injuryData.set(team.displayName, outPlayers);
-          }
+
+    teams.forEach(team => {
+      if (team.injuries && team.injuries.length > 0) {
+        // Map stored injuries to calculation format
+        // Note: Tank01 doesnt give BPM directly, we might need a lookup or default
+        // For now, we will use a naive approach: if status is OUT/Injured, treat as significant if we can match a name
+        // Or updated approach: The new service stores them. We need to map them to BPM if possible.
+        // Wait, the previous code relied on ESPN BPM. Tank01 doesn't have it.
+        // We need a way to estimate impact.
+        // For now, let's just log them and maybe use a default high impact for known stars if possible, or just count them.
+
+        // Actually, the new service stores them in 'injuries' field.
+        // We will filter for 'active' vs 'out'.
+
+        const outPlayers = team.injuries.filter(inj => {
+          if (!inj.status || !inj.description) return false;
+
+          const status = inj.status.toLowerCase();
+          const desc = inj.description.toLowerCase();
+
+          const isOut = status.includes('out') || status.includes('injured') || status.includes('doubtful') || status.includes('questionable');
+
+          // ONLY include Season-Ending or long-term injuries in the Base Model Ratings
+          const isSeasonEnding = desc.includes('surgery') || desc.includes('season') || desc.includes('achilles') || desc.includes('acl') || desc.includes('torn');
+
+          return isOut && isSeasonEnding;
+        }).map(inj => {
+          // Adjust impact based on probability of playing
+          let statusFactor = 1.0;
+          if (inj.status.toLowerCase().includes('questionable')) statusFactor = 0.5;
+          if (inj.status.toLowerCase().includes('doubtful')) statusFactor = 0.9;
+
+          return {
+            name: inj.name,
+            status: inj.status,
+            bpm: 2.0 * statusFactor, // Simplified bpm * status factor
+            mpg: 30.0 // Default MPG
+          };
         });
-        
-        console.log(`✅ Fetched injuries for ${injuryData.size} teams`);
+
+        if (outPlayers.length > 0) {
+          injuryData.set(team.teamName, outPlayers);
+        }
       }
-    } catch (error) {
-      console.warn('⚠️ Could not fetch injury data, continuing without it');
-    }
+    });
+
+    console.log(`✅ Loaded injuries for ${injuryData.size} teams from Firestore`);
 
     // Apply contextual adjustments
     teamsWithNetRatings.forEach(team => {
-      // Recency rating with blowout dampening
+      // Recency rating with exponential decay and soft margin cap
       team.recencyRating = calculateRecencyRating(team.netRatings, team.games);
-      
-      // Blended rating
-      team.blendedRating = (team.srsRating * WEIGHT_SEASON) + (team.recencyRating * WEIGHT_RECENCY);
-      
+
+      // Dynamic blended rating - weights adjust based on sample size
+      // Use the last game's date if available, otherwise now
+      const lastGameDate = team.games[team.games.length - 1]?.date || new Date().toISOString();
+      const recencyWeight = getRecencyWeight(lastGameDate);
+      const srsWeight = 1 - recencyWeight;
+      team.blendedRating = (team.srsRating * srsWeight) + (team.recencyRating * recencyWeight);
+
       // Injury adjustment with tiered replacement system
       const teamInjuries = injuryData.get(team.teamName) || [];
       team.injuries = teamInjuries;
       team.injuryAdjustment = calculateInjuryAdjustment(teamInjuries);
-      
+
       // Rest adjustment (will be calculated per-game when predicting)
       // For now, calculate average rest penalty across recent games
       const recentGames = team.games.slice(-10);
@@ -555,7 +615,7 @@ export async function POST() {
         avgRestPenalty += calculateRestAdjustment(game);
       });
       team.restAdjustment = recentGames.length > 0 ? avgRestPenalty / recentGames.length : 0;
-      
+
       // Final TPR (baseline)
       team.finalTPR = team.blendedRating - team.injuryAdjustment + team.restAdjustment;
     });
@@ -566,7 +626,7 @@ export async function POST() {
     // SAVE RESULTS TO FIRESTORE
     // ========================================================================
     console.log('\n💾 Saving Power Ratings to Firestore...');
-    
+
     const batch = db.batch();
 
     teamsWithNetRatings.forEach(team => {
@@ -580,9 +640,9 @@ export async function POST() {
           injuryAdjustment: team.injuryAdjustment,
           baselineTPR: team.finalTPR,
           avgPace: team.avgPace,
+          homeCourtAdvantage: team.teamHCA,
           calculatedAt: new Date().toISOString(),
-        },
-        'injuries': team.injuries,
+        }
       });
     });
 
@@ -599,13 +659,16 @@ export async function POST() {
       message: `Calculated power ratings for ${teams.length} teams`,
       convergence: convergence,
       injuriesFound: injuryData.size,
-      topTeams: sortedTeams.slice(0, 5).map(t => ({
+      topTeams: sortedTeams.slice(0, 10).map(t => ({
         team: t.teamName,
+        abbreviation: t.abbreviation,
+        logo: `https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/${t.abbreviation}.png`,
         tpr: t.finalTPR.toFixed(2),
         srs: t.srsRating.toFixed(2),
         recency: t.recencyRating.toFixed(2),
         blended: t.blendedRating.toFixed(2),
         injuries: t.injuryAdjustment.toFixed(2),
+        rest: t.restAdjustment.toFixed(2),
         pace: t.avgPace.toFixed(1),
       })),
       bottomTeams: sortedTeams.slice(-5).map(t => ({
@@ -621,8 +684,8 @@ export async function POST() {
 
   } catch (error: any) {
     console.error('❌ Calculation error:', error);
-    return NextResponse.json({ 
-      error: error.message 
+    return NextResponse.json({
+      error: error.message
     }, { status: 500 });
   }
 }

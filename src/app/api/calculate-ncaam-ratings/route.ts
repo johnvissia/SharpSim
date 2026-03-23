@@ -1,27 +1,8 @@
 // src/app/api/calculate-ncaam-ratings/route.ts
 import { NextResponse } from 'next/server';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { db } from '@/lib/firebase';
 
 export const dynamic = 'force-dynamic';
-
-if (!getApps().length) {
-    try {
-        if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
-            initializeApp({
-                credential: cert({
-                    projectId: process.env.FIREBASE_PROJECT_ID,
-                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-                }),
-            });
-        }
-    } catch (e) {
-        console.error('Failed to initialize firebase', e);
-    }
-}
-
-const db = getFirestore();
 
 const WEIGHT_SEASON = 0.70;
 const WEIGHT_RECENCY = 0.30;
@@ -152,6 +133,9 @@ export async function POST() {
 
             const blendedRating = (team.srsRating * WEIGHT_SEASON) + (recencyRating * WEIGHT_RECENCY);
 
+            team.recencyRating = recencyRating;
+            team.blendedRating = blendedRating;
+
             const ref = db.collection('ncaam_team_stats').doc(team.abbreviation);
             batch.update(ref, {
                 'powerRatings': {
@@ -167,7 +151,25 @@ export async function POST() {
         });
 
         await batch.commit();
-        return NextResponse.json({ success: true, iterations: iteration });
+
+        const sortedTeams = [...teamsWithRatings].sort((a, b) => b.blendedRating - a.blendedRating);
+        const topTeams = sortedTeams.slice(0, 10).map(t => ({
+            team: t.teamName,
+            abbreviation: t.abbreviation,
+            logo: `https://a.espncdn.com/i/teamlogos/ncaa/500/scoreboard/${t.abbreviation}.png`,
+            rating: t.blendedRating.toFixed(2),
+            srs: t.srsRating.toFixed(2),
+            recency: t.recencyRating?.toFixed(2) || '0.00',
+            pace: t.avgPace.toFixed(1),
+            orb: t.avgORB.toFixed(1),
+            drb: t.avgDRB.toFixed(1)
+        }));
+
+        return NextResponse.json({
+            success: true,
+            iterations: iteration,
+            topTeams
+        });
     } catch (e: any) {
         console.error(e);
         return NextResponse.json({ error: e.message }, { status: 500 });

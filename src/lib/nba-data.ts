@@ -31,17 +31,38 @@ export const nbaTeamAbbreviationToName: Record<string, string> = {
   'WAS': 'Washington Wizards',
 };
 
+export const nbaTeamNameToAbbreviation: Record<string, string> = Object.fromEntries(
+  Object.entries(nbaTeamAbbreviationToName).map(([abbr, name]) => [name, abbr])
+);
+
 // Maps prop types from Tank01 to a simpler format
 export const mapTank01MarketToApp = (propType: string): string | null => {
-    const map: Record<string, string> = {
-        'player_points_over_under': 'pts',
-        'player_rebounds_over_under': 'reb',
-        'player_assists_over_under': 'ast',
-        'player_threes_over_under': '3pt',
-        'player_blocks_over_under': 'blk',
-        'player_steals_over_under': 'stl',
-        'player_blocks_steals_over_under': 'blk+stl',
-        'player_points_rebounds_assists_over_under': 'pts+reb+ast',
-    };
-    return map[propType.toLowerCase()] || null;
+  const map: Record<string, string> = {
+    'player_points_over_under': 'pts',
+    'player_rebounds_over_under': 'reb',
+    'player_assists_over_under': 'ast',
+    'player_threes_over_under': '3pt',
+    'player_blocks_over_under': 'blk',
+    'player_steals_over_under': 'stl',
+    'player_blocks_steals_over_under': 'blk+stl',
+    'player_points_rebounds_assists_over_under': 'pts+reb+ast',
+  };
+  return map[propType.toLowerCase()] || null;
+};
+
+// Normalize ESPN's sometimes weird abbreviations to standard
+export const normalizeESPNTeamAbbreviation = (abbr: string): string => {
+  if (!abbr) return '';
+  const map: Record<string, string> = {
+    'GS': 'GSW',
+    'SA': 'SAS',
+    'NY': 'NYK',
+    'WSH': 'WAS',
+    'NO': 'NOP',
+    'UTAH': 'UTA',
+    'PHO': 'PHX',
+    'CHO': 'CHA',
+    'NOP': 'NOP', // Ensure mapping
+  };
+  return map[abbr.toUpperCase()] || abbr.toUpperCase();
 };

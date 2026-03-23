@@ -18,12 +18,18 @@ import {
   Ticket,
   Shield,
   BarChart3,
+  Zap,
+  Target,
+  History,
 } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
 import { AuthButton } from '@/components/auth/auth-button';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutGrid },
+  { href: '/model', label: 'Model', icon: Zap },
+  { href: '/accuracy', label: 'Accuracy', icon: History },
+  { href: '/props', label: 'Prop Hub', icon: Target },
   { href: '/my-picks', label: 'My Picks', icon: Ticket },
   { href: '/stats', label: 'Stats', icon: BarChart3 },
   { href: '/store', label: 'Store', icon: Store },

@@ -1,31 +1,24 @@
 // src/app/api/sync-all-nba-teams/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { db } from '@/lib/firebase';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes (ESPN is faster)
 
-// Initialize Firebase Admin
-if (!getApps().length) {
-  try {
-    if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
-      initializeApp({
-        credential: cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-        }),
-      });
-    } else {
-      console.warn('⚠️ Missing Firebase Credentials. Firestore saving will fail.');
-    }
-  } catch (e) {
-    console.error('Failed to initialize firebase', e);
-  }
+interface BoxScore {
+  FGA: number;
+  FTA: number;
+  TOV: number;
+  ORB: number;
+  FG: number;
+  oppDRB: number;
+  oppFGA: number;
+  oppFTA: number;
+  oppTOV: number;
+  oppORB: number;
+  oppFG: number;
+  teamDRB: number;
 }
-
-const db = getFirestore();
 
 interface GameResult {
   gameNumber: number;
@@ -37,6 +30,7 @@ interface GameResult {
   opponentScore: number;
   margin: number;
   adjustedMargin: number;
+  boxScore?: BoxScore;
   daysRest: number;
   isBackToBack: boolean;
   gamesInLast4Days: number;
@@ -44,6 +38,59 @@ interface GameResult {
 }
 
 const HOME_COURT_ADVANTAGE = 2.3;
+
+// ============================================================================
+// ESPN BOX SCORE FETCHER
+// ============================================================================
+
+async function fetchGameBoxScore(gameId: string, teamId: string): Promise<BoxScore | null> {
+  try {
+    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gameId}`, {
+      cache: 'no-store'
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    const teamBox = data.boxscore?.teams?.find((t: any) => t.team.id === teamId);
+    const oppBox = data.boxscore?.teams?.find((t: any) => t.team.id !== teamId);
+
+    if (!teamBox || !oppBox) return null;
+
+    const getStat = (box: any, label: string) => {
+      const s = box.statistics?.find((st: any) => st.label === label || st.name === label);
+      return s?.displayValue || "0";
+    };
+
+    const parseStat = (stat: string): { made: number; attempted: number } => {
+      if (!stat || !stat.includes('-')) return { made: 0, attempted: 0 };
+      const [made, attempted] = stat.split('-').map(Number);
+      return { made, attempted };
+    };
+
+    const teamFG = parseStat(getStat(teamBox, 'fieldGoalsMade-fieldGoalsAttempted'));
+    const teamFT = parseStat(getStat(teamBox, 'freeThrowsMade-freeThrowsAttempted'));
+    const oppFG = parseStat(getStat(oppBox, 'fieldGoalsMade-fieldGoalsAttempted'));
+    const oppFT = parseStat(getStat(oppBox, 'freeThrowsMade-freeThrowsAttempted'));
+
+    return {
+      FG: teamFG.made,
+      FGA: teamFG.attempted,
+      FTA: teamFT.attempted,
+      ORB: parseInt(getStat(teamBox, 'offensiveRebounds')),
+      teamDRB: parseInt(getStat(teamBox, 'defensiveRebounds')),
+      TOV: parseInt(getStat(teamBox, 'turnovers')),
+      oppFG: oppFG.made,
+      oppFGA: oppFG.attempted,
+      oppFTA: oppFT.attempted,
+      oppORB: parseInt(getStat(oppBox, 'offensiveRebounds')),
+      oppDRB: parseInt(getStat(oppBox, 'defensiveRebounds')),
+      oppTOV: parseInt(getStat(oppBox, 'turnovers')),
+    };
+  } catch (e) {
+    console.warn(`Failed to fetch box score for game ${gameId}`, e);
+    return null;
+  }
+}
 
 // Map team names to ESPN Team IDs
 const espnTeamIds: Record<string, string> = {
@@ -138,6 +185,7 @@ function analyzeScheduleFatigue(games: any[]): GameResult[] {
 // ============================================================================
 // ESPN SCRAPER FUNCTION
 // ============================================================================
+import { normalizeESPNTeamAbbreviation } from '@/lib/nba-data';
 
 async function scrapeTeamESPN(teamName: string, teamId: string) {
   console.log(`📥 Fetching ${teamName} (ID: ${teamId}) from ESPN...`);
@@ -175,7 +223,7 @@ async function scrapeTeamESPN(teamName: string, teamId: string) {
     gameNumber++;
     const date = event.date;
     const isHome = teamCompetitor.homeAway === 'home';
-    const opponent = opponentCompetitor.team.abbreviation;
+    const opponent = normalizeESPNTeamAbbreviation(opponentCompetitor.team.abbreviation);
     const teamScore = parseInt(teamCompetitor.score?.value || '0');
     const opponentScore = parseInt(opponentCompetitor.score?.value || '0');
 
@@ -195,6 +243,7 @@ async function scrapeTeamESPN(teamName: string, teamId: string) {
       : margin + HOME_COURT_ADVANTAGE;
 
     games.push({
+      id: event.id,
       gameNumber, // Temp placeholder
       date,
       isHome,
@@ -211,8 +260,26 @@ async function scrapeTeamESPN(teamName: string, teamId: string) {
   games.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   games.forEach((g, i) => g.gameNumber = i + 1);
 
+  // Fetch box scores in parallel (limit batch size to avoid rate limits)
+  const BATCH_SIZE = 5;
+  const gamesWithBoxScores: GameResult[] = [];
+
+  for (let i = 0; i < games.length; i += BATCH_SIZE) {
+    const batch = games.slice(i, i + BATCH_SIZE);
+    const boxResults = await Promise.all(batch.map(g => fetchGameBoxScore(g.id, teamId)));
+
+    batch.forEach((g, idx) => {
+      gamesWithBoxScores.push({
+        ...g,
+        boxScore: boxResults[idx] || undefined
+      });
+    });
+    // Tiny pause between batches
+    await new Promise(r => setTimeout(r, 50));
+  }
+
   // Schedule Analysis
-  const gamesWithSchedule = analyzeScheduleFatigue(games);
+  const gamesWithSchedule = analyzeScheduleFatigue(gamesWithBoxScores);
 
   // Stats
   const totalGames = gamesWithSchedule.length;
@@ -380,7 +447,7 @@ export async function POST(request: NextRequest) {
         batch.set(ref, {
           ...team,
           updatedAt: new Date().toISOString()
-        });
+        }, { merge: true });
       });
       try {
         await batch.commit();

@@ -1,140 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import {
+    calculateDynamicHCA,
+    calculateInjuryPenalty,
+    calculateTeamAdaptationFactor,
+    calculateZScoreEdge,
+    checkSteam,
+    type PlayerData,
+    type RestContext
+} from '@/lib/math-utils';
+import { db } from '@/lib/firebase';
+import { nbaTeamNameToAbbreviation } from '@/lib/nba-data';
 
 export const dynamic = 'force-dynamic';
 
-// Initialize Firebase Admin
-if (!getApps().length) {
-    try {
-        if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
-            initializeApp({
-                credential: cert({
-                    projectId: process.env.FIREBASE_PROJECT_ID,
-                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-                }),
-            });
-        }
-    } catch (e) {
-        console.error('Failed to initialize firebase', e);
-    }
-}
 
-const db = getFirestore();
+// Constants
+const LEAGUE_AVG_PACE = 99.0; // Approximation, should be dynamic in full production
+const SCHEDULE_RESIDUAL = 0; // Placeholder for Schedule Strength adjustment if not in Base
 
-const HCA_NET = 2.3;
-const REPLACEMENT_BPM_STAR = 0;
-const REPLACEMENT_BPM_STARTER = -2.0;
-const REPLACEMENT_BPM_BENCH = -4.0;
-const INJURY_DAMPING = 0.75;
-
-// Map team names to ESPN IDs for injury fetching
-const espnTeamIds: Record<string, string> = {
-    'Atlanta Hawks': '1', 'Boston Celtics': '2', 'Brooklyn Nets': '17', 'Charlotte Hornets': '30',
-    'Chicago Bulls': '4', 'Cleveland Cavaliers': '5', 'Dallas Mavericks': '6', 'Denver Nuggets': '7',
-    'Detroit Pistons': '8', 'Golden State Warriors': '9', 'Houston Rockets': '10', 'Indiana Pacers': '11',
-    'LA Clippers': '12', 'Los Angeles Clippers': '12', 'Los Angeles Lakers': '13', 'Memphis Grizzlies': '29',
-    'Miami Heat': '14', 'Milwaukee Bucks': '15', 'Minnesota Timberwolves': '16', 'New Orleans Pelicans': '3',
-    'New York Knicks': '18', 'Oklahoma City Thunder': '25', 'Orlando Magic': '19', 'Philadelphia 76ers': '20',
-    'Phoenix Suns': '21', 'Portland Trail Blazers': '22', 'Sacramento Kings': '23', 'San Antonio Spurs': '24',
-    'Toronto Raptors': '28', 'Utah Jazz': '26', 'Washington Wizards': '27',
-    // Short names just in case
-    'Hawks': '1', 'Celtics': '2', 'Nets': '17', 'Hornets': '30', 'Bulls': '4', 'Cavaliers': '5',
-    'Mavericks': '6', 'Nuggets': '7', 'Pistons': '8', 'Warriors': '9', 'Rockets': '10', 'Pacers': '11',
-    'Clippers': '12', 'Lakers': '13', 'Grizzlies': '29', 'Heat': '14', 'Bucks': '15', 'Timberwolves': '16',
-    'Pelicans': '3', 'Knicks': '18', 'Thunder': '25', 'Magic': '19', '76ers': '20', 'Suns': '21',
-    'Trail Blazers': '22', 'Blazers': '22', 'Kings': '23', 'Spurs': '24', 'Raptors': '28', 'Jazz': '26', 'Wizards': '27'
-};
+// Altitude Cities (Elevation > 1200m)
+const altitudeTeams = ['Denver Nuggets', 'Utah Jazz'];
 
 async function getTeamStats(abbrevOrName: string) {
-    const snapshot = await db.collection('nba_team_stats').where('teamName', '==', abbrevOrName).limit(1).get();
-    if (!snapshot.empty) return snapshot.docs[0].data();
+    const normalized = abbrevOrName.trim();
 
-    const doc = await db.collection('nba_team_stats').doc(abbrevOrName).get();
+    // 1. Try to resolve to an abbreviation first (canonical ID)
+    let searchId = normalized.toUpperCase();
+
+    // If it looks like a full name, map it to abbreviation
+    if (nbaTeamNameToAbbreviation[normalized]) {
+        searchId = nbaTeamNameToAbbreviation[normalized];
+    } else {
+        // Fallback: try different capitalizations for the mapping
+        const titleCase = normalized.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        if (nbaTeamNameToAbbreviation[titleCase]) {
+            searchId = nbaTeamNameToAbbreviation[titleCase];
+        }
+    }
+
+    // 2. Fetch by Abbreviation (Primary Document ID)
+    let doc = await db.collection('nba_team_stats').doc(searchId).get();
     if (doc.exists) return doc.data();
 
-    // Try finding by ID if possible or fuzzy match? 
-    // For now require exact match or sync will fail
+    // 3. Fallback: Search by teamName field if abbreviation lookup failed
+    const snapshot = await db.collection('nba_team_stats').where('teamName', '==', normalized).limit(1).get();
+    if (!snapshot.empty) return snapshot.docs[0].data();
+
     return null;
-}
-
-// Fetch injuries specifically for a team from ESPN
-async function fetchTeamInjuries(teamName: string) {
-    const teamId = espnTeamIds[teamName];
-    if (!teamId) {
-        console.warn(`No ESPN ID for ${teamName}, skipping injury check.`);
-        return [];
-    }
-
-    try {
-        // Use team endpoint which often has injury report
-        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${teamId}/roster`);
-        if (!res.ok) return [];
-        const data = await res.json();
-        const athletes = data.athletes || [];
-
-        const injuries = [];
-        for (const player of athletes) {
-            if (player.injuries && player.injuries.length > 0) {
-                const status = player.injuries[0].status; // e.g. "Out", "Questionable"
-                // Map to simplified status
-                let simpleStatus = 'ACTIVE';
-                if (status.includes('Out') || status.includes('IR')) simpleStatus = 'OUT';
-                else if (status.includes('Questionable') || status.includes('Doubtful')) simpleStatus = 'GTD';
-
-                if (simpleStatus !== 'ACTIVE') {
-                    // Estimate BPM/Importance based on roster slot or simple lookup?
-                    // In a real app we need a player database.
-                    // Heuristic: "STAR" if salary > X or specific notable names?
-                    // For this demo, let's assume everyone is 'Starter' unless we identify them.
-                    // Or just use the 'tier' passed from the User prompt if possible? No.
-
-                    // Quick & Dirty Logic for "Star" detection (Top 50 names hardcoded or just 'Starter')
-                    // Let's default to Starter (-2.0)
-
-
-                    // Keep relevant details for Salary logic
-                    injuries.push({
-                        name: player.displayName,
-                        status: simpleStatus,
-                        rawDate: player.injuries[0].date, // Capture date for 'BakedIn' check
-                        playerObj: player // Pass full object to access contracts
-                    });
-                }
-            }
-        }
-        return injuries;
-    } catch (e) {
-        console.warn(`Failed to fetch injuries from ESPN for ${teamName}`, e);
-        return [];
-    }
-}
-
-// Helper to determine impact based on salary
-function getPlayerImpactAndTier(player: any): { impact: number; tier: string } {
-    const salaryObj = player.contracts?.find((c: any) => c.season?.year === 2026 || c.season?.current);
-    const salary = salaryObj?.salary || 0; // Default 0 if unknown
-
-    // Tier thresholds (approximate for 2025-26 caps)
-    if (salary > 25000000) return { impact: 4.2, tier: 'Star' };
-    if (salary > 16000000) return { impact: 2.5, tier: 'High Starter' };
-    if (salary > 8000000) return { impact: 1.5, tier: 'Starter' };
-    if (salary > 3000000) return { impact: 0.8, tier: 'Rotation' };
-
-    return { impact: 0.3, tier: 'Bench' }; // Minimum impact
-}
-
-// Helper: Check if injury is long-term (baked into SRS)
-function isInjuryBakedIn(injuryDateStr: string): boolean {
-    if (!injuryDateStr) return false;
-    const injDate = new Date(injuryDateStr);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - injDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    // If injured > 30 days ago, assume market/SRS has adjusted
-    return diffDays > 30;
 }
 
 export async function GET(request: NextRequest) {
@@ -142,6 +54,9 @@ export async function GET(request: NextRequest) {
     const homeName = searchParams.get('home');
     const awayName = searchParams.get('away');
     const marketSpread = parseFloat(searchParams.get('marketSpread') || '0');
+    // Optional params for full verification
+    const homeRestDays = parseInt(searchParams.get('homeRest') || '1');
+    const awayRestDays = parseInt(searchParams.get('awayRest') || '1');
 
     if (!homeName || !awayName) {
         return NextResponse.json({ error: 'Missing home or away team name' }, { status: 400 });
@@ -151,124 +66,531 @@ export async function GET(request: NextRequest) {
         const homeStats = await getTeamStats(homeName);
         const awayStats = await getTeamStats(awayName);
 
-        if (!homeStats || !awayStats) {
-            // Fallback: If stats missing, use 0 baseline but allow injury check to proceed
-        }
+        // Helper to map stored injuries to PlayerData
+        const mapInjuries = (stats: any): PlayerData[] => {
+            if (!stats || !stats.injuries) return [];
 
-        const homeBaseline = homeStats?.powerRatings?.blendedRating || homeStats?.summary?.avgAdjustedMargin || 0;
-        const awayBaseline = awayStats?.powerRatings?.blendedRating || awayStats?.summary?.avgAdjustedMargin || 0;
+            // Filter for significant injuries
+            // Tank01 injury status varies, we look for "Out" or similar
+            // And map to our PlayerData structure
 
-        // Fetch LIVE injuries
-        const homeInjuriesList = await fetchTeamInjuries(homeName);
-        const awayInjuriesList = await fetchTeamInjuries(awayName);
+            return stats.injuries.filter((inj: any) => {
+                const status = inj.status?.toLowerCase() || '';
+                const desc = inj.description?.toLowerCase() || '';
 
-        const calculateInjuryPenalty = (injuries: any[]) => {
-            const impactfulInjuries: any[] = [];
-            let totalPenalty = 0;
+                // Broad check for unavailability
+                const isOut = status.includes('out') || status.includes('injured') || status.includes('irp') || status.includes('doubtful') || status.includes('questionable');
 
-            if (!injuries) return { impactfulInjuries, totalPenalty };
+                // FILTER 1: Ignore G-League/Two-Way/Assignment players as they have no impact on spread
+                const isLowImpact = desc.includes('g league') || desc.includes('two-way') || desc.includes('assignment');
 
-            injuries.forEach((inj: any) => {
-                // Determine Status
-                const status = inj.status.toUpperCase();
-                // Filter active or probable
-                if (status === 'ACTIVE' || status === 'PROBABLE') return;
+                // FILTER 2: Exclude Season-Ending injuries (already factored into Base Team Rating)
+                const isSeasonEnding = desc.includes('surgery') || desc.includes('season') || desc.includes('achilles') || desc.includes('acl') || desc.includes('torn');
 
-                // Check for "Season" ending or long term
-                if (isInjuryBakedIn(inj.rawDate)) {
-                    // Skip penalty if baked in
-                    return;
+                return isOut && !isLowImpact && !isSeasonEnding;
+            }).map((inj: any) => {
+                // Heuristic for impact
+                const name = inj.name || '';
+                let estimatedVOR = 2.5; // Default starter
+                let expectedMinutes = 30;
+
+                const lowerName = name.toLowerCase();
+
+                // ─── Player Impact Tier System ───────────────────────────────────────
+                // Strategy: exact last-name matching is used for unique surnames.
+                // For ambiguous last names (Mitchell, Brown, White, George, etc.)
+                // we check the full name first to assign correct tier.
+                // Tiers:
+                //   MVP        → VOR 8.0  (top-5 MVP race)
+                //   STAR       → VOR 6.0  (All-Star / franchise player)
+                //   STARTER    → VOR 4.0  (quality starter, 28-34 mpg)
+                //   ROTATION   → VOR 3.0  (key reserve, 18-27 mpg)
+                //   DEFAULT    → VOR 2.5  (bench / fringe)
+
+                const clean = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '');
+                const cn = clean(name); // cleaned version of this player's name
+
+                // Full-name checks for disambiguation (checked before tier lists)
+                // Returns a tier override if matched, else null
+                const disambiguated = (() => {
+                    // Mitchell disambiguation
+                    if (cn.includes('donovanmitchell') || cn.includes('mitchelldonovan')) return 'mvp';
+                    if (cn.includes('daviontmitchell') || cn.includes('mitchelldavion')) return 'rotation';
+                    if (cn.includes('malik') && cn.includes('monk')) return 'starter';
+                    // Brown disambiguation
+                    if (cn.includes('jaylen') && cn.includes('brown')) return 'star';
+                    if (cn.includes('bruce') && cn.includes('brown')) return 'rotation';
+                    if (cn.includes('moses') && cn.includes('brown')) return 'rotation';
+                    // White disambiguation
+                    if (cn.includes('derrick') && cn.includes('white')) return 'starter';
+                    if (cn.includes('coby') && cn.includes('white')) return 'starter';
+                    if (cn.includes('haywood') && cn.includes('high')) return null; // not a real player match issue
+                    // George disambiguation
+                    if (cn.includes('paul') && cn.includes('george')) return 'star';
+                    if (cn.includes('shai') || cn.includes('gilgeous')) return 'mvp';
+                    // Curry
+                    if (cn.includes('stephen') && cn.includes('curry')) return 'star';
+                    if (cn.includes('seth') && cn.includes('curry')) return 'rotation';
+                    if (cn.includes('steph') && cn.includes('curry')) return 'star';
+                    // Leonard
+                    if (cn.includes('kawhi') && cn.includes('leonard')) return 'star';
+                    if (cn.includes('meyers') && cn.includes('leonard')) return 'rotation';
+                    // Powell
+                    if (cn.includes('norman') && cn.includes('powell')) return 'starter';
+                    // Johnson disambiguation
+                    if (cn.includes('jalen') && cn.includes('johnson') || cn.includes('jalenjohnson')) return 'starter';
+                    if (cn.includes('keldon') && cn.includes('johnson')) return 'rotation';
+                    if (cn.includes('stanley') && cn.includes('johnson')) return 'rotation';
+                    // Jones disambiguation
+                    if (cn.includes('tyus') && cn.includes('jones')) return 'rotation';
+                    if (cn.includes('herb') && cn.includes('jones')) return 'rotation';
+                    if (cn.includes('derrick') && cn.includes('jones')) return 'rotation';
+                    // Williams disambiguation
+                    if (cn.includes('grant') && cn.includes('williams')) return 'rotation';
+                    if (cn.includes('robert') && cn.includes('williams')) return 'rotation';
+                    if (cn.includes('ziaire') && cn.includes('williams')) return 'rotation';
+                    if (cn.includes('mark') && cn.includes('williams')) return 'rotation';
+                    if (cn.includes('vince') && cn.includes('williams')) return 'rotation';
+                    return null;
+                })();
+
+                // ── Tier 1: MVP Candidates (VOR 8.0) ──────────────────────────────
+                const MVP_LAST_NAMES = new Set([
+                    'jokic',         // Nikola Jokic
+                    'doncic',        // Luka Doncic
+                    'cunningham',    // Cade Cunningham
+                    'antetokounmpo', // Giannis
+                    'brunson',       // Jalen Brunson
+                    'edwards',       // Anthony Edwards
+                    'wembanyama',    // Victor Wembanyama
+                    'booker',        // Devin Booker
+                ]);
+
+                // ── Tier 2: Stars / All-Stars (VOR 6.0) ───────────────────────────
+                const STAR_LAST_NAMES = new Set([
+                    'tatum',       // Jayson Tatum
+                    'morant',      // Ja Morant
+                    'curry',       // Stephen Curry (full name guarded above)
+                    'james',       // LeBron James
+                    'durant',      // Kevin Durant
+                    'lillard',     // Damian Lillard
+                    'haliburton',  // Tyrese Haliburton
+                    'sabonis',     // Domantas Sabonis
+                    'fox',         // De'Aaron Fox
+                    'markkanen',   // Lauri Markkanen
+                    'banchero',    // Paolo Banchero
+                    'williamson',  // Zion Williamson
+                    'ingram',      // Brandon Ingram
+                    'butler',      // Jimmy Butler (guarded above if needed)
+                    'adebayo',     // Bam Adebayo
+                    'young',       // Trae Young (guarded if needed)
+                    'randle',      // Julius Randle
+                    'leonard',     // Kawhi Leonard (full name guarded above)
+                    'harden',      // James Harden
+                    'irving',      // Kyrie Irving
+                    'bane',        // Desmond Bane
+                    'wagner',      // Franz Wagner
+                    'george',      // Paul George (full name guarded above)
+                    'sengun',      // Alperen Sengun
+                    'holmgren',    // Chet Holmgren
+                    'embiid',      // Joel Embiid
+                    'siakam',      // Pascal Siakam
+                    'maxey',       // Tyrese Maxey
+                    'brown',       // Jaylen Brown (full name guarded above)
+                    'mitchell',    // Donovan Mitchell (full name guarded above)
+                    'nembhard',    // Andrew Nembhard -- rising star
+                    'thompson',    // Klay Thompson
+                ]);
+
+                // ── Tier 3: Quality Starters (VOR 4.0) ────────────────────────────
+                const STARTER_LAST_NAMES = new Set([
+                    'murray',      // Jamal Murray
+                    'derozan',     // DeMar DeRozan
+                    'lavine',      // Zach LaVine
+                    'vucevic',     // Nikola Vucevic
+                    'white',       // Derrick/Coby White (guarded above)
+                    'ball',        // LaMelo Ball
+                    'garland',     // Darius Garland
+                    'mobley',      // Evan Mobley
+                    'allen',       // Jarrett Allen
+                    'nurkic',      // Jusuf Nurkic
+                    'beal',        // Bradley Beal
+                    'russell',     // D'Angelo Russell
+                    'ivey',        // Jaden Ivey
+                    'simons',      // Anfernee Simons
+                    'reaves',      // Austin Reaves
+                    'kuminga',     // Jonathan Kuminga
+                    'johnson',     // Jalen Johnson (full name guarded above)
+                    'claxton',     // Nic Claxton
+                    'powell',      // Norman Powell (full name guarded above)
+                    'monk',        // Malik Monk (full name guarded above)
+                    'agbaji',      // Ochai Agbaji
+                    'green',       // Draymond Green
+                    'poole',       // Jordan Poole
+                    'brooks',      // Mikal Brooks
+                    'oubre',       // Kelly Oubre
+                    'hayward',     // Gordon Hayward
+                    'bogdanovic',  // Bogdan Bogdanovic
+                    'dinwiddie',   // Spencer Dinwiddie
+                    'dejounte',    // Dejounte Murray (last name Murray guarded above)
+                    'dejountemurray', // catch full-name cleaned
+                    'bridges',     // Miles/Mikal Bridges
+                    'poeltl',      // Jakob Poeltl
+                    'gobert',      // Rudy Gobert
+                    'robinson',    // Mitchell Robinson
+                    'ntilikina',
+                    'barrett',     // RJ Barrett
+                    'anunoby',     // OG Anunoby
+                    'quickley',    // Immanuel Quickley
+                    'fournier',
+                    'oladipo',     // Victor Oladipo
+                    'neto',
+                    'wiseman',     // James Wiseman
+                    'scoot',       // Scoot Henderson (first name)
+                    'henderson',   // Scoot Henderson
+                    'mathurin',    // Bennedict Mathurin
+                    'nwora',
+                    'harris',      // Tobias Harris
+                    'covington',
+                    'mcbride',     // Miles McBride
+                    'kuzma',       // Kyle Kuzma
+                    'hardaway',    // Tim Hardaway Jr
+                    'rozier',      // Terry Rozier
+                    'dejean',      // Reed Dejean
+                    'jones',       // Herb/Tyus Jones (guarded above)
+                    'vanderbilt',  // Jarred Vanderbilt
+                    'olynyk',
+                    'brogdon',     // Malcolm Brogdon
+                    'teague',
+                    'okeke',       // Mo Bamba? No - Chuma Okeke
+                    'johnson',
+                ]);
+
+                // ── Tier 4: Key Rotation Players (VOR 3.0) ────────────────────────
+                const ROTATION_LAST_NAMES = new Set([
+                    'huerter',     // Kevin Huerter
+                    'clarkson',    // Jordan Clarkson
+                    'nance',       // Larry Nance Jr.
+                    'bogdanovic',  // Bojan Bogdanovic
+                    'portis',      // Bobby Portis
+                    'augustin',
+                    'plumlee',     // Mason Plumlee
+                    'nader',
+                    'payton',      // Gary Payton II
+                    'grant',       // Jerami Grant
+                    'strus',       // Max Strus
+                    'highsmith',   // Haywood Highsmith
+                    'herro',       // Tyler Herro
+                    'lowry',       // Kyle Lowry
+                    'okoro',       // Isaac Okoro
+                    'love',        // Kevin Love
+                    'rubio',
+                    'mccolllum',   // CJ McCollum
+                    'mccollum',
+                    'holiday',     // Jrue/Aaron Holiday
+                    'noel',
+                    'okogie',      // Josh Okogie
+                    'finney',      // Finney-Smith
+                    'finneysmith',
+                    'mclemore',    // Ben McLemore - no
+                    'burks',       // Alec Burks
+                    'nwaba',
+                    'goodwin',
+                    'carter',      // Jevon Carter, etc.
+                    'wiggins',     // Andrew Wiggins
+                    'looney',      // Kevon Looney
+                    'podzemski',   // Brandin Podzemski
+                    'moody',       // Moses Moody
+                    'klay',        // Klay Thompson - last name thompson above
+                    'dillon',      // Dillon Brooks - also 'brooks' above
+                    'heart',
+                    'porzingis',   // Kristaps Porzingis
+                    'kornet',
+                    'hauser',      // Sam Hauser
+                    'horford',     // Al Horford
+                    'smart',       // Marcus Smart
+                    'rozier',
+                    'muscala',
+                    'bitadze',
+                    'toppin',      // Obi Toppin
+                    'grimes',      // Quentin Grimes
+                    'bogdanovic',
+                    'winslow',
+                    'bazley',      // Darius Bazley
+                    'dort',        // Luguentz Dort
+                    'mann',        // Terence Mann
+                    'coffey',      // Amir Coffey
+                    'george',
+                    'zubac',       // Ivica Zubac
+                    'leonard',
+                    'jackson',     // Reggie Jackson
+                    'nembhard',
+                    'matisse',     // Matisse Thybulle
+                    'thybulle',
+                    'mcdaniel',    // Jaden McDaniels
+                    'alexander',   // Kyle Alexander etc
+                    'conley',      // Mike Conley
+                    'mcdermott',   // Doug McDermott
+                    'beverley',    // Patrick Beverley
+                    'green',
+                ]);
+
+                // ── Determine tier ────────────────────────────────────────────────
+                let playerTier: string;
+
+                if (disambiguated) {
+                    playerTier = disambiguated;
+                } else if (MVP_LAST_NAMES.has(cn) || [...MVP_LAST_NAMES].some(n => cn.includes(n))) {
+                    playerTier = 'mvp';
+                } else if (STAR_LAST_NAMES.has(cn) || [...STAR_LAST_NAMES].some(n => cn.includes(n))) {
+                    playerTier = 'star';
+                } else if (STARTER_LAST_NAMES.has(cn) || [...STARTER_LAST_NAMES].some(n => cn.includes(n))) {
+                    playerTier = 'starter';
+                } else if (ROTATION_LAST_NAMES.has(cn) || [...ROTATION_LAST_NAMES].some(n => cn.includes(n))) {
+                    playerTier = 'rotation';
+                } else {
+                    playerTier = 'default';
                 }
 
-                // Determine Impact via Salary
-                const { impact, tier } = getPlayerImpactAndTier(inj.playerObj);
-
-                // Weight by status certainty
-                let weight = 1.0;
-                if (status === 'GTD' || status === 'QUESTIONABLE') weight = 0.5;
-                if (status === 'DOUBTFUL') weight = 0.75;
-
-                const finalImpact = impact * weight;
-
-                if (finalImpact > 0.4) {
-                    impactfulInjuries.push({
-                        name: inj.name,
-                        status: inj.status,
-                        impact: -finalImpact,
-                        tier: tier,
-                        bakedIn: false
-                    });
-                    totalPenalty -= finalImpact;
+                if (playerTier === 'mvp') {
+                    estimatedVOR = 8.0;
+                    expectedMinutes = 36;
+                    console.log(`[ImpactModel] MVP CANDIDATE: ${name} → VOR 8.0`);
+                } else if (playerTier === 'star') {
+                    estimatedVOR = 6.0;
+                    expectedMinutes = 34;
+                    console.log(`[ImpactModel] STAR: ${name} → VOR 6.0`);
+                } else if (playerTier === 'starter') {
+                    estimatedVOR = 4.0;
+                    expectedMinutes = 32;
+                    console.log(`[ImpactModel] STARTER: ${name} → VOR 4.0`);
+                } else if (playerTier === 'rotation') {
+                    estimatedVOR = 3.0;
+                    expectedMinutes = 22;
+                    console.log(`[ImpactModel] ROTATION: ${name} → VOR 3.0`);
+                } else {
+                    console.log(`[ImpactModel] DEFAULT: ${name} → VOR 2.5`);
                 }
+
+                return {
+                    name: name,
+                    status: 'OUT', // For the model's purposes
+                    expectedMinutes: expectedMinutes,
+                    stats: {
+                        bpm: estimatedVOR,
+                        rapm_z: 0,
+                        onOff_z: 0,
+                        usage_z: 0
+                    }
+                };
             });
-            return { impactfulInjuries, totalPenalty };
         };
 
-        const homeInj = calculateInjuryPenalty(homeInjuriesList);
-        const awayInj = calculateInjuryPenalty(awayInjuriesList);
+        // 1. BASE TEAM RATING (Lineup-Adjusted)
+        const homeNetRating = homeStats?.powerRatings?.avgNetRating || 0;
+        const awayNetRating = awayStats?.powerRatings?.avgNetRating || 0;
 
-        const homeFinalTPR = homeBaseline + homeInj.totalPenalty;
-        const awayFinalTPR = awayBaseline + awayInj.totalPenalty;
+        const homePace = homeStats?.powerRatings?.avgPace || 99;
+        const awayPace = awayStats?.powerRatings?.avgPace || 99;
 
-        // Projected Spread: (Home - Away + HCA) * -1
-        // Example: Home (-13) - Away (-1) + 2.3 = -9.7 (Home is 9.7 worse?) No
-        // TPR is "Points above average".
-        // Baseline: Home +1.07. Away -0.08.
-        // HCA: +2.3 for Home.
-        // Gap = (1.07) - (-0.08) + 2.3 = 3.45 (Home favored by 3.45)
-        // Line should be Home -3.45.
+        const homePaceFactor = homePace / LEAGUE_AVG_PACE;
+        const awayPaceFactor = awayPace / LEAGUE_AVG_PACE;
 
-        const rawGap = homeFinalTPR - awayFinalTPR + HCA_NET;
-        const projectedSpread = -rawGap;
+        const homeBase = homeNetRating * homePaceFactor + SCHEDULE_RESIDUAL;
+        const awayBase = awayNetRating * awayPaceFactor + SCHEDULE_RESIDUAL;
 
-        // Correct Edge Calculation
-        // Market: Home -3.0 (Input: -3.0)
-        // Model: Home -10.0 (Input: -10.0)
-        // Edge: Model - Market?
-        // If Model says -10 (Favored by 10) and Market says -3 (Favored by 3).
-        // You want to bet Home. Edge is 7 points.
-        // Formula: Market - Model (since negative is good)
-        // -3 - (-10) = +7. Correct.
-        // Wait, normally Edge = |Model - Market| implies magnitude. 
-        // Direction matters.
-        // Let's calculate simple difference.
+        // 2. INJURY MODEL
+        const homeInjuries = mapInjuries(homeStats);
+        const awayInjuries = mapInjuries(awayStats);
 
+        // Build per-player injury trace for the detail panel
+        const buildInjuryTrace = (players: PlayerData[]) =>
+            players.map(p => {
+                const vor = p.stats?.bpm ?? 0;
+                const mins = p.expectedMinutes;
+                const minutesShare = mins / 48;
+                const rawImpact = vor * minutesShare;
+                const statusWeights: Record<string, number> = {
+                    OUT: 1.0, DOUBTFUL: 0.8, QUESTIONABLE: 0.55, GTD: 0.4
+                };
+                const statusWeight = statusWeights[p.status] ?? 1.0;
+                const penalty = -(rawImpact * statusWeight);
+                return {
+                    name: p.name,
+                    status: p.status,
+                    vor,
+                    mins,
+                    minutesShare: parseFloat(minutesShare.toFixed(4)),
+                    rawImpact: parseFloat(rawImpact.toFixed(3)),
+                    statusWeight,
+                    penalty: parseFloat(penalty.toFixed(3)),
+                };
+            });
+
+        const homeInjuryTrace = buildInjuryTrace(homeInjuries);
+        const awayInjuryTrace = buildInjuryTrace(awayInjuries);
+
+        let homeInjuryPenalty = 0;
+        homeInjuries.forEach(p => homeInjuryPenalty += calculateInjuryPenalty(p));
+
+        let awayInjuryPenalty = 0;
+        awayInjuries.forEach(p => awayInjuryPenalty += calculateInjuryPenalty(p));
+
+        const homeAdaptation = calculateTeamAdaptationFactor(0);
+        const awayAdaptation = calculateTeamAdaptationFactor(0);
+
+        const homeFinalInjury = homeInjuryPenalty * homeAdaptation;
+        const awayFinalInjury = awayInjuryPenalty * awayAdaptation;
+
+        // 3. HOME COURT ADVANTAGE (Dynamic)
+        const homeRest: RestContext = {
+            isBackToBack: homeRestDays === 0,
+            is3in4: false
+        };
+        const awayRest: RestContext = {
+            isBackToBack: awayRestDays === 0,
+            is3in4: false
+        };
+
+        const hcaContext = {
+            elevationMeters: altitudeTeams.includes(homeName) ? 1609 : 0,
+            refereeFactor: 0
+        };
+
+        const { totalHCA, breakdown: hcaBreakdown } = calculateDynamicHCA(homeRest, awayRest, hcaContext);
+
+        // 4. FINAL SPREAD CALCULATION
+        const homeTPR = homeBase + homeFinalInjury;
+        const awayTPR = awayBase + awayFinalInjury;
+
+        const projectedSpread = awayTPR - homeTPR - totalHCA;
+
+        // 5. EDGE & BET SIGNAL
+        const MODEL_STD_DEV = 11.8;
         const edge = marketSpread - projectedSpread;
-        // Ex: Market -3, Project -10 -> Edge +7 (Positive means value on Home covering)
-        // Ex: Market -3, Project +2 (Dog) -> Edge -5 (Negative means avoid Home/Bet Away)
+        const zScore = calculateZScoreEdge(marketSpread, projectedSpread);
 
-        // Recommendation Logic
-        let rec = "";
-        const absEdge = Math.abs(edge);
+        let betSignal = "No Play";
+        const absZ = Math.abs(zScore);
+        if (absZ >= 1.0) betSignal = "ELITE VALUE";
+        else if (absZ >= 0.75) betSignal = "STRONG VALUE";
+        else if (absZ >= 0.55) betSignal = "PLAYABLE";
 
-        if (absEdge > 2.0) {
-            const side = edge > 0 ? homeName : awayName;
-            rec = `High Value. The model projects a ${absEdge.toFixed(1)} pt edge on ${side}. `;
-            if (homeInj.totalPenalty < -2 || awayInj.totalPenalty < -2) {
-                rec += "Market may be under-reacting to key injuries.";
-            } else {
-                rec += "Baseline metrics show a significant disparity.";
-            }
-        } else {
-            rec = "Fair Value. Market lines align within standard variance.";
-        }
+        const recommendedSide = zScore > 0 ? homeName : awayName;
+        const steamConfirmed = checkSteam(projectedSpread, marketSpread, marketSpread);
 
         return NextResponse.json({
-            homeTeam: homeName,
-            awayTeam: awayName,
-            homeBaseline,
-            awayBaseline,
-            homeInjuries: homeInj.impactfulInjuries,
-            awayInjuries: awayInj.impactfulInjuries,
-            homeTotalPenalty: homeInj.totalPenalty,
-            awayTotalPenalty: awayInj.totalPenalty,
-            homeFinalTPR,
-            awayFinalTPR,
-            projectedSpread,
-            marketSpread,
-            edge: absEdge, // Return magnitude for UI
-            recommendation: rec,
-            hca: HCA_NET
+            matchup: `${awayName} @ ${homeName}`,
+            prediction: {
+                projectedSpread: parseFloat(projectedSpread.toFixed(2)),
+                marketSpread: marketSpread,
+                zScore: parseFloat(zScore.toFixed(2)),
+                betSignal,
+                recommendedSide: absZ >= 0.55 ? recommendedSide : null,
+                confidence: Math.min(absZ * 25, 99).toFixed(0) + '%'
+            },
+            components: {
+                home: {
+                    baseRating: parseFloat(homeBase.toFixed(2)),
+                    injuryPenalty: parseFloat(homeFinalInjury.toFixed(2)),
+                    finalTPR: parseFloat(homeTPR.toFixed(2))
+                },
+                away: {
+                    baseRating: parseFloat(awayBase.toFixed(2)),
+                    injuryPenalty: parseFloat(awayFinalInjury.toFixed(2)),
+                    finalTPR: parseFloat(awayTPR.toFixed(2))
+                },
+                hca: {
+                    total: totalHCA,
+                    breakdown: hcaBreakdown
+                }
+            },
+            injuries: {
+                home: homeInjuries.map(i => ({ name: i.name, status: i.status, impact: calculateInjuryPenalty(i).toFixed(2) })),
+                away: awayInjuries.map(i => ({ name: i.name, status: i.status, impact: calculateInjuryPenalty(i).toFixed(2) }))
+            },
+            // ── Full computation trace for the "See Details" panel ──────────────
+            trace: {
+                constants: {
+                    leagueAvgPace: LEAGUE_AVG_PACE,
+                    modelStdDev: MODEL_STD_DEV,
+                    scheduleResidual: SCHEDULE_RESIDUAL,
+                    adaptationFactor: homeAdaptation,
+                },
+                home: {
+                    teamName: homeName,
+                    step1_base: {
+                        avgNetRating: parseFloat(homeNetRating.toFixed(3)),
+                        avgPace: parseFloat(homePace.toFixed(1)),
+                        paceFactor: parseFloat(homePaceFactor.toFixed(4)),
+                        formula: `${homeNetRating.toFixed(3)} × (${homePace.toFixed(1)} / ${LEAGUE_AVG_PACE}) = ${homeBase.toFixed(3)}`,
+                        result: parseFloat(homeBase.toFixed(3)),
+                    },
+                    step2_injuries: {
+                        players: homeInjuryTrace,
+                        rawTotal: parseFloat(homeInjuryPenalty.toFixed(3)),
+                        adaptationFactor: homeAdaptation,
+                        formula: `${homeInjuryPenalty.toFixed(3)} × ${homeAdaptation} = ${homeFinalInjury.toFixed(3)}`,
+                        result: parseFloat(homeFinalInjury.toFixed(3)),
+                    },
+                    step3_tpr: {
+                        formula: `${homeBase.toFixed(3)} + (${homeFinalInjury.toFixed(3)}) = ${homeTPR.toFixed(3)}`,
+                        result: parseFloat(homeTPR.toFixed(3)),
+                    },
+                },
+                away: {
+                    teamName: awayName,
+                    step1_base: {
+                        avgNetRating: parseFloat(awayNetRating.toFixed(3)),
+                        avgPace: parseFloat(awayPace.toFixed(1)),
+                        paceFactor: parseFloat(awayPaceFactor.toFixed(4)),
+                        formula: `${awayNetRating.toFixed(3)} × (${awayPace.toFixed(1)} / ${LEAGUE_AVG_PACE}) = ${awayBase.toFixed(3)}`,
+                        result: parseFloat(awayBase.toFixed(3)),
+                    },
+                    step2_injuries: {
+                        players: awayInjuryTrace,
+                        rawTotal: parseFloat(awayInjuryPenalty.toFixed(3)),
+                        adaptationFactor: awayAdaptation,
+                        formula: `${awayInjuryPenalty.toFixed(3)} × ${awayAdaptation} = ${awayFinalInjury.toFixed(3)}`,
+                        result: parseFloat(awayFinalInjury.toFixed(3)),
+                    },
+                    step3_tpr: {
+                        formula: `${awayBase.toFixed(3)} + (${awayFinalInjury.toFixed(3)}) = ${awayTPR.toFixed(3)}`,
+                        result: parseFloat(awayTPR.toFixed(3)),
+                    },
+                },
+                step4_hca: {
+                    base: hcaBreakdown.base,
+                    fatigue: hcaBreakdown.fatigue,
+                    altitude: hcaBreakdown.altitude,
+                    refBias: hcaBreakdown.refBias,
+                    formula: `${hcaBreakdown.base} (base) + ${hcaBreakdown.fatigue} (fatigue) + ${hcaBreakdown.altitude} (altitude) = ${totalHCA}`,
+                    result: totalHCA,
+                    homeIsBackToBack: homeRestDays === 0,
+                    awayIsBackToBack: awayRestDays === 0,
+                    isAltitudeGame: altitudeTeams.includes(homeName),
+                },
+                step5_spread: {
+                    formula: `awayTPR(${awayTPR.toFixed(3)}) - homeTPR(${homeTPR.toFixed(3)}) - HCA(${totalHCA}) = ${projectedSpread.toFixed(3)}`,
+                    awayTPR: parseFloat(awayTPR.toFixed(3)),
+                    homeTPR: parseFloat(homeTPR.toFixed(3)),
+                    hca: totalHCA,
+                    result: parseFloat(projectedSpread.toFixed(3)),
+                    interpretation: projectedSpread < 0 ? `Home (${homeName}) favored by ${Math.abs(projectedSpread).toFixed(1)}` : `Away (${awayName}) favored by ${Math.abs(projectedSpread).toFixed(1)}`,
+                },
+                step6_edge: {
+                    marketSpread,
+                    projectedSpread: parseFloat(projectedSpread.toFixed(3)),
+                    edge: parseFloat(edge.toFixed(3)),
+                    stdDev: MODEL_STD_DEV,
+                    formula: `(${marketSpread} - ${projectedSpread.toFixed(3)}) / ${MODEL_STD_DEV} = ${zScore.toFixed(4)}`,
+                    zScore: parseFloat(zScore.toFixed(4)),
+                    absZ: parseFloat(absZ.toFixed(4)),
+                    signal: betSignal,
+                    recommendedSide: absZ >= 0.55 ? recommendedSide : null,
+                    confidence: Math.min(absZ * 25, 99).toFixed(1) + '%',
+                },
+            }
         });
 
     } catch (error: any) {

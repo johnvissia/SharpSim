@@ -4,120 +4,163 @@ export const teamNameMap: Record<string, string> = {
     'St Louis Blues': 'St. Louis Blues',
     'Vegas Golden Knights': 'Vegas Golden Knights',
 
-    // NCAAM Mappings (Targeting School Name only for canonical key)
-    'Michigan St': 'Michigan State',
-    'Michigan St.': 'Michigan State',
+    // NBA
+    'Atlanta Hawks': 'Atlanta Hawks',
+    'Boston Celtics': 'Boston Celtics',
+    'Brooklyn Nets': 'Brooklyn Nets',
+    'Charlotte Hornets': 'Charlotte Hornets',
+    'Chicago Bulls': 'Chicago Bulls',
+    'Cleveland Cavaliers': 'Cleveland Cavaliers',
+    'Dallas Mavericks': 'Dallas Mavericks',
+    'Denver Nuggets': 'Denver Nuggets',
+    'Detroit Pistons': 'Detroit Pistons',
+    'Golden State Warriors': 'Golden State Warriors',
+    'Houston Rockets': 'Houston Rockets',
+    'Indiana Pacers': 'Indiana Pacers',
+    'LA Clippers': 'Los Angeles Clippers',
+    'Clippers': 'Los Angeles Clippers',
+    'Los Angeles Clippers': 'Los Angeles Clippers',
+    'Los Angeles Lakers': 'Los Angeles Lakers',
+    'Lakers': 'Los Angeles Lakers',
+    'Memphis Grizzlies': 'Memphis Grizzlies',
+    'Miami Heat': 'Miami Heat',
+    'Milwaukee Bucks': 'Milwaukee Bucks',
+    'Minnesota Timberwolves': 'Minnesota Timberwolves',
+    'New Orleans Pelicans': 'New Orleans Pelicans',
+    'New York Knicks': 'New York Knicks',
+    'Knicks': 'New York Knicks',
+    'Oklahoma City Thunder': 'Oklahoma City Thunder',
+    'Thunder': 'Oklahoma City Thunder',
+    'Orlando Magic': 'Orlando Magic',
+    'Philadelphia 76ers': 'Philadelphia 76ers',
+    '76ers': 'Philadelphia 76ers',
+    'Sixers': 'Philadelphia 76ers',
+    'Phoenix Suns': 'Phoenix Suns',
+    'Portland Trail Blazers': 'Portland Trail Blazers',
+    'Sacramento Kings': 'Sacramento Kings',
+    'Kings': 'Sacramento Kings',
+    'San Antonio Spurs': 'San Antonio Spurs',
+    'Spurs': 'San Antonio Spurs',
+    'Toronto Raptors': 'Toronto Raptors',
+    'Utah Jazz': 'Utah Jazz',
+    'Washington Wizards': 'Washington Wizards',
 
-    'Ole Miss': 'Mississippi',
-    'Ole Miss Rebels': 'Mississippi',
+    // NCAAM Mappings
+    'Miami': 'Miami (FL)',
+    'Miami (FL)': 'Miami (FL)',
+    'Miami Hurricanes': 'Miami (FL)',
+    'Miami Florida': 'Miami (FL)',
+    'Miami (OH)': 'Miami (OH)',
+    'Miami Ohio': 'Miami (OH)',
 
-    'NC State': 'North Carolina State',
-    'NC State Wolfpack': 'North Carolina State',
-    'North Carolina St': 'North Carolina State',
+    'Florida St': 'Florida State',
+    'Floridia St': 'Florida State',
+    'Florida St.': 'Florida State',
+    'Florida State': 'Florida State',
+    'Fla State': 'Florida State',
 
-    'UConn': 'Connecticut',
-    'UConn Huskies': 'Connecticut',
+    'Mississippi St': 'Mississippi State',
+    'Mississippi St.': 'Mississippi State',
+    'MS State': 'Mississippi State',
 
-    'UMass': 'Massachusetts',
-    'UMass Minutemen': 'Massachusetts',
+    'App State': 'Appalachian State',
+    'Appalachian St': 'Appalachian State',
 
-    'USC': 'Southern California',
-    'USC Trojans': 'Southern California',
+    'NC State': 'NC State',
+    'North Carolina St': 'NC State',
+    'North Carolina State': 'NC State',
 
-    'LSU': 'Louisiana State',
-    'LSU Tigers': 'Louisiana State',
-
-    'UCF': 'Central Florida',
-    'UCF Knights': 'Central Florida',
-
-    'BYU': 'Brigham Young',
-    'BYU Cougars': 'Brigham Young',
-
-    'SMU': 'Southern Methodist',
-    'SMU Mustangs': 'Southern Methodist',
-
-    'TCU': 'Texas Christian',
-    'TCU Horned Frogs': 'Texas Christian',
-
-    'UAB': 'Alabama Birmingham',
-    'UAB Blazers': 'Alabama Birmingham',
-
-    'UTEP': 'Texas El Paso',
-    'UTEP Miners': 'Texas El Paso',
-
-    'UTSA': 'Texas San Antonio',
-    'UTSA Roadrunners': 'Texas San Antonio',
-
-    'VCU': 'Virginia Commonwealth',
-    'VCU Rams': 'Virginia Commonwealth',
-
-    'UNLV': 'Nevada Las Vegas',
-    'UNLV Rebels': 'Nevada Las Vegas',
-
-    'Miami': 'Miami',
-    'Miami (FL)': 'Miami',
-    'Miami Hurricanes': 'Miami',
-
-    'Pittsburgh': 'Pittsburgh',
-    'Pitt': 'Pittsburgh',
-
-    'Wake Forest': 'Wake Forest',
-
-    'North Carolina': 'North Carolina',
-    'UNC': 'North Carolina',
-
-    'Duke': 'Duke',
-
-    'Kentucky': 'Kentucky',
-    'Kansas': 'Kansas',
-    'Arizona': 'Arizona',
+    'Kansas St': 'Kansas State',
+    'Kansas St.': 'Kansas State',
+    'K-State': 'Kansas State',
 
     'Arizona St': 'Arizona State',
-    'Arizona St Sun Devils': 'Arizona State',
+    'Arizona St.': 'Arizona State',
+    'ASU': 'Arizona State',
 
-    'Purdue': 'Purdue',
-    'Houston': 'Houston',
-    'Tennessee': 'Tennessee',
-    'Marquette': 'Marquette',
-    'Iowa State': 'Iowa State',
-    'Creighton': 'Creighton',
-    'Baylor': 'Baylor',
-    'Gonzaga': 'Gonzaga',
-    'Auburn': 'Auburn',
-    'Illinois': 'Illinois',
-    'Alabama': 'Alabama',
-    'South Carolina': 'South Carolina',
-    'Florida': 'Florida',
-    'Wisconsin': 'Wisconsin',
-    'Texas': 'Texas',
-    'Texas Tech': 'Texas Tech',
-    'San Diego State': 'San Diego State',
-    'Utah State': 'Utah State',
-    'Nevada': 'Nevada',
-    'Boise State': 'Boise State',
-    'Colorado State': 'Colorado State',
-    'New Mexico': 'New Mexico',
-    'Washington State': 'Washington State',
+    'Oregon St': 'Oregon State',
+    'Oregon St.': 'Oregon State',
 
-    'Syracuse': 'Syracuse',
-    'Syracuse Orange': 'Syracuse',
+    'Oklahoma St': 'Oklahoma State',
+    'Oklahoma St.': 'Oklahoma State',
 
-    'Virginia': 'Virginia',
-    'Virginia Cavaliers': 'Virginia',
+    'Michigan St': 'Michigan State',
+    'Michigan St.': 'Michigan State',
+    'MSU': 'Michigan State',
 
-    'Clemson': 'Clemson',
-    'Florida State': 'Florida State',
-    'Boston College': 'Boston College',
+    'Penn St': 'Penn State',
+    'Penn St.': 'Penn State',
+
+    'Ohio St': 'Ohio State',
+    'Ohio St.': 'Ohio State',
+    'OSU': 'Ohio State',
+
+    'Virginia Tech': 'Virginia Tech',
+    'VA Tech': 'Virginia Tech',
+    'Va Tech': 'Virginia Tech',
+    'VPI': 'Virginia Tech',
+
     'Georgia Tech': 'Georgia Tech',
-    'Louisville': 'Louisville',
-    'Notre Dame': 'Notre Dame',
-    'West Virginia': 'West Virginia',
-    'Kansas State': 'Kansas State',
-    'Kansas St': 'Kansas State',
-    'Missouri': 'Missouri',
+    'GA Tech': 'Georgia Tech',
+    'Ga Tech': 'Georgia Tech',
 
+    'Cal': 'California',
+    'Cal Berkeley': 'California',
+    'UC Berkeley': 'California',
 
-    // Add generic "St" expander in function if key not found
+    'Ole Miss': 'Ole Miss',
+    'Mississippi': 'Ole Miss',
+
+    'UConn': 'UConn',
+    'Connecticut': 'UConn',
+
+    'UMass': 'UMass',
+    'Massachusetts': 'UMass',
+
+    'USC': 'USC',
+    'Southern California': 'USC',
+    'Southern Cal': 'USC',
+
+    'LSU': 'LSU',
+    'Louisiana State': 'LSU',
+
+    'SMU': 'SMU',
+    'Southern Methodist': 'SMU',
+
+    'TCU': 'TCU',
+    'Texas Christian': 'TCU',
+
+    'UCF': 'UCF',
+    'Central Florida': 'UCF',
+
+    'BYU': 'BYU',
+    'Brigham Young': 'BYU',
+
+    'UAB': 'UAB',
+    'Alabama Birmingham': 'UAB',
+
+    'UTEP': 'UTEP',
+    'Texas El Paso': 'UTEP',
+
+    'UTSA': 'UTSA',
+    'Texas San Antonio': 'UTSA',
+
+    'VCU': 'VCU',
+    'Virginia Commonwealth': 'VCU',
+
+    'UNLV': 'UNLV',
+    'Nevada Las Vegas': 'UNLV',
+
+    'Texas A&M': 'Texas A&M',
+    'A&M': 'Texas A&M',
+    'Texas AM': 'Texas A&M',
+    'TAMU': 'Texas A&M',
+
+    'UNC': 'North Carolina',
+    'Pitt': 'Pittsburgh',
+    'Wash St': 'Washington State',
+    'Wash State': 'Washington State',
+    'Wazzu': 'Washington State',
 };
 
 const mascots = [
@@ -129,36 +172,75 @@ const mascots = [
     'Longhorns', 'Red Raiders', 'Aztecs', 'Aggies', 'Wolf Pack', 'Broncos', 'Lobos',
     'Orange', 'Cavaliers', 'Seminoles', 'Eagles', 'Yellow Jackets', 'Cardinals',
     'Fighting Irish', 'Mountaineers', 'Sun Devils', 'Hokies', 'Ducks', 'Beavers',
-    'Buffaloes', 'Gophers'
+    'Buffaloes', 'Gophers', 'Utes', 'Sooners', 'Cowboys', 'Cornhuskers', 'Hoosiers',
+    'Nittany Lions', 'Buckeyes', 'Wolverines', 'Bruins', 'Commodores', 'Razorbacks',
+    'Warriors', 'Gaels', 'Bulls', 'Dons', 'Waves', 'Titans', 'Matadors', 'Highlanders',
+    'Antelopes', 'Lumberjacks', 'Wildcats', 'Colonels', 'Governors', 'Bisons', 'Owls',
+    'Hatters', 'Dolphins', 'Ospreys', 'Eagles', 'Lions', 'Dragons', 'Blue Hens', 'Phoenix',
+    'Cougars', 'Hawks', 'Pirates', 'Monarchs', 'Dukes', 'Miners', 'Broncos', 'Aggies',
+    'Roadrunners', 'Blazers', 'Owls', 'Mean Green', 'Owls', 'Mustangs', 'Shockers',
+    'Bulls', 'Green Wave', 'Golden Hurricane', 'Pirates', '49ers', 'Owls', 'Bulldogs',
+    'Crusaders', 'Raiders', 'Leopards', 'Bison', 'Mountain Hawks', 'Mids', 'Black Knights',
+    'Terriers', 'Greyhounds', 'Red Foxes', 'Peacocks', 'Monmouth', 'Stags', 'Broncos',
+    'Bears', 'Tigers', 'Quakers', 'Crimson', 'Big Red', 'Bulldogs', 'Lions', 'Big Green',
+    'Hurricanes', 'Blue Jackets', 'Devils', 'Islanders', 'Rangers', 'Flyers', 'Penguins',
+    'Capitals', 'Predators', 'Stars', 'Blues', 'Golden Knights', 'Kings', 'Ducks', 'Sharks',
+    'Kraken', 'Oilers', 'Flames', 'Canucks', 'Jets', 'Maple Leafs', 'Senators', 'Canadiens'
 ];
 
 export function normalizeTeamName(name: string): string {
     if (!name) return '';
     let processed = name.trim();
 
-    // 1. Direct Overrides
+    // 0. Early Override Check (Fast Path)
     if (teamNameMap[processed]) return teamNameMap[processed];
 
-    // 2. Expand abbreviations
-    processed = processed
-        .replace(/\bSt\b\.?/g, 'State')
-        .replace(/\bMiss\b\.?/g, 'Mississippi')
-        .replace(/\bInt'l\b/g, 'International');
+    // 1. Standardize "St." vs "St" vs "Saint" and remove apostrophes
+    processed = processed.replace(/'s\b/g, '').replace(/'/g, '');
 
-    // 3. Remove known mascots from the end
-    for (const mascot of mascots) {
-        // Match mascot only if it's the last word or followed by non-letters
-        const regex = new RegExp(`\\s+${mascot}\\s*$`, 'i');
-        if (regex.test(processed)) {
-            processed = processed.replace(regex, '').trim();
-            break;
+    // Handle "St" or "St." at the START -> "St." (e.g., St. Louis)
+    if (/^St\.?\s/i.test(processed) || /^Saint\s/i.test(processed)) {
+        processed = processed.replace(/^(St\.?|Saint)\s/i, 'St. ');
+    }
+    // Handle "St" or "St." at the END -> "State" (e.g., Arizona St)
+    if (/\s(St\.?|State)$/i.test(processed)) {
+        processed = processed.replace(/\s(St\.?|State)$/i, ' State');
+    }
+
+    // 1.5 Special check for common abbreviations before further processing
+    if (teamNameMap[processed]) return teamNameMap[processed];
+
+    // 2. Remove known mascots from the end
+    // Loop twice to handle multi-word mascots or "State Mascots"
+    for (let i = 0; i < 2; i++) {
+        for (const mascot of mascots) {
+            const regex = new RegExp(`\\s+${mascot}$`, 'i');
+            if (regex.test(processed)) {
+                processed = processed.replace(regex, '').trim();
+            }
         }
     }
 
-    // 4. Handle "St." specifically again in case it was part of a mascot sequence (rare)
-
-    // 5. Final check against override map with the "cleaned" name
+    // 2.5 Check map again after mascot removal
     if (teamNameMap[processed]) return teamNameMap[processed];
+
+    // 3. Expand common abbreviations
+    processed = processed
+        .replace(/\bMiss\b\.?/g, 'Mississippi')
+        .replace(/\bInt'l\b/g, 'International')
+        .replace(/\bUniv\b\.?/g, 'University')
+        .replace(/\bTenn\b\.?/g, 'Tennessee')
+        .replace(/\bMich\b\.?/g, 'Michigan')
+        .replace(/\bWisc\b\.?/g, 'Wisconsin')
+        .replace(/\bIll\b\.?/g, 'Illinois')
+        .replace(/\bPenn\b\.?/g, 'Pennsylvania');
+
+    // 4. Final check against override map with the "cleaned" name
+    if (teamNameMap[processed]) return teamNameMap[processed];
+
+    // 5. Special Fix for "St. Louis" vs "St Louis" consistency if map failed
+    if (processed === 'St Louis') return 'St. Louis Blues';
+    if (processed === 'St. Louis') return 'St. Louis Blues';
 
     return processed;
 }
