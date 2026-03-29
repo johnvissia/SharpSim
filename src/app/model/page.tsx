@@ -25,7 +25,7 @@ interface ModelStats {
 }
 
 export default function ModelPage() {
-  const [selectedSport, setSelectedSport] = useState<'NBA' | 'NCAAM'>('NBA');
+  const [selectedSport, setSelectedSport] = useState<'NBA' | 'NCAAM' | 'MLB'>('NBA');
   const [rankedPredictions, setRankedPredictions] = useState<PredictionResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{ today: ModelStats, week: ModelStats } | null>(null);
@@ -117,7 +117,7 @@ export default function ModelPage() {
             } catch (e) { }
           }
 
-          const endpoint = selectedSport === 'NBA' ? '/api/predict-game' : '/api/predict-ncaam';
+          const endpoint = selectedSport === 'NBA' ? '/api/predict-game' : selectedSport === 'NCAAM' ? '/api/predict-ncaam' : '/api/predict-mlb';
           try {
             const res = await fetch(`${endpoint}?home=${hName}&away=${aName}&marketSpread=${spreadPoints}`);
             const json = await res.json();
@@ -210,6 +210,7 @@ export default function ModelPage() {
           <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 w-fit">
             <button onClick={() => setSelectedSport('NBA')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${selectedSport === 'NBA' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>NBA</button>
             <button onClick={() => setSelectedSport('NCAAM')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${selectedSport === 'NCAAM' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>NCAAM</button>
+            <button onClick={() => setSelectedSport('MLB')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${selectedSport === 'MLB' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>MLB</button>
           </div>
         </div>
 

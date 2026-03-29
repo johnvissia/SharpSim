@@ -113,6 +113,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
         { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard', slug: 'nba', sport: 'NBA' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard', slug: 'nfl', sport: 'NFL' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard', slug: 'nhl', sport: 'NHL' as SportName },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard', slug: 'mlb', sport: 'MLB' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard', slug: 'college-football', sport: 'NCAAF' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard', slug: 'mens-college-basketball', sport: 'NCAAM' as SportName },
     ];
@@ -161,6 +162,19 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
                     return `${leader.athlete.displayName} - ${leader.displayValue}`;
                 }
 
+                const getPitcher = (competitor: EspnCompetitor) => {
+                    const probable = (competitor as any).probables?.[0]; // Types are tricky here as we didn't fully mock probables
+                    if (!probable || !probable.athlete) return undefined;
+                    
+                    const name = probable.athlete.shortName || probable.athlete.displayName;
+                    const stats = probable.statistics || [];
+                    const wins = stats.find((s: any) => s.name === 'wins')?.displayValue || '0';
+                    const losses = stats.find((s: any) => s.name === 'losses')?.displayValue || '0';
+                    const era = stats.find((s: any) => s.name === 'ERA')?.displayValue || '0.00';
+
+                    return { name, wins, losses, era };
+                };
+
                 const homeTeam: Team = {
                     id: String(getSafeId(home)),
                     name: home.team.displayName,
@@ -169,6 +183,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
                     leadingScorer: getLeader(home, 'points'),
                     leadingRebounder: getLeader(home, 'rebounds'),
                     leadingAssister: getLeader(home, 'assists'),
+                    startingPitcher: sport === 'MLB' ? getPitcher(home) : undefined,
                 };
 
                 const awayTeam: Team = {
@@ -179,6 +194,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
                     leadingScorer: getLeader(away, 'points'),
                     leadingRebounder: getLeader(away, 'rebounds'),
                     leadingAssister: getLeader(away, 'assists'),
+                    startingPitcher: sport === 'MLB' ? getPitcher(away) : undefined,
                 };
 
                 return {
@@ -193,9 +209,8 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
                         away: parseInt(away.score, 10),
                     },
                     statusDetail: comp.status.type.detail,
-                    statusState: comp.status.type.state,
-                };
-            }).filter((g): g is Game => g !== null);
+                    };
+            }).filter((g: Game | null): g is Game => g !== null);
 
             cleanGames = [...cleanGames, ...mapped];
         });

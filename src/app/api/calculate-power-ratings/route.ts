@@ -590,17 +590,10 @@ export async function POST() {
 
     console.log(`✅ Loaded injuries for ${injuryData.size} teams from Firestore`);
 
-    // Apply contextual adjustments
+    // Apply contextual adjustments (First Pass: raw values)
     teamsWithNetRatings.forEach(team => {
       // Recency rating with exponential decay and soft margin cap
       team.recencyRating = calculateRecencyRating(team.netRatings, team.games);
-
-      // Dynamic blended rating - weights adjust based on sample size
-      // Use the last game's date if available, otherwise now
-      const lastGameDate = team.games[team.games.length - 1]?.date || new Date().toISOString();
-      const recencyWeight = getRecencyWeight(lastGameDate);
-      const srsWeight = 1 - recencyWeight;
-      team.blendedRating = (team.srsRating * srsWeight) + (team.recencyRating * recencyWeight);
 
       // Injury adjustment with tiered replacement system
       const teamInjuries = injuryData.get(team.teamName) || [];
@@ -615,6 +608,39 @@ export async function POST() {
         avgRestPenalty += calculateRestAdjustment(game);
       });
       team.restAdjustment = recentGames.length > 0 ? avgRestPenalty / recentGames.length : 0;
+    });
+
+    // ── VARIANCE NORMALIZATION FOR RECENCY ──
+    // Recency has a much wider variance than SRS. We scale Recency into the SRS distribution.
+    const srsValues = teamsWithNetRatings.map(t => t.srsRating);
+    const recValues = teamsWithNetRatings.map(t => t.recencyRating);
+    
+    const srsMean = srsValues.reduce((sum, val) => sum + val, 0) / srsValues.length;
+    const recMean = recValues.reduce((sum, val) => sum + val, 0) / recValues.length;
+    
+    const srsStd = Math.sqrt(srsValues.reduce((sq, val) => sq + Math.pow(val - srsMean, 2), 0) / srsValues.length);
+    const recStd = Math.sqrt(recValues.reduce((sq, val) => sq + Math.pow(val - recMean, 2), 0) / recValues.length);
+
+    const W_SRS = 0.70;
+    const W_REC = 0.30;
+
+    // Second Pass: Normalize, Blend, and Finalize
+    teamsWithNetRatings.forEach(team => {
+      // Normalize recency to match SRS variance
+      const zRecency = recStd > 0 ? (team.recencyRating - recMean) / recStd : 0;
+      const normalizedRecency = srsMean + (zRecency * srsStd);
+
+      // Assign normalized value so it is displayed sensibly in the UI
+      team.recencyRating = normalizedRecency;
+
+      // Static blended rating
+      team.blendedRating = (team.srsRating * W_SRS) + (normalizedRecency * W_REC);
+      
+      // Negative Base Constraint
+      if (team.srsRating < 0 && team.blendedRating > team.srsRating) {
+         // Caps the maximum points a sub-zero team can gain from a hot streak at +1.5
+         team.blendedRating = Math.min(team.blendedRating, team.srsRating + 1.5);
+      }
 
       // Final TPR (baseline)
       team.finalTPR = team.blendedRating - team.injuryAdjustment + team.restAdjustment;

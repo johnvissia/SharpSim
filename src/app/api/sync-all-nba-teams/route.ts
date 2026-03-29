@@ -201,7 +201,8 @@ async function scrapeTeamESPN(teamName: string, teamId: string) {
 
   const data = await response.json();
   const events = data.events || [];
-  const abbreviation = data.team?.abbreviation || 'N/A';
+  const rawAbbrev = data.team?.abbreviation || 'N/A';
+  const abbreviation = normalizeESPNTeamAbbreviation(rawAbbrev);
 
   let gameNumber = 0;
   const games: any[] = [];

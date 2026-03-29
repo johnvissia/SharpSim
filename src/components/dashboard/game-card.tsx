@@ -40,26 +40,35 @@ const OddsButton = ({
 const TeamDisplay = ({ team, sport, score }: { team: Team, sport: SportName, score?: number | null }) => {
     const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
     return (
-        <div className="flex justify-between items-center w-full">
-            <div className="flex items-center gap-3 text-sm font-semibold">
-                <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
-                    {team.logo ? (
-                        <Image
-                            src={team.logo}
-                            alt={team.name}
-                            width={32}
-                            height={32}
-                            className="w-8 h-8 object-contain"
-                        />
-                    ) : (
-                        <FallbackIcon className="w-6 h-6 text-muted-foreground" />
-                    )}
+        <div className="flex flex-col w-full pb-1">
+            <div className="flex justify-between items-center w-full">
+                <div className="flex items-center gap-3 text-sm font-semibold">
+                    <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
+                        {team.logo ? (
+                            <Image
+                                src={team.logo}
+                                alt={team.name}
+                                width={32}
+                                height={32}
+                                className="w-8 h-8 object-contain"
+                            />
+                        ) : (
+                            <FallbackIcon className="w-6 h-6 text-muted-foreground" />
+                        )}
+                    </div>
+                    {team.rank && <span className="font-bold w-6 text-center">#{team.rank}</span>}
+                    <span className="truncate">{team.name}</span>
                 </div>
-                {team.rank && <span className="font-bold w-6 text-center">#{team.rank}</span>}
-                <span className="truncate">{team.name}</span>
+                 {typeof score === 'number' && !isNaN(score) && (
+                    <span className="text-3xl font-bold tracking-tight">{score}</span>
+                )}
             </div>
-             {typeof score === 'number' && !isNaN(score) && (
-                <span className="text-3xl font-bold tracking-tight">{score}</span>
+            
+            {sport === 'MLB' && team.startingPitcher && (
+                <div className="pl-11 flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
+                    <span className="font-bold text-slate-300 truncate">{team.startingPitcher.name}</span>
+                    <span className="text-slate-500">({team.startingPitcher.wins}-{team.startingPitcher.losses}, {team.startingPitcher.era} ERA)</span>
+                </div>
             )}
         </div>
     );

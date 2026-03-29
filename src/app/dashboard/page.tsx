@@ -142,7 +142,7 @@ export default function DashboardPage() {
 
     useEffect(() => {
         const fetchTeamLogos = async () => {
-            const sports = ['basketball/nba', 'football/nfl', 'hockey/nhl', 'football/college-football', 'basketball/mens-college-basketball'];
+            const sports = ['basketball/nba', 'football/nfl', 'hockey/nhl', 'football/college-football', 'basketball/mens-college-basketball', 'baseball/mlb'];
             const newLogoMap = new Map<string, string>();
             const promises = sports.map(async (sport) => {
                 try {
@@ -483,7 +483,7 @@ export default function DashboardPage() {
                 <div className="flex flex-col gap-4 w-full">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900/50 p-3 rounded-xl border border-slate-800 backdrop-blur-sm">
                         <div className="flex gap-2 overflow-x-auto no-scrollbar w-full md:w-auto">
-                            {['All', 'Favorites', 'NBA', 'NCAAM', 'NHL', 'NFL'].map(sport => (
+                            {['All', 'Favorites', 'NBA', 'NCAAM', 'MLB', 'NHL', 'NFL'].map(sport => (
                                 <button
                                     key={sport}
                                     onClick={() => setSelectedCategory(sport)}

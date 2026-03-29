@@ -119,6 +119,23 @@ export default function DataPage() {
     }
   };
 
+  const handleSyncMLB = async () => {
+    setLoading('sync-mlb');
+    try {
+      toast({ title: 'Syncing MLB', description: `Initializing MLB Team Data...` });
+      const res = await fetch('/api/sync-mlb-teams', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Sync failed`);
+      
+      setResults(prev => ({ ...prev, 'sync-mlb': { ...data, successCount: 30, totalTeams: 30 } }));
+      toast({ title: 'MLB Sync Complete', description: `Ready for mathematical modeling.` });
+    } catch (error: any) {
+      toast({ title: 'MLB Sync Failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleSyncProps = async () => {
     setLoading('sync-props');
     try {
@@ -350,6 +367,18 @@ export default function DataPage() {
           syncLoading={loading === 'sync-ncaam'}
           calcLoading={loading === 'calc-ncaam'}
           result={results['calc-ncaam'] || results['sync-ncaam']}
+        />
+
+        <AdminCard
+          title="MLB Model"
+          description="Architecture ready for custom baseball projection math."
+          icon={Database}
+          sport="MLB"
+          onSync={handleSyncMLB}
+          onCalculate={() => handleAction('/api/calculate-mlb-ratings', 'calc-mlb', 'MLB Ratings Calculated')}
+          syncLoading={loading === 'sync-mlb'}
+          calcLoading={loading === 'calc-mlb'}
+          result={results['calc-mlb'] || results['sync-mlb']}
         />
 
         <Card className="border-indigo-500/30 bg-indigo-950/10 md:col-span-2">

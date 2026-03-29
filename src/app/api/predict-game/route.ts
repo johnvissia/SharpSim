@@ -387,8 +387,8 @@ export async function GET(request: NextRequest) {
         };
 
         // 1. BASE TEAM RATING (Lineup-Adjusted)
-        const homeNetRating = homeStats?.powerRatings?.avgNetRating || 0;
-        const awayNetRating = awayStats?.powerRatings?.avgNetRating || 0;
+        const homeNetRating = homeStats?.powerRatings?.baselineTPR || homeStats?.powerRatings?.avgNetRating || 0;
+        const awayNetRating = awayStats?.powerRatings?.baselineTPR || awayStats?.powerRatings?.avgNetRating || 0;
 
         const homePace = homeStats?.powerRatings?.avgPace || 99;
         const awayPace = awayStats?.powerRatings?.avgPace || 99;

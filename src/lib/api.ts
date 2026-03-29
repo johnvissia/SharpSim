@@ -45,6 +45,7 @@ export async function syncGameLinesAndScores(firestore: Firestore) {
     { key: 'americanfootball_ncaaf', label: 'NCAAF' },
     { key: 'basketball_nba', label: 'NBA' },
     { key: 'basketball_ncaab', label: 'NCAAM' },
+    { key: 'baseball_mlb', label: 'MLB' },
     { key: 'icehockey_nhl', label: 'NHL' },
   ];
 

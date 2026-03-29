@@ -20,6 +20,12 @@ export type Team = {
   leadingScorer?: string;
   leadingRebounder?: string;
   leadingAssister?: string;
+  startingPitcher?: {
+    name: string;
+    wins: string | number;
+    losses: string | number;
+    era: string | number;
+  };
 };
 
 export type Odds = {
