@@ -209,6 +209,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
                         away: parseInt(away.score, 10),
                     },
                     statusDetail: comp.status.type.detail,
+                    statusState: comp.status.type.state,
                     };
             }).filter((g: Game | null): g is Game => g !== null);
 
