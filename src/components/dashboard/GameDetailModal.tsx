@@ -13,6 +13,7 @@ import { Button } from '../ui/button';
 import { MainLinesView } from './MainLinesView';
 import { GameLeadersView } from './GameLeadersView';
 import { ModelCalculationView } from './ModelCalculationView';
+import { MLBLiveGameTracker } from './MLBLiveGameTracker';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
@@ -405,15 +406,36 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                                 </TabsContent>
                             </Tabs>
                         ) : (
-                            <MainLinesView game={game} />
+                            game.sport === 'MLB' ? (
+                                <Tabs defaultValue="lines" className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                                        <TabsTrigger value="lines">Game Lines</TabsTrigger>
+                                        <TabsTrigger value="analysis">Matchup Analysis</TabsTrigger>
+                                    </TabsList>
+                                    <TabsContent value="lines">
+                                        <MainLinesView game={game} />
+                                    </TabsContent>
+                                    <TabsContent value="analysis">
+                                        <MLBLiveGameTracker game={game} />
+                                    </TabsContent>
+                                </Tabs>
+                            ) : (
+                                <MainLinesView game={game} />
+                            )
                         )
                     ) : (
                         <div className="space-y-6">
-                            <Card className="bg-slate-900 border-slate-800">
-                                <CardHeader><CardTitle>Model Retroactive Analysis</CardTitle></CardHeader>
-                                <CardContent><ModelCalculationView game={game} /></CardContent>
-                            </Card>
-                            <GameLeadersView game={game} />
+                            {game.sport === 'MLB' ? (
+                                <MLBLiveGameTracker game={game} />
+                            ) : (
+                                <>
+                                    <Card className="bg-slate-900 border-slate-800">
+                                        <CardHeader><CardTitle>Model Retroactive Analysis</CardTitle></CardHeader>
+                                        <CardContent><ModelCalculationView game={game} /></CardContent>
+                                    </Card>
+                                    <GameLeadersView game={game} />
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
