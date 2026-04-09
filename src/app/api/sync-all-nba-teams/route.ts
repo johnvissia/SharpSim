@@ -355,6 +355,10 @@ async function scrapeTeamESPN(teamName: string, teamId: string) {
 // MAIN SYNC FUNCTION
 // ============================================================================
 
+export async function GET(request: NextRequest) {
+  return POST(request);
+}
+
 export async function POST(request: NextRequest) {
   try {
     let body: { batch?: number } = {};

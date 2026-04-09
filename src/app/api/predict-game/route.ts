@@ -53,7 +53,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const homeName = searchParams.get('home');
     const awayName = searchParams.get('away');
-    const marketSpread = parseFloat(searchParams.get('marketSpread') || '0');
+    const marketSpreadStr = searchParams.get('marketSpread');
+    const hasMarketSpread = marketSpreadStr !== null && marketSpreadStr !== 'null';
+    const marketSpread = hasMarketSpread ? parseFloat(marketSpreadStr || '0') : 0;
     // Optional params for full verification
     const homeRestDays = parseInt(searchParams.get('homeRest') || '1');
     const awayRestDays = parseInt(searchParams.get('awayRest') || '1');
@@ -467,27 +469,29 @@ export async function GET(request: NextRequest) {
 
         // 5. EDGE & BET SIGNAL
         const MODEL_STD_DEV = 11.8;
-        const edge = marketSpread - projectedSpread;
-        const zScore = calculateZScoreEdge(marketSpread, projectedSpread);
+        const edge = hasMarketSpread ? marketSpread - projectedSpread : 0;
+        const zScore = hasMarketSpread ? calculateZScoreEdge(marketSpread, projectedSpread) : 0;
 
         let betSignal = "No Play";
         const absZ = Math.abs(zScore);
-        if (absZ >= 1.0) betSignal = "ELITE VALUE";
-        else if (absZ >= 0.75) betSignal = "STRONG VALUE";
-        else if (absZ >= 0.55) betSignal = "PLAYABLE";
+        if (hasMarketSpread) {
+            if (absZ >= 1.0) betSignal = "ELITE VALUE";
+            else if (absZ >= 0.75) betSignal = "STRONG VALUE";
+            else if (absZ >= 0.55) betSignal = "PLAYABLE";
+        }
 
-        const recommendedSide = zScore > 0 ? homeName : awayName;
+        const recommendedSide = (hasMarketSpread && zScore > 0) ? homeName : (hasMarketSpread && zScore < 0 ? awayName : null);
         const steamConfirmed = checkSteam(projectedSpread, marketSpread, marketSpread);
 
         return NextResponse.json({
             matchup: `${awayName} @ ${homeName}`,
             prediction: {
                 projectedSpread: parseFloat(projectedSpread.toFixed(2)),
-                marketSpread: marketSpread,
+                marketSpread: hasMarketSpread ? marketSpread : null,
                 zScore: parseFloat(zScore.toFixed(2)),
                 betSignal,
-                recommendedSide: absZ >= 0.55 ? recommendedSide : null,
-                confidence: Math.min(absZ * 25, 99).toFixed(0) + '%'
+                recommendedSide: (hasMarketSpread && absZ >= 0.55) ? recommendedSide : null,
+                confidence: hasMarketSpread ? Math.min(absZ * 25, 99).toFixed(0) + '%' : '0%'
             },
             components: {
                 home: {

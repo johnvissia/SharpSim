@@ -45,11 +45,13 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
         async function fetchModelData() {
             setLoading(true);
             try {
-                let spreadPoints = game.odds?.spread?.points || 0;
-                if (!spreadPoints && game.odds?.spread?.home) {
-                    spreadPoints = game.odds.spread.home;
+                let spreadPoints: number | string = 'null';
+                const hasValidSpread = game.odds?.spread !== undefined && typeof game.odds?.spread?.points === 'number';
+
+                if (hasValidSpread) {
+                    spreadPoints = game.odds?.spread?.points as number;
+                    if (Math.abs(spreadPoints) > 50) spreadPoints = 'null';
                 }
-                if (Math.abs(spreadPoints) > 50) spreadPoints = 0;
 
                 const response = await fetch(`/api/predict-game?home=${game.homeTeam.name}&away=${game.awayTeam.name}&marketSpread=${spreadPoints}`);
                 const result = await response.json();
@@ -94,9 +96,13 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
     const marketSpread = prediction.marketSpread;
     const projectedSpread = prediction.projectedSpread;
 
-    const pickSpreadDisplay = isHomePick
-        ? (marketSpread > 0 ? `+${marketSpread}` : (marketSpread === 0 ? 'PK' : marketSpread))
-        : (marketSpread * -1 > 0 ? `+${marketSpread * -1}` : (marketSpread === 0 ? 'PK' : marketSpread * -1));
+    const hasMarketSpread = marketSpread !== null && marketSpread !== undefined;
+
+    const pickSpreadDisplay = !hasMarketSpread 
+        ? 'No Line'
+        : isHomePick
+            ? (marketSpread > 0 ? `+${marketSpread}` : (marketSpread === 0 ? 'PK' : marketSpread))
+            : (marketSpread * -1 > 0 ? `+${marketSpread * -1}` : (marketSpread === 0 ? 'PK' : marketSpread * -1));
 
     const projOnPick = isHomePick ? projectedSpread : -projectedSpread;
     const projDisplay = projOnPick > 0 ? `+${projOnPick.toFixed(1)}` : projOnPick.toFixed(1);
@@ -145,7 +151,7 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
                                 <div className="text-right">
                                     <div className="text-[10px] uppercase opacity-80 font-bold mb-1">Z-Score</div>
                                     <div className="text-3xl font-black text-white">
-                                        {prediction.zScore.toFixed(2)}
+                                        {hasMarketSpread ? prediction.zScore.toFixed(2) : '-.--'}
                                     </div>
                                 </div>
                             </div>
@@ -157,7 +163,7 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
                                 <div className="text-[10px] text-slate-500 uppercase font-black mb-1">Vegas Line</div>
                                 <div className="text-sm font-mono font-bold bg-slate-800 text-slate-300 px-3 py-2 rounded flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap">
                                     <span className="opacity-60">{isHomePick ? game.homeTeam.name : game.awayTeam.name}</span>
-                                    <span>{pickSpreadDisplay}</span>
+                                    <span>{hasMarketSpread ? pickSpreadDisplay : 'No Line'}</span>
                                 </div>
                             </div>
                             <div className="text-slate-700 font-black text-[10px]">VS</div>

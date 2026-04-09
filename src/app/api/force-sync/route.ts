@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { sportKeyMapping } from '@/lib/sports';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // Allow 5 minutes for syncing odds from 8 sports sequentially
+
 export async function GET() {
     try {
         const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
@@ -20,6 +23,15 @@ export async function GET() {
 
             const batch = db.batch();
             data.forEach((game: any) => {
+                const gameStart = new Date(game.commence_time).getTime();
+                const now = new Date().getTime();
+                const timeLimitMs = 15 * 60 * 1000;
+                
+                // Freeze the Vegas line 15 minutes before the game time
+                if (now >= gameStart - timeLimitMs) {
+                    return; // Skip this game to keep the line frozen
+                }
+
                 const gameData = {
                     id: game.id,
                     sportKey: game.sport_key,

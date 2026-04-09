@@ -1,0 +1,24 @@
+{
+  "crons": [
+    {
+      "path": "/api/force-sync",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/update-injuries",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/sync-all-nba-teams",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/calculate-power-ratings",
+      "schedule": "10 6 * * *"
+    },
+    {
+      "path": "/api/sync-accuracy",
+      "schedule": "20 6 * * *"
+    }
+  ]
+}

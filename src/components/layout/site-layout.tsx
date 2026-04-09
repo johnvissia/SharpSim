@@ -1,17 +1,41 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
-import { Coins, Pencil, Save, LogIn, LogOut, Users } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Ticket,
+  BarChart3,
+  Database,
+  BrainCircuit,
+  Target,
+  ShoppingCart,
+  GraduationCap,
+  ShieldCheck,
+  Coins,
+  LogIn,
+  LogOut,
+  Zap,
+} from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+const navItems = [
+  { href: '/dashboard',  id: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard },
+  { href: '/my-picks',   id: 'picks',     label: 'Picks',      icon: Ticket },
+  { href: '/stats',      id: 'stats',     label: 'Stats',      icon: BarChart3 },
+  { href: '/data',       id: 'data',      label: 'Data',       icon: Database },
+  { href: '/model',      id: 'model',     label: 'Model',      icon: BrainCircuit },
+  { href: '/accuracy',   id: 'accuracy',  label: 'Accuracy',   icon: Target },
+  { href: '/store',      id: 'store',     label: 'Store',      icon: ShoppingCart },
+  { href: '/coaching',   id: 'coaching',  label: 'Coaching',   icon: GraduationCap },
+  { href: '/admin',      id: 'admin',     label: 'Admin',      icon: ShieldCheck },
+];
 
 export function SiteLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -25,175 +49,109 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   );
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  const [isEditing, setIsEditing] = useState(false);
-
-  const initialNavItems = [
-    { href: '/', id: 'home', label: '🏠 Home' },
-    { href: '/dashboard', id: 'dashboard', label: '🔥 Dashboard' },
-    { href: '/my-picks', id: 'picks', label: '🎫 My Picks' },
-    { href: '/stats', id: 'stats', label: '📊 Stats' },
-    { href: '/data', id: 'data', label: '📈 Data' },
-    { href: '/model', id: 'model', label: '🧠 Our Model' },
-    { href: '/accuracy', id: 'accuracy', label: '🎯 Accuracy' },
-    { href: '/store', id: 'store', label: '🛒 Store' },
-    { href: '/coaching', id: 'coaching', label: '🎓 Coaching' },
-    { href: '/admin', id: 'admin', label: '🛡️ Admin' }
-  ];
-
-  const [navItems, setNavItems] = useState(initialNavItems);
-  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
-
-  // Load order from localStorage on mount
-  useEffect(() => {
-    const savedOrder = localStorage.getItem('navOrder');
-    if (savedOrder) {
-      try {
-        const orderedIds: string[] = JSON.parse(savedOrder);
-        const orderedItems = orderedIds
-          .map(id => initialNavItems.find(item => item.id === id))
-          .filter((item): item is typeof initialNavItems[0] => !!item);
-
-        const currentIds = new Set(orderedItems.map(i => i.id));
-        const missingItems = initialNavItems.filter(item => !currentIds.has(item.id));
-        setNavItems([...orderedItems, ...missingItems]);
-      } catch (e) {
-        console.error("Failed to parse nav order from localStorage", e);
-        setNavItems(initialNavItems);
-      }
-    } else {
-      setNavItems(initialNavItems);
-    }
-  }, []);
-
-  const handleSaveOrder = () => {
-    const orderedIds = navItems.map(item => item.id);
-    localStorage.setItem('navOrder', JSON.stringify(orderedIds));
-    setIsEditing(false);
-  };
-
-  const handleDragStart = (index: number) => {
-    setDraggedItemIndex(index);
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
-    e.preventDefault(); // Necessary to allow drop
-    if (draggedItemIndex === null || draggedItemIndex === index) return;
-
-    const newNavItems = [...navItems];
-    const [draggedItem] = newNavItems.splice(draggedItemIndex, 1);
-    newNavItems.splice(index, 0, draggedItem);
-
-    setDraggedItemIndex(index);
-    setNavItems(newNavItems);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedItemIndex(null);
-  };
-
-  const getActiveTabId = () => {
+  const getActiveId = () => {
     if (pathname === '/') return 'home';
-    const activeSegment = pathname.split('/')[1];
-    if (activeSegment) {
-      const activeItem = initialNavItems.find(item => item.href === `/${activeSegment}`);
-      if (activeItem) return activeItem.id;
-    }
-    return '';
+    const segment = pathname.split('/')[1];
+    return navItems.find(item => item.href === `/${segment}`)?.id ?? '';
   };
-  const activeTab = getActiveTabId();
-
+  const activeId = getActiveId();
   const showNav = pathname !== '/';
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      <div className="max-w-5xl mx-auto">
-        {showNav && (
-          <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 py-3 mb-4">
-            <div className="flex items-center justify-between gap-4 px-2">
-              <div className="flex items-center gap-2 flex-grow min-w-0">
-                <nav
-                  className={cn(
-                    "flex items-center gap-1 overflow-x-auto no-scrollbar",
-                    isEditing && "space-x-1"
-                  )}
-                  onDragOver={isEditing ? (e) => e.preventDefault() : undefined}
-                >
-                  {navItems.map((tab, index) => (
-                    <div
-                      key={tab.id}
-                      draggable={isEditing}
-                      onDragStart={() => handleDragStart(index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDragEnd={handleDragEnd}
+      {showNav && (
+        <header className="sticky top-0 z-30 w-full border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
+          <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-6">
+
+            {/* ── Brand ── */}
+            <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0 group">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 shadow-lg shadow-emerald-500/30 transition-transform group-hover:scale-105">
+                <Zap className="h-4.5 w-4.5 text-white" strokeWidth={2.5} />
+              </div>
+              <span className="text-[15px] font-bold tracking-tight text-white">
+                Sharp<span className="text-emerald-400">Sim</span>
+              </span>
+            </Link>
+
+            {/* ── Divider ── */}
+            <div className="h-5 w-px bg-slate-800 flex-shrink-0" />
+
+            {/* ── Nav links ── */}
+            <nav className="flex items-center gap-0.5 flex-1 min-w-0">
+              {navItems.map((item) => {
+                const isActive = activeId === item.id;
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className={cn(
+                      'group relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium whitespace-nowrap transition-all duration-150',
+                      isActive
+                        ? 'text-white bg-slate-800'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    )}
+                  >
+                    <Icon
                       className={cn(
-                        "transition-all",
-                        isEditing ? 'cursor-move rounded-full p-0.5 bg-slate-800' : '',
-                        draggedItemIndex === index ? 'opacity-50 scale-95' : 'opacity-100'
+                        'h-3.5 w-3.5 flex-shrink-0 transition-colors',
+                        isActive ? 'text-emerald-400' : 'text-slate-500 group-hover:text-slate-300'
                       )}
-                    >
-                      <Link
-                        href={tab.href}
-                        className={cn(
-                          'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all flex-shrink-0 block',
-                          activeTab === tab.id && !isEditing
-                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                            : 'text-slate-400 hover:text-white',
-                          isEditing ? 'pointer-events-none bg-slate-700 text-white' : 'hover:bg-slate-800'
-                        )}
-                        onClick={(e) => {
-                          if (isEditing) e.preventDefault();
-                        }}
-                      >
-                        {tab.label}
-                      </Link>
-                    </div>
-                  ))}
-                </nav>
-                {isEditing ? (
-                  <Button onClick={handleSaveOrder} size="sm" className="bg-green-600 hover:bg-green-500 text-white ml-2 flex-shrink-0">
-                    <Save className="h-4 w-4 mr-2" /> Save
-                  </Button>
-                ) : (
-                  <Button onClick={() => setIsEditing(true)} size="icon" variant="ghost" className="flex-shrink-0">
-                    <Pencil className="h-4 w-4 text-slate-400 hover:text-white" />
-                  </Button>
-                )}
-              </div>
+                      strokeWidth={2}
+                    />
+                    {item.label}
+                    {isActive && (
+                      <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full bg-emerald-400" />
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
 
-              <div className="flex-shrink-0 flex items-center gap-2">
-                {isUserLoading || isProfileLoading ? (
-                  <div className="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-full">
-                    <Skeleton className="h-5 w-5 rounded-full" />
-                    <Skeleton className="h-5 w-16" />
-                  </div>
-                ) : userProfile ? (
-                  <div className="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-full text-sm font-bold text-amber-400">
-                    <Coins className="h-5 w-5" />
-                    <span>{userProfile.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                  </div>
-                ) : null}
+            {/* ── User controls ── */}
+            <div className="flex-shrink-0 flex items-center gap-2">
+              {isUserLoading || isProfileLoading ? (
+                <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg">
+                  <Skeleton className="h-4 w-4 rounded-full" />
+                  <Skeleton className="h-4 w-14" />
+                </div>
+              ) : userProfile ? (
+                <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-sm font-semibold text-amber-400">
+                  <Coins className="h-4 w-4" />
+                  <span>{userProfile.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                </div>
+              ) : null}
 
-                {isUserLoading ? (
-                  <Skeleton className="h-9 w-20" />
-                ) : user ? (
-                  <Button variant="ghost" size="sm" onClick={() => signOut(auth)}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                ) : (
-                  <Button asChild size="sm">
-                    <Link href="/login">
-                      <LogIn className="h-4 w-4 mr-2" />
-                      Login
-                    </Link>
-                  </Button>
-                )}
-              </div>
+              {isUserLoading ? (
+                <Skeleton className="h-8 w-20 rounded-lg" />
+              ) : user ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => signOut(auth)}
+                  className="text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg h-8 px-3 text-[13px]"
+                >
+                  <LogOut className="h-3.5 w-3.5 mr-1.5" />
+                  Logout
+                </Button>
+              ) : (
+                <Button
+                  asChild
+                  size="sm"
+                  className="bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg h-8 px-4 text-[13px] font-semibold shadow-lg shadow-emerald-500/20"
+                >
+                  <Link href="/login">
+                    <LogIn className="h-3.5 w-3.5 mr-1.5" />
+                    Login
+                  </Link>
+                </Button>
+              )}
             </div>
+
           </div>
-        )}
-        <main className="px-4 pb-8">{children}</main>
-      </div>
+        </header>
+      )}
+      <main className="mx-auto max-w-[1400px] px-6 py-6">{children}</main>
     </div>
   );
 }

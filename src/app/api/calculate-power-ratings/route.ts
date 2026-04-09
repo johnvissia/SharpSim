@@ -9,6 +9,7 @@ import {
 } from '@/lib/math-utils';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // Allow 5 minutes
 
 // ============================================================================
 // GLOBAL CONSTANTS (UPDATED WITH IMPROVEMENTS)
@@ -455,6 +456,10 @@ function calculateKellyStake(coverProb: number, decimalOdds: number, useConserva
 // ============================================================================
 // MAIN CALCULATION FUNCTION
 // ============================================================================
+
+export async function GET() {
+  return POST();
+}
 
 export async function POST() {
   try {

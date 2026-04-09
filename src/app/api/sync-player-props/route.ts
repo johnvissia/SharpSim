@@ -24,6 +24,16 @@ export async function POST(request: NextRequest) {
 
         // 2. For each event, fetch player props
         for (const event of events) {
+            const gameStart = new Date(event.commence_time).getTime();
+            const now = new Date().getTime();
+            const timeLimitMs = 15 * 60 * 1000;
+            
+            // Freeze the line 15 minutes before the game time
+            if (now >= gameStart - timeLimitMs) {
+                console.log(`[PLAYER PROPS API] Skipping event ${event.id} (frozen 15 mins before start)`);
+                continue;
+            }
+
             console.log(`[PLAYER PROPS API] Fetching props for ${event.away_team} @ ${event.home_team}...`);
 
             const propsRes = await fetch(`https://api.the-odds-api.com/v4/sports/basketball_nba/events/${event.id}/odds?apiKey=${API_KEY}&regions=us&markets=player_points&oddsFormat=american&bookmakers=pinnacle,draftkings,fanduel`);

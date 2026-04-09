@@ -58,7 +58,6 @@ const TeamHeader = ({ team, sport, isFavorite, onToggleFavorite, isUpdating }: {
                     </div>
                 )}
                 <h2 className="text-2xl font-bold h-16 flex items-center justify-center">
-                    {team.rank && <span className="font-bold mr-2">#{team.rank}</span>}
                     {team.name}
                 </h2>
                 <p className="text-xs text-muted-foreground">View Team Trends &rarr;</p>

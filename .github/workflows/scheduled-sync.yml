@@ -1,0 +1,20 @@
+name: Scheduled API Sync
+
+on:
+  schedule:
+    # Runs every 6 hours
+    - cron: '0 */6 * * *'
+  # Allows you to trigger this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  sync_jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Game Lines Sync
+        run: |
+          curl -X GET "${{ secrets.PROD_URL }}/api/force-sync"
+      
+      - name: Trigger Injury Updates
+        run: |
+          curl -X GET "${{ secrets.PROD_URL }}/api/update-injuries"

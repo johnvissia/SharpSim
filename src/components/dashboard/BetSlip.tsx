@@ -172,6 +172,25 @@ export function BetSlip() {
         return;
     }
 
+    const timeLimitMS = 15 * 60 * 1000;
+    const now = new Date().getTime();
+    
+    // Check if any game starts in 15 minutes or less
+    const invalidPick = picks.find(p => {
+        if (!p.game.startTime) return false;
+        const gameStart = new Date(p.game.startTime).getTime();
+        return now >= gameStart - timeLimitMS;
+    });
+
+    if (invalidPick) {
+         toast({
+            variant: 'destructive',
+            title: 'Bet Unavailable',
+            description: `The game (${invalidPick.game.awayTeam?.name} @ ${invalidPick.game.homeTeam?.name}) starts in less than 15 minutes. Betting is frozen.`,
+        });
+        return;
+    }
+
     const userDocRef = doc(firestore, 'users', user.uid);
     const betsCollectionRef = collection(firestore, 'users', user.uid, 'bets');
     const batch = writeBatch(firestore);

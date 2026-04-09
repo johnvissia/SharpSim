@@ -1,0 +1,23 @@
+name: NBA Daily Sync & Ratings
+
+on:
+  schedule:
+    # 6:00 AM UTC (1:00 AM EST / 2:00 AM EDT)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync_and_rate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Sync All NBA Teams
+        run: |
+          curl -f --show-error "${{ secrets.PROD_URL }}/api/sync-all-nba-teams"
+      
+      - name: 2. Calculate Power Ratings
+        run: |
+          curl -f --show-error "${{ secrets.PROD_URL }}/api/calculate-power-ratings"
+          
+      - name: 3. Sync and Grade Accuracy
+        run: |
+          curl -f --show-error "${{ secrets.PROD_URL }}/api/sync-accuracy"

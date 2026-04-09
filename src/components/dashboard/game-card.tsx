@@ -56,7 +56,7 @@ const TeamDisplay = ({ team, sport, score }: { team: Team, sport: SportName, sco
                             <FallbackIcon className="w-6 h-6 text-muted-foreground" />
                         )}
                     </div>
-                    {team.rank && <span className="font-bold w-6 text-center">#{team.rank}</span>}
+
                     <span className="truncate">{team.name}</span>
                 </div>
                  {typeof score === 'number' && !isNaN(score) && (

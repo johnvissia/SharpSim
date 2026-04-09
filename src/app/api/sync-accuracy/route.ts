@@ -5,6 +5,7 @@ import { normalizeTeamName } from '@/lib/team-names';
 import { DailyGame } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
     // Derive base URL from the incoming request so we work on any port
@@ -38,8 +39,8 @@ export async function GET(request: NextRequest) {
             const aName = normalizeTeamName(game.awayTeam.name);
 
             // --- SNAPSHOT LOGIC (Lock predictions starting < 15m ago or soon) ---
-            // If game starts in <= 15 mins OR started in last 10 mins (catch-up), and no snapshot exists:
-            if (((timeUntilStart <= 15 * 60 * 1000 && timeUntilStart > 0) || (timeUntilStart <= 0 && timeUntilStart > -10 * 60 * 1000)) && !pendingGameIds.has(game.id)) {
+            // If game starts in <= 15 mins (or already started/finished), and no pending snapshot exists:
+            if (timeUntilStart <= 15 * 60 * 1000 && !pendingGameIds.has(game.id)) {
                 // Check if already snapshotted
                 const existing = await db.collection('model_predictions')
                     .where('gameId', '==', game.id)
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
 
                         if (predRes.ok) {
                             const prediction = predJson.prediction;
-                            await db.collection('model_predictions').doc(game.id).set({
+                            const predData = {
                                 gameId: game.id,
                                 sport: game.sport,
                                 homeTeam: game.homeTeam.name,
@@ -84,8 +85,17 @@ export async function GET(request: NextRequest) {
                                 status: 'pending',
                                 actualScore: null,
                                 correct: null
-                            });
+                            };
+                            
+                            await db.collection('model_predictions').doc(game.id).set(predData);
                             results.snapshots.push(`${aName} @ ${hName}`);
+                            
+                            // Make it available for immediate grading if game is already over
+                            pendingGameIds.add(game.id);
+                            const newDoc = {
+                                data: () => ({ ...predData, gameId: game.id })
+                            } as any;
+                            activePredictionsSnapshot.docs.push(newDoc);
                         }
                     } catch (e: any) {
                         results.errors.push(`Prediction failed for ${game.id}: ${e.message}`);

@@ -112,7 +112,9 @@ const transformDailyGamesToGames = (
 
         if (allOdds.length > 0) {
             game.allOdds = allOdds;
-            game.odds = allOdds[0].odds;
+            // Search for an odds object that actually has a non-zero spread
+            const bestOdds = allOdds.find(o => o.odds.spread && o.odds.spread.points !== 0);
+            game.odds = bestOdds ? bestOdds.odds : allOdds[0].odds;
         }
 
         return game;
@@ -325,16 +327,30 @@ export default function DashboardPage() {
                     oddsApiId: oddsGame.id,
                 });
             } else {
-                // If specific logic is needed for odds-only games, typically keep them but maybe ESPN name is better?
-                // Usually we prefer matching.
+                // For NCAAM, ESPN is the authoritative source for game schedules.
+                // Do NOT add odds-only NCAAM games that have no ESPN match — the Firestore
+                // data can contain stale or incorrect bracket matchups.
+                if (oddsGame.sport === 'NCAAM') return;
+
                 finalGames.set(key, { ...oddsGame, id: oddsGame.id, oddsApiId: oddsGame.id });
             }
         });
 
         const allGames = Array.from(finalGames.values());
 
+        // The ESPN source ID is a long numeric string (e.g. "401856600").
+        // The odds-API source ID is a UUID with dashes.
+        // Games that came from ESPN should ALWAYS be shown (they are real scheduled games).
+        // Only apply the Power-4 filter to odds-only games that have no ESPN match,
+        // because those can be stale regular-season entries with non-tournament teams.
+        const espnGameIds = new Set(espnGames.map(g => g.id));
+
         const power4Filtered = allGames.filter(game => {
             if (game.sport === 'NCAAM') {
+                // If this game came directly from ESPN, always include it
+                // (covers postseason teams like UConn who aren't Power 4).
+                if (espnGameIds.has(game.id)) return true;
+                // Otherwise apply Power 4 filter to regular-season odds data.
                 return power4TeamNames.has(game.homeTeam.name) || power4TeamNames.has(game.awayTeam.name);
             }
             return true;

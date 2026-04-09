@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { updateAllTeamInjuries } from '@/lib/services/nba-injuries';
+import { updateAllTeamInjuries } from '@/lib/services/tank01';
 
 export const dynamic = 'force-dynamic';
 
