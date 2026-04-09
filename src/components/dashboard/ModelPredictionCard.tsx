@@ -109,7 +109,7 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
 
     const signalColors: Record<string, string> = {
         'ELITE VALUE': 'text-green-400 bg-green-950/40 border-green-500/50',
-        'STRONG VALUE': 'text-emerald-400 bg-emerald-950/40 border-emerald-500/50',
+        'STRONG VALUE': 'text-brand-400 bg-brand-950/40 border-brand-500/50',
         'PLAYABLE': 'text-yellow-400 bg-yellow-950/40 border-yellow-500/50',
         'No Play': 'text-slate-400 bg-slate-900 border-slate-700'
     };
@@ -168,8 +168,8 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
                             </div>
                             <div className="text-slate-700 font-black text-[10px]">VS</div>
                             <div className="text-center w-[45%]">
-                                <div className="text-[10px] text-indigo-400 uppercase font-black mb-1">Model Proj</div>
-                                <div className="text-sm font-mono font-bold bg-indigo-950/30 text-indigo-300 border border-indigo-500/30 px-3 py-2 rounded flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap">
+                                <div className="text-[10px] text-brand-400 uppercase font-black mb-1">Model Proj</div>
+                                <div className="text-sm font-mono font-bold bg-brand-950/30 text-brand-300 border border-brand-500/30 px-3 py-2 rounded flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap">
                                     <span className="opacity-60">{isHomePick ? game.homeTeam.name : game.awayTeam.name}</span>
                                     <span>{projDisplay}</span>
                                 </div>
@@ -210,7 +210,7 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
                         {data.trace && (
                             <button
                                 onClick={() => setShowDetail(true)}
-                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-indigo-500/30 bg-indigo-950/20 text-indigo-400 text-xs font-bold hover:bg-indigo-950/40 hover:border-indigo-400/50 transition-all group"
+                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-brand-500/30 bg-brand-950/20 text-brand-400 text-xs font-bold hover:bg-brand-950/40 hover:border-brand-400/50 transition-all group"
                             >
                                 <span>See Full Computation Breakdown</span>
                                 <ChevronDown className="h-3.5 w-3.5 group-hover:translate-y-0.5 transition-transform" />

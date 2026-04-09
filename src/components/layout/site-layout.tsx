@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
+import { useAppMode } from '@/context/AppModeContext';
 import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
@@ -20,9 +21,12 @@ import {
   LogIn,
   LogOut,
   Zap,
+  Wallet,
+  Gamepad2,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -39,6 +43,7 @@ const navItems = [
 
 export function SiteLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
+  const { isRealMoneyMode, toggleRealMoneyMode } = useAppMode();
   const auth = useAuth();
   const firestore = useFirestore();
   const pathname = usePathname();
@@ -50,7 +55,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const getActiveId = () => {
-    if (pathname === '/') return 'home';
+    if (!pathname || pathname === '/') return 'home';
     const segment = pathname.split('/')[1];
     return navItems.find(item => item.href === `/${segment}`)?.id ?? '';
   };
@@ -58,18 +63,46 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const showNav = pathname !== '/';
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+    <div className={cn(
+      "min-h-screen bg-slate-950 text-slate-100 font-sans transition-colors duration-500",
+      isRealMoneyMode && "selection:bg-emerald-500/30"
+    )}>
+      {/* ── Real Money Mode Watermark Banner ── */}
+      {isRealMoneyMode && (
+        <div className="fixed top-0 left-0 right-0 z-[100] h-6 bg-emerald-500/10 backdrop-blur-sm pointer-events-none flex items-center justify-center overflow-hidden border-b border-emerald-500/20">
+          <div className="flex animate-[slide_10s_linear_infinite] whitespace-nowrap text-[10px] font-bold tracking-[0.2em] text-emerald-400/60 uppercase">
+            {[...Array(20)].map((_, i) => (
+              <span key={i} className="mx-8 flex items-center gap-2">
+                <Wallet className="h-2.5 w-2.5" />
+                Real Money Mode Active
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {showNav && (
-        <header className="sticky top-0 z-30 w-full border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
+        <header className={cn(
+          "sticky top-0 z-30 w-full border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl transition-all duration-300",
+          isRealMoneyMode && "mt-6 border-emerald-500/20 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.1)]"
+        )}>
           <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-6">
 
             {/* ── Brand ── */}
             <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0 group">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 shadow-lg shadow-emerald-500/30 transition-transform group-hover:scale-105">
+              <div className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-lg shadow-lg transition-all group-hover:scale-105",
+                isRealMoneyMode 
+                  ? "bg-emerald-500 shadow-emerald-500/30" 
+                  : "bg-brand-500 shadow-brand-500/30"
+              )}>
                 <Zap className="h-4.5 w-4.5 text-white" strokeWidth={2.5} />
               </div>
               <span className="text-[15px] font-bold tracking-tight text-white">
-                Sharp<span className="text-emerald-400">Sim</span>
+                Sharp<span className={cn(
+                  "transition-colors",
+                  isRealMoneyMode ? "text-emerald-400" : "text-brand-400"
+                )}>Sim</span>
               </span>
             </Link>
 
@@ -95,13 +128,18 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
                     <Icon
                       className={cn(
                         'h-3.5 w-3.5 flex-shrink-0 transition-colors',
-                        isActive ? 'text-emerald-400' : 'text-slate-500 group-hover:text-slate-300'
+                        isActive 
+                          ? (isRealMoneyMode ? 'text-emerald-400' : 'text-brand-400')
+                          : 'text-slate-500 group-hover:text-slate-300'
                       )}
                       strokeWidth={2}
                     />
                     {item.label}
                     {isActive && (
-                      <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full bg-emerald-400" />
+                      <span className={cn(
+                        "absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full transition-colors",
+                        isRealMoneyMode ? "bg-emerald-400" : "bg-brand-400"
+                      )} />
                     )}
                   </Link>
                 );
@@ -109,43 +147,74 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
             </nav>
 
             {/* ── User controls ── */}
-            <div className="flex-shrink-0 flex items-center gap-2">
-              {isUserLoading || isProfileLoading ? (
-                <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg">
-                  <Skeleton className="h-4 w-4 rounded-full" />
-                  <Skeleton className="h-4 w-14" />
+            <div className="flex-shrink-0 flex items-center gap-4">
+              {/* ── Mode Toggle ── */}
+              <div className="flex items-center gap-2 bg-slate-900/50 border border-slate-800/50 px-2.5 py-1 rounded-full">
+                <div className={cn(
+                  "flex h-5 w-5 items-center justify-center rounded-full transition-colors",
+                  !isRealMoneyMode ? "text-brand-400" : "text-slate-600"
+                )}>
+                  <Gamepad2 className="h-3.5 w-3.5" />
                 </div>
-              ) : userProfile ? (
-                <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-sm font-semibold text-amber-400">
-                  <Coins className="h-4 w-4" />
-                  <span>{userProfile.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                <Switch 
+                  checked={isRealMoneyMode} 
+                  onCheckedChange={toggleRealMoneyMode}
+                  className={cn(
+                    "data-[state=checked]:bg-emerald-500",
+                    "data-[state=unchecked]:bg-brand-500"
+                  )}
+                />
+                <div className={cn(
+                  "flex h-5 w-5 items-center justify-center rounded-full transition-colors",
+                  isRealMoneyMode ? "text-emerald-400" : "text-slate-600"
+                )}>
+                  <Wallet className="h-3.5 w-3.5" />
                 </div>
-              ) : null}
+              </div>
 
-              {isUserLoading ? (
-                <Skeleton className="h-8 w-20 rounded-lg" />
-              ) : user ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => signOut(auth)}
-                  className="text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg h-8 px-3 text-[13px]"
-                >
-                  <LogOut className="h-3.5 w-3.5 mr-1.5" />
-                  Logout
-                </Button>
-              ) : (
-                <Button
-                  asChild
-                  size="sm"
-                  className="bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg h-8 px-4 text-[13px] font-semibold shadow-lg shadow-emerald-500/20"
-                >
-                  <Link href="/login">
-                    <LogIn className="h-3.5 w-3.5 mr-1.5" />
-                    Login
-                  </Link>
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {isUserLoading || isProfileLoading ? (
+                  <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg">
+                    <Skeleton className="h-4 w-4 rounded-full" />
+                    <Skeleton className="h-4 w-14" />
+                  </div>
+                ) : userProfile ? (
+                  <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-sm font-semibold text-amber-400">
+                    <Coins className="h-4 w-4" />
+                    <span>{userProfile.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  </div>
+                ) : null}
+
+                {isUserLoading ? (
+                  <Skeleton className="h-8 w-20 rounded-lg" />
+                ) : user ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => signOut(auth)}
+                    className="text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg h-8 px-3 text-[13px]"
+                  >
+                    <LogOut className="h-3.5 w-3.5 mr-1.5" />
+                    Logout
+                  </Button>
+                ) : (
+                  <Button
+                    asChild
+                    size="sm"
+                    className={cn(
+                      "text-white rounded-lg h-8 px-4 text-[13px] font-semibold shadow-lg transition-all",
+                      isRealMoneyMode 
+                        ? "bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/20"
+                        : "bg-brand-500 hover:bg-brand-400 shadow-brand-500/20"
+                    )}
+                  >
+                    <Link href="/login">
+                      <LogIn className="h-3.5 w-3.5 mr-1.5" />
+                      Login
+                    </Link>
+                  </Button>
+                )}
+              </div>
             </div>
 
           </div>

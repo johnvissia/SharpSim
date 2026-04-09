@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { SiteLayout } from '@/components/layout/site-layout';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { BetSlipProvider } from '@/context/BetSlipContext';
+import { AppModeProvider } from '@/context/AppModeContext';
 
 export const metadata: Metadata = {
   title: 'SharpSim: SportsEdge Trainer',
@@ -27,9 +28,11 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
         <FirebaseClientProvider>
-          <BetSlipProvider>
-            <SiteLayout>{children}</SiteLayout>
-          </BetSlipProvider>
+          <AppModeProvider>
+            <BetSlipProvider>
+              <SiteLayout>{children}</SiteLayout>
+            </BetSlipProvider>
+          </AppModeProvider>
         </FirebaseClientProvider>
         <Toaster />
       </body>

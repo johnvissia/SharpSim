@@ -106,7 +106,7 @@ interface GameDetailSheetProps {
 function StepHeader({ step, icon, title }: { step: string; icon: React.ReactNode; title: string }) {
     return (
         <div className="flex items-center gap-3 mb-3">
-            <div className="w-7 h-7 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 text-[10px] font-black shrink-0">
+            <div className="w-7 h-7 rounded-full bg-brand-600/20 border border-brand-500/40 flex items-center justify-center text-brand-400 text-[10px] font-black shrink-0">
                 {step}
             </div>
             <div className="flex items-center gap-2 text-slate-200 font-bold text-sm">
@@ -123,7 +123,7 @@ function FormulaBox({ formula, result, unit = '' }: { formula: string; result: n
         <div className="bg-slate-950 rounded-lg p-3 border border-slate-800 font-mono text-xs mt-2">
             <div className="text-slate-500 mb-1">Formula</div>
             <div className="text-slate-300 break-all">{formula}</div>
-            <div className={`text-base font-black mt-1 ${isNeg ? 'text-red-400' : 'text-emerald-400'}`}>
+            <div className={`text-base font-black mt-1 ${isNeg ? 'text-red-400' : 'text-brand-400'}`}>
                 = {result >= 0 ? '+' : ''}{result}{unit}
             </div>
         </div>
@@ -164,7 +164,7 @@ function TeamSection({ team, side }: { team: TeamTrace; side: 'home' | 'away' })
                     </div>
                     <div className="bg-slate-900 rounded p-2 border border-slate-600/40">
                         <div className="text-[9px] text-slate-500 uppercase">Base Rating</div>
-                        <div className={`text-sm font-black ${team.step1_base.result >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <div className={`text-sm font-black ${team.step1_base.result >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
                             {team.step1_base.result >= 0 ? '+' : ''}{team.step1_base.result}
                         </div>
                     </div>
@@ -227,7 +227,7 @@ function TeamSection({ team, side }: { team: TeamTrace; side: 'home' | 'away' })
                 )}
                 <div className="flex justify-between items-center mt-2 px-1">
                     <span className="text-[10px] text-slate-500">Total penalty</span>
-                    <span className={`font-black font-mono text-sm ${team.step2_injuries.result < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    <span className={`font-black font-mono text-sm ${team.step2_injuries.result < 0 ? 'text-red-400' : 'text-brand-400'}`}>
                         {team.step2_injuries.result.toFixed(3)}
                     </span>
                 </div>
@@ -238,7 +238,7 @@ function TeamSection({ team, side }: { team: TeamTrace; side: 'home' | 'away' })
                 <div className="text-[10px] text-slate-500 uppercase font-bold mb-2">③ Final TPR</div>
                 <div className="bg-slate-950 rounded-lg p-3 border border-slate-700/50">
                     <div className="text-[10px] font-mono text-slate-400 break-all mb-1">{team.step3_tpr.formula}</div>
-                    <div className={`text-xl font-black font-mono ${team.step3_tpr.result >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <div className={`text-xl font-black font-mono ${team.step3_tpr.result >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
                         {team.step3_tpr.result >= 0 ? '+' : ''}{team.step3_tpr.result}
                     </div>
                 </div>
@@ -249,7 +249,7 @@ function TeamSection({ team, side }: { team: TeamTrace; side: 'home' | 'away' })
 
 const signalColors: Record<string, string> = {
     'ELITE VALUE': 'bg-green-600 text-white',
-    'STRONG VALUE': 'bg-emerald-600 text-white',
+    'STRONG VALUE': 'bg-brand-600 text-white',
     'PLAYABLE': 'bg-yellow-500 text-slate-900',
     'No Play': 'bg-slate-700 text-slate-300',
 };
@@ -267,7 +267,7 @@ export function GameDetailSheet({ open, onOpenChange, matchup, trace, homeLogo, 
             >
                 <SheetHeader className="p-5 bg-slate-900 border-b border-slate-800 sticky top-0 z-10">
                     <SheetTitle className="text-slate-100 text-base font-black flex items-center gap-2">
-                        <Calculator className="h-4 w-4 text-indigo-400" />
+                        <Calculator className="h-4 w-4 text-brand-400" />
                         Computation Breakdown
                     </SheetTitle>
                     <div className="text-xs text-slate-400 font-semibold">{matchup}</div>
@@ -309,21 +309,21 @@ export function GameDetailSheet({ open, onOpenChange, matchup, trace, homeLogo, 
                                 <div className="text-[9px] text-slate-500 uppercase">Base</div>
                                 <div className="text-sm font-black text-slate-300 font-mono">+{s4.base}</div>
                             </div>
-                            <div className="bg-slate-900 rounded p-2">
+                             <div className="bg-slate-900 rounded p-2">
                                 <div className="text-[9px] text-slate-500 uppercase">Fatigue</div>
-                                <div className={`text-sm font-black font-mono ${s4.fatigue < 0 ? 'text-red-400' : s4.fatigue > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                <div className={`text-sm font-black font-mono ${s4.fatigue < 0 ? 'text-red-400' : s4.fatigue > 0 ? 'text-brand-400' : 'text-slate-500'}`}>
                                     {s4.fatigue >= 0 ? '+' : ''}{s4.fatigue}
                                 </div>
                             </div>
                             <div className="bg-slate-900 rounded p-2">
                                 <div className="text-[9px] text-slate-500 uppercase">Altitude</div>
-                                <div className={`text-sm font-black font-mono ${s4.altitude > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                <div className={`text-sm font-black font-mono ${s4.altitude > 0 ? 'text-brand-400' : 'text-slate-500'}`}>
                                     +{s4.altitude}
                                 </div>
                             </div>
                             <div className="bg-slate-900 rounded p-2 border border-slate-600/40">
                                 <div className="text-[9px] text-slate-500 uppercase">Total HCA</div>
-                                <div className="text-sm font-black text-indigo-400 font-mono">+{s4.result}</div>
+                                <div className="text-sm font-black text-brand-400 font-mono">+{s4.result}</div>
                             </div>
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2">
@@ -338,7 +338,7 @@ export function GameDetailSheet({ open, onOpenChange, matchup, trace, homeLogo, 
                                 </Badge>
                             )}
                             {s4.isAltitudeGame && (
-                                <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">
+                                <Badge variant="outline" className="text-[10px] border-brand-500/30 text-brand-400">
                                     ⛰ Altitude +0.5
                                 </Badge>
                             )}
@@ -366,9 +366,9 @@ export function GameDetailSheet({ open, onOpenChange, matchup, trace, homeLogo, 
                                     {s5.homeTPR >= 0 ? '+' : ''}{s5.homeTPR}
                                 </div>
                             </div>
-                            <div className="bg-indigo-950/20 border border-indigo-500/20 rounded p-2">
+                            <div className="bg-brand-950/20 border border-brand-500/20 rounded p-2">
                                 <div className="text-[9px] text-slate-500 uppercase">HCA</div>
-                                <div className="text-sm font-black text-indigo-400 font-mono">+{s5.hca}</div>
+                                <div className="text-sm font-black text-brand-400 font-mono">+{s5.hca}</div>
                             </div>
                         </div>
                         <div className="bg-slate-950 rounded-xl p-4 border border-slate-700/50 text-center">
@@ -396,9 +396,9 @@ export function GameDetailSheet({ open, onOpenChange, matchup, trace, homeLogo, 
                                     {s6.projectedSpread >= 0 ? '+' : ''}{s6.projectedSpread}
                                 </div>
                             </div>
-                            <div className="bg-slate-900 rounded p-2">
+                             <div className="bg-slate-900 rounded p-2">
                                 <div className="text-[9px] text-slate-500 uppercase">Raw Edge</div>
-                                <div className={`text-sm font-black font-mono ${s6.edge >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                <div className={`text-sm font-black font-mono ${s6.edge >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
                                     {s6.edge >= 0 ? '+' : ''}{s6.edge}
                                 </div>
                             </div>
@@ -427,11 +427,11 @@ export function GameDetailSheet({ open, onOpenChange, matchup, trace, homeLogo, 
                                     <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">Confidence</div>
                                     <div className="text-lg font-black text-slate-200">{s6.confidence}</div>
                                 </div>
-                                {s6.recommendedSide && (
+                                 {s6.recommendedSide && (
                                     <div className="text-right">
                                         <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">Side</div>
                                         <div className="text-sm font-black text-white flex items-center gap-1">
-                                            <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />
+                                            <ChevronRight className="h-3.5 w-3.5 text-brand-400" />
                                             {s6.recommendedSide}
                                         </div>
                                     </div>
@@ -444,8 +444,8 @@ export function GameDetailSheet({ open, onOpenChange, matchup, trace, homeLogo, 
                             <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">Signal Thresholds</div>
                             <div className="space-y-1">
                                 {[
-                                    { label: 'ELITE VALUE', threshold: '|z| ≥ 1.00', color: 'text-green-400' },
-                                    { label: 'STRONG VALUE', threshold: '|z| ≥ 0.75', color: 'text-emerald-400' },
+                                     { label: 'ELITE VALUE', threshold: '|z| ≥ 1.00', color: 'text-green-400' },
+                                    { label: 'STRONG VALUE', threshold: '|z| ≥ 0.75', color: 'text-brand-400' },
                                     { label: 'PLAYABLE', threshold: '|z| ≥ 0.55', color: 'text-yellow-400' },
                                     { label: 'No Play', threshold: '|z| < 0.55', color: 'text-slate-500' },
                                 ].map(t => (

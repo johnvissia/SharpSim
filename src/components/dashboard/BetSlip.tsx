@@ -12,7 +12,7 @@ import { calculateParlay } from '@/lib/parlay';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser } from '@/firebase';
 import { collection, doc, writeBatch, increment } from 'firebase/firestore';
-import type { UserBet, ParlayLeg } from '@/lib/types';
+import type { UserBet, ParlayLeg, SportName } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 export function BetSlip() {
@@ -210,10 +210,10 @@ export function BetSlip() {
             gameIdForGrading = pick.game.oddsApiId || pick.game.id!;
         }
         
-        const baseBet = {
+        const baseBet: Omit<UserBet, 'id'> = {
           gameId: gameIdForGrading,
           userId: user.uid,
-          sport: pick.game.sport,
+          sport: pick.game.sport as SportName,
           betType: pick.betType,
           pick: pick.pick,
           matchup: pick.game.homeTeam && pick.game.awayTeam ? `${pick.game.awayTeam.name} @ ${pick.game.homeTeam.name}` : pick.pick,
@@ -379,10 +379,10 @@ export function BetSlip() {
             </div>
              <div className="flex justify-between items-center text-sm font-semibold">
                 <span className="text-muted-foreground">To Win</span>
-                <span className="font-bold text-green-500">{potentialPayout.toFixed(2)} coins</span>
+                <span className="font-bold text-brand-400">{potentialPayout.toFixed(2)} coins</span>
             </div>
             <Button 
-              className="w-full"
+              className="w-full bg-brand-600 hover:bg-brand-700 text-white"
               disabled={!stake || parseFloat(stake) <= 0 || !user}
               onClick={handlePlaceBet}
             >

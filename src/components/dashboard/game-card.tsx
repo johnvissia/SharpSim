@@ -189,7 +189,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                         disabled={!canBet}
                         isSelected={isPickInSlip('spread', `${game.awayTeam.name} ${awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}`)}
                     >
-                        <span className="font-semibold text-primary">{awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}</span>
+                        <span className="font-semibold text-brand-500">{awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}</span>
                         <span className="text-xs text-muted-foreground">{odds.spread.away > 0 ? `+${odds.spread.away}` : odds.spread.away}</span>
                     </OddsButton>
                     <OddsButton 
@@ -197,7 +197,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                         disabled={!canBet}
                         isSelected={isPickInSlip('spread', `${game.homeTeam.name} ${homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}`)}
                     >
-                        <span className="font-semibold text-primary">{homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}</span>
+                        <span className="font-semibold text-brand-500">{homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}</span>
                         <span className="text-xs text-muted-foreground">{odds.spread.home > 0 ? `+${odds.spread.home}` : odds.spread.home}</span>
                     </OddsButton>
                 </div>
@@ -210,7 +210,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                         disabled={!canBet}
                         isSelected={isPickInSlip('total', `Over ${odds.total.points}`)}
                     >
-                       <span className="font-semibold text-primary">O {odds.total.points}</span>
+                       <span className="font-semibold text-brand-500">O {odds.total.points}</span>
                        <span className="text-xs text-muted-foreground">{odds.total.over > 0 ? `+${odds.total.over}` : odds.total.over}</span>
                     </OddsButton>
                     <OddsButton 
@@ -218,7 +218,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                         disabled={!canBet}
                         isSelected={isPickInSlip('total', `Under ${odds.total.points}`)}
                     >
-                        <span className="font-semibold text-primary">U {odds.total.points}</span>
+                        <span className="font-semibold text-brand-500">U {odds.total.points}</span>
                         <span className="text-xs text-muted-foreground">{odds.total.under > 0 ? `+${odds.total.under}` : odds.total.under}</span>
                     </OddsButton>
                 </div>
@@ -231,14 +231,14 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                         disabled={!canBet}
                         isSelected={isPickInSlip('moneyline', game.awayTeam.name)}
                     >
-                        <span className="font-semibold text-primary">{odds.moneyline.away > 0 ? `+${odds.moneyline.away}` : odds.moneyline.away}</span>
+                        <span className="font-semibold text-brand-500">{odds.moneyline.away > 0 ? `+${odds.moneyline.away}` : odds.moneyline.away}</span>
                     </OddsButton>
                     <OddsButton 
                         onClick={(e) => handleBetSelection(e, game.homeTeam.name, odds.moneyline.home, 'moneyline')} 
                         disabled={!canBet}
                         isSelected={isPickInSlip('moneyline', game.homeTeam.name)}
                     >
-                        <span className="font-semibold text-primary">{odds.moneyline.home > 0 ? `+${odds.moneyline.home}` : odds.moneyline.home}</span>
+                        <span className="font-semibold text-brand-500">{odds.moneyline.home > 0 ? `+${odds.moneyline.home}` : odds.moneyline.home}</span>
                     </OddsButton>
                 </div>
             </div>

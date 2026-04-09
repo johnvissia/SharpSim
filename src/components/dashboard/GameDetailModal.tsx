@@ -109,7 +109,7 @@ const PlayerLines = ({ playerName, props, game }: { playerName: string; props: P
                     <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <div className="min-w-0">
                         <p className="font-semibold text-sm truncate">{playerName}</p>
-                        <p className="text-primary font-bold text-xl">{mainLine.line}</p>
+                        <p className="text-brand-500 font-bold text-xl">{mainLine.line}</p>
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -139,7 +139,7 @@ const PlayerLines = ({ playerName, props, game }: { playerName: string; props: P
                             <div key={`${prop.playerId}-${prop.line}`} className="grid grid-cols-[200px_1fr] md:grid-cols-[250px_1fr] items-center gap-3 py-2">
                                 <div className="flex items-center gap-2">
                                     <div className="min-w-0 pl-6">
-                                        <p className="text-primary font-bold text-lg">{prop.line}</p>
+                                        <p className="text-brand-500 font-bold text-lg">{prop.line}</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
@@ -218,7 +218,7 @@ const PlayerPropsView = ({ game }: { game: Game }) => {
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <Loader2 className="h-12 w-12 animate-spin text-brand-500" />
                 <h2 className="text-xl font-semibold text-foreground">Fetching Player Props...</h2>
                 <p className="text-muted-foreground">This may take a moment.</p>
             </div>

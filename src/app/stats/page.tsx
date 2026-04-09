@@ -204,7 +204,7 @@ export default function StatsPage() {
                 <div className="flex items-center gap-2 text-xs text-slate-500 mb-2 uppercase tracking-tighter font-bold">
                     <span>Account</span>
                     <span className="text-[10px] mx-1">›</span>
-                    <span className="text-blue-400">Ledger Analysis</span>
+                    <span className="text-brand-400">Ledger Analysis</span>
                 </div>
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                     <div>
@@ -216,9 +216,9 @@ export default function StatsPage() {
 
             {/* KPI Bento Grid */}
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                <div className="bg-slate-900/50 p-6 rounded-xl flex flex-col gap-1 border border-slate-800 hover:ring-1 ring-blue-500/50 transition-all">
+                <div className="bg-slate-900/50 p-6 rounded-xl flex flex-col gap-1 border border-slate-800 hover:ring-1 ring-brand-500/50 transition-all">
                     <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">Total Profit</span>
-                    <span className={cn("text-3xl font-extrabold", stats.overall.netProfit >= 0 ? "text-emerald-400" : "text-destructive")}>
+                    <span className={cn("text-3xl font-extrabold", stats.overall.netProfit >= 0 ? "text-brand-400" : "text-destructive")}>
                         {stats.overall.netProfit >= 0 ? '+' : '-'}${Math.abs(stats.overall.netProfit).toFixed(2)}
                     </span>
                     {/* TODO: Implement historical bankroll snapshots to compute this dynamically vs last month */}
@@ -228,7 +228,7 @@ export default function StatsPage() {
                 </div>
                 <div className="bg-slate-900/50 p-6 rounded-xl flex flex-col gap-1 border border-slate-800">
                     <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">Total ROI</span>
-                    <span className={cn("text-3xl font-extrabold", stats.roiPercentage >= 0 ? "text-emerald-400" : "text-destructive")}>
+                    <span className={cn("text-3xl font-extrabold", stats.roiPercentage >= 0 ? "text-brand-400" : "text-destructive")}>
                          {stats.roiPercentage > 0 ? '+' : ''}{stats.roiPercentage.toFixed(2)}%
                     </span>
                     <span className="text-slate-500 text-xs font-bold mt-2 uppercase">Aggregated across all sports</span>
@@ -237,7 +237,7 @@ export default function StatsPage() {
                     <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">Win Percentage</span>
                     <span className="text-3xl font-extrabold text-foreground">{stats.winPercentage.toFixed(1)}%</span>
                     <div className="w-full bg-slate-800 h-1.5 mt-3 rounded-full overflow-hidden">
-                        <div className="bg-blue-500 h-full transition-all" style={{ width: `${stats.winPercentage}%` }}></div>
+                        <div className="bg-brand-500 h-full transition-all" style={{ width: `${stats.winPercentage}%` }}></div>
                     </div>
                 </div>
                 <div className="bg-slate-900/50 p-6 rounded-xl flex flex-col gap-1 border border-slate-800">
@@ -269,7 +269,7 @@ export default function StatsPage() {
                     </div>
                     <div className="flex-1 p-6 space-y-6">
                         <div className="flex gap-4">
-                            <div className="w-10 h-10 rounded bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
+                            <div className="w-10 h-10 rounded bg-brand-500/10 flex items-center justify-center text-brand-400 shrink-0">
                                 <Lightbulb className="w-5 h-5" />
                             </div>
                             <div>
@@ -278,7 +278,7 @@ export default function StatsPage() {
                             </div>
                         </div>
                         <div className="flex gap-4">
-                            <div className="w-10 h-10 rounded bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
+                            <div className="w-10 h-10 rounded bg-brand-500/10 flex items-center justify-center text-brand-400 shrink-0">
                                 <Verified className="w-5 h-5" />
                             </div>
                             <div>
@@ -298,7 +298,7 @@ export default function StatsPage() {
                     </div>
                     {/* Placeholder action btn */}
                     <div className="p-4 bg-slate-900/80 mt-auto border-t border-slate-800">
-                        <button className="w-full py-2 text-xs font-black uppercase text-blue-400 border border-blue-400/20 rounded hover:bg-blue-400 hover:text-white transition-all">View All Alerts</button>
+                        <button className="w-full py-2 text-xs font-black uppercase text-brand-400 border border-brand-400/20 rounded hover:bg-brand-400 hover:text-white transition-all">View All Alerts</button>
                     </div>
                 </div>
             </section>

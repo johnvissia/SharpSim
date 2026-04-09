@@ -472,7 +472,7 @@ export default function DashboardPage() {
     if (isUserLoading || !user) {
         return (
             <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
-                <Loader className="h-12 w-12 animate-spin text-primary" />
+                <Loader className="h-12 w-12 animate-spin text-brand-500" />
                 <h2 className="text-xl font-semibold text-foreground">
                     Redirecting to login...
                 </h2>
@@ -487,7 +487,7 @@ export default function DashboardPage() {
         <>
             {showLoadingSpinner ? (
                 <div className="flex flex-col items-center justify-center gap-4 text-center h-64">
-                    <Loader className="h-12 w-12 animate-spin text-primary" />
+                    <Loader className="h-12 w-12 animate-spin text-brand-500" />
                     <h2 className="text-xl font-semibold text-foreground">
                         Loading Daily Lines...
                     </h2>
@@ -526,7 +526,7 @@ export default function DashboardPage() {
                             <button
                                 onClick={handleSyncLines}
                                 disabled={isSyncingLines}
-                                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-brand-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <RefreshCw className={`w-4 h-4 ${isSyncingLines ? 'animate-spin' : ''}`} />
                                 {isSyncingLines ? 'Syncing...' : 'Sync Game Lines'}

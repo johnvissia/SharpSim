@@ -97,7 +97,7 @@ export default function AccuracyPage() {
             <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-                        <History className="h-8 w-8 text-emerald-400" />
+                        <History className="h-8 w-8 text-brand-400" />
                         Model Accuracy
                     </h1>
                     <p className="text-muted-foreground mt-2">
@@ -107,7 +107,7 @@ export default function AccuracyPage() {
                 <Button
                     onClick={handleSync}
                     disabled={syncing}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="bg-brand-600 hover:bg-brand-700 text-white"
                 >
                     {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
                     Sync & Grade
@@ -121,7 +121,7 @@ export default function AccuracyPage() {
                         <CardTitle className="text-sm font-medium text-slate-400">Win Rate</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-emerald-400">{filteredStats.winRate.toFixed(1)}%</div>
+                        <div className="text-2xl font-bold text-brand-400">{filteredStats.winRate.toFixed(1)}%</div>
                         <p className="text-xs text-slate-500 mt-1">{filteredStats.wins}W - {filteredStats.losses}L</p>
                     </CardContent>
                 </Card>
@@ -139,7 +139,7 @@ export default function AccuracyPage() {
                         <CardTitle className="text-sm font-medium text-slate-400">Est. ROI</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className={`text-2xl font-bold ${filteredStats.roi >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <div className={`text-2xl font-bold ${filteredStats.roi >= 0 ? 'text-brand-400' : 'text-rose-400'}`}>
                             {filteredStats.roi > 0 ? '+' : ''}{filteredStats.roi.toFixed(1)}%
                         </div>
                         <p className="text-xs text-slate-500 mt-1">Based on -110 standard</p>
@@ -150,7 +150,7 @@ export default function AccuracyPage() {
                         <CardTitle className="text-sm font-medium text-slate-400">Status</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Active</Badge>
+                        <Badge className="bg-brand-500/10 text-brand-500 border-brand-500/20">Active</Badge>
                         <p className="text-xs text-slate-500 mt-1">Snapshotting every 15m</p>
                     </CardContent>
                 </Card>
@@ -165,10 +165,10 @@ export default function AccuracyPage() {
                             <TabsTrigger value="ALL" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">
                                 All
                             </TabsTrigger>
-                            <TabsTrigger value="ELITE VALUE" className="text-xs data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400">
+                            <TabsTrigger value="ELITE VALUE" className="text-xs data-[state=active]:bg-brand-500/20 data-[state=active]:text-brand-400">
                                 Elite
                             </TabsTrigger>
-                            <TabsTrigger value="STRONG VALUE" className="text-xs data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400">
+                            <TabsTrigger value="STRONG VALUE" className="text-xs data-[state=active]:bg-brand-500/20 data-[state=active]:text-brand-400">
                                 Strong
                             </TabsTrigger>
                             <TabsTrigger value="PLAYABLE" className="text-xs data-[state=active]:bg-slate-700 data-[state=active]:text-slate-300">
@@ -209,14 +209,14 @@ export default function AccuracyPage() {
                                             <div className="text-xs text-slate-500">{new Date(p.startTime).toLocaleDateString()}</div>
                                         </td>
                                         <td className="px-4 py-4 text-white">
-                                            <Badge variant="outline" className="border-indigo-500/50 text-indigo-400">
+                                            <Badge variant="outline" className="border-brand-500/50 text-brand-400">
                                                 {p.recommendedSide} {p.marketSpread > 0 ? `+${p.marketSpread}` : p.marketSpread}
                                             </Badge>
                                         </td>
                                         <td className="px-4 py-4">
                                             <div className="flex flex-col gap-1">
-                                                <Badge className={`text-[10px] w-fit font-bold ${p.betSignal?.includes('ELITE') ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                                                    p.betSignal?.includes('STRONG') ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                                                <Badge className={`text-[10px] w-fit font-bold ${p.betSignal?.includes('ELITE') ? 'bg-brand-500/20 text-brand-400 border-brand-500/30' :
+                                                    p.betSignal?.includes('STRONG') ? 'bg-brand-500/20 text-brand-400 border-brand-500/30' :
                                                         'bg-slate-800 text-slate-400 border-slate-700'
                                                     }`}>
                                                     {p.betSignal || 'NO SIGNAL'}
@@ -239,7 +239,7 @@ export default function AccuracyPage() {
                                             )}
                                         </td>
                                         <td className="px-4 py-4">
-                                            <Badge className={p.status === 'graded' ? 'bg-slate-800 text-slate-400' : 'bg-indigo-500/10 text-indigo-400'}>
+                                            <Badge className={p.status === 'graded' ? 'bg-slate-800 text-slate-400' : 'bg-brand-500/10 text-brand-400'}>
                                                 {p.status.toUpperCase()}
                                             </Badge>
                                         </td>
