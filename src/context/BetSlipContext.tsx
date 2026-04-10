@@ -22,6 +22,7 @@ interface BetSlipContextType {
   picks: BetSlipPick[];
   addPick: (pick: Omit<BetSlipPick, 'id'>) => void;
   removePick: (pickId: string) => void;
+  updatePickOdds: (pickId: string, odds: number) => void;
   clearPicks: () => void;
 }
 
@@ -52,6 +53,12 @@ export const BetSlipProvider = ({ children }: { children: ReactNode }) => {
     setPicks(currentPicks => currentPicks.filter(p => p.id !== pickId));
   };
 
+  const updatePickOdds = (pickId: string, odds: number) => {
+    setPicks(currentPicks =>
+      currentPicks.map(p => (p.id === pickId ? { ...p, odds } : p))
+    );
+  };
+
   const clearPicks = () => {
     setPicks([]);
   };
@@ -60,6 +67,7 @@ export const BetSlipProvider = ({ children }: { children: ReactNode }) => {
     picks,
     addPick,
     removePick,
+    updatePickOdds,
     clearPicks,
   }), [picks]);
 

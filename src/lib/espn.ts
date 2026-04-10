@@ -121,10 +121,10 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
     try {
         const promises: Promise<{ data: any, slug: string, sport: SportName }>[] = [];
         sources.forEach(src => {
-            // Fetch BOTH today and tomorrow — games after ~8 PM Eastern are stored
-            // under UTC tomorrow in ESPN's API, so we need both dates to avoid missing them.
-            promises.push(fetch(`${src.url}?dates=${getDateStr(0)}&limit=100`, { cache: 'no-store' }).then(r => r.json()).then(d => ({ data: d, slug: src.slug, sport: src.sport })));
-            promises.push(fetch(`${src.url}?dates=${getDateStr(1)}&limit=100`, { cache: 'no-store' }).then(r => r.json()).then(d => ({ data: d, slug: src.slug, sport: src.sport })));
+            // Fetch past 4 days, today, and tomorrow to ensure we catch old games for grading
+            for (let i = -4; i <= 1; i++) {
+                promises.push(fetch(`${src.url}?dates=${getDateStr(i)}&limit=100`, { cache: 'no-store' }).then(r => r.json()).then(d => ({ data: d, slug: src.slug, sport: src.sport })));
+            }
         });
 
         const results = await Promise.all(promises);

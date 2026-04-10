@@ -108,6 +108,8 @@ export interface UserBet {
   playerName?: string;
   market?: string;
   line?: number;
+  // Real money tracking
+  sportsbook?: string;
 };
 
 export interface DailyGame {

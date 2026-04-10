@@ -8,13 +8,16 @@ export async function GET() {
         const snapshot = await db
             .collection('model_predictions')
             .orderBy('startTime', 'desc')
-            .limit(50)
+            .limit(200)
             .get();
 
-        const predictions = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
+        const predictions = snapshot.docs
+            .map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }))
+            .filter((p: any) => p.sport === 'NBA')
+            .slice(0, 50);
 
         return NextResponse.json({ predictions });
     } catch (error: any) {
