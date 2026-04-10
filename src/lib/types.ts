@@ -39,7 +39,7 @@ export type SportsbookOdds = {
   odds: Odds;
 };
 
-export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'Soccer' | 'WNBA' | 'NCAAF' | 'NCAAM';
+export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'EPL' | 'MLS' | 'UCL' | 'Liga MX' | 'WNBA' | 'NCAAF' | 'NCAAM';
 
 export type Game = {
   id: string;
@@ -54,6 +54,7 @@ export type Game = {
   liveScore?: { home: number; away: number };
   statusDetail?: string; // e.g., "Final", "Q3 10:00" from ESPN
   statusState?: 'pre' | 'in' | 'post';
+  leagueContext?: string; // e.g., "English Premier League", "UEFA Champions League"
 };
 
 export type Sport = {

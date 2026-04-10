@@ -17,6 +17,7 @@ export async function GET() {
                 ...doc.data()
             }))
             .filter((p: any) => p.sport === 'NBA')
+            .filter((p: any) => p.marketSpread !== 0) // Exclude bad data where spread wasn't captured
             .slice(0, 50);
 
         return NextResponse.json({ predictions });

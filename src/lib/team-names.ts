@@ -225,6 +225,14 @@ export const teamNameMap: Record<string, string> = {
     'Cardinals': 'St. Louis Cardinals',
     'Rays': 'Tampa Bay Rays',
     'Rangers': 'Texas Rangers',
+
+    // Soccer Mappings
+    'AFC Bournemouth': 'Bournemouth',
+    'Brighton & Hove Albion': 'Brighton and Hove Albion',
+    'Manchester United': 'Manchester United', // just ensuring identity
+    'Newcastle United': 'Newcastle United',
+    'Wolverhampton Wanderers': 'Wolverhampton Wanderers',
+    'West Ham United': 'West Ham United',
 };
 
 const mascots = [

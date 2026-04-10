@@ -39,8 +39,10 @@ export async function GET(request: NextRequest) {
             const aName = normalizeTeamName(game.awayTeam.name);
 
             // --- SNAPSHOT LOGIC (Lock predictions starting < 15m ago or soon) ---
-            // If game starts in <= 15 mins (or already started/finished), and no pending snapshot exists:
-            if (timeUntilStart <= 15 * 60 * 1000 && !pendingGameIds.has(game.id)) {
+            // Only snapshot games that are about to start or recently started (prevent running predictions on 4 days of history)
+            const isRelevantForSnapshot = timeUntilStart <= 15 * 60 * 1000 && timeUntilStart > -2 * 60 * 60 * 1000;
+            
+            if (isRelevantForSnapshot && !pendingGameIds.has(game.id)) {
                 // Check if already snapshotted
                 const existing = await db.collection('model_predictions')
                     .where('gameId', '==', game.id)
@@ -53,14 +55,36 @@ export async function GET(request: NextRequest) {
                         normalizeTeamName(d.awayTeam) === aName
                     );
 
+                    // --- Find the Vegas spread from Odds API bookmakers ---
                     let spreadPoints = 0;
-                    if (dg?.bookmakerOdds?.[0]) {
-                        try {
-                            const bookmaker = JSON.parse(dg.bookmakerOdds[0]);
-                            const sm = bookmaker.markets.find((m: any) => m.key === 'spreads');
-                            spreadPoints = sm?.outcomes.find((o: any) => normalizeTeamName(o.name) === hName)?.point || 0;
-                        } catch (e) { }
+                    let spreadSource = 'none';
+                    
+                    if (dg?.bookmakerOdds) {
+                        for (const bkStr of dg.bookmakerOdds) {
+                            try {
+                                const bookmaker = JSON.parse(bkStr);
+                                const sm = bookmaker.markets.find((m: any) => m.key === 'spreads');
+                                if (sm) {
+                                    const outcome = sm.outcomes.find((o: any) => normalizeTeamName(o.name) === hName);
+                                    if (outcome && outcome.point !== undefined) {
+                                        if (outcome.point !== 0 || spreadPoints === 0) {
+                                            spreadPoints = outcome.point;
+                                            spreadSource = bookmaker.title || 'Odds API';
+                                            if (spreadPoints !== 0) break;
+                                        }
+                                    }
+                                }
+                            } catch (e) { }
+                        }
                     }
+
+                    // --- Skip games with no real spread (can't grade without a line) ---
+                    if (spreadPoints === 0) {
+                        console.log(`[sync-accuracy] SKIP ${aName} @ ${hName} — no spread found in daily_games`);
+                        continue;
+                    }
+
+                    console.log(`[sync-accuracy] Snapshotting ${aName} @ ${hName} | Line: ${spreadPoints} (${spreadSource})`);
 
                     const endpoint = game.sport === 'NBA' ? '/api/predict-game' : '/api/predict-ncaam';
 
@@ -78,6 +102,7 @@ export async function GET(request: NextRequest) {
                                 startTime: game.startTime,
                                 snapshotTime: now.toISOString(),
                                 marketSpread: spreadPoints,
+                                spreadSource: spreadSource,
                                 projectedSpread: prediction.projectedSpread,
                                 zScore: prediction.zScore,
                                 betSignal: prediction.betSignal,
@@ -88,7 +113,7 @@ export async function GET(request: NextRequest) {
                             };
                             
                             await db.collection('model_predictions').doc(game.id).set(predData);
-                            results.snapshots.push(`${aName} @ ${hName}`);
+                            results.snapshots.push(`${aName} @ ${hName} (Line: ${spreadPoints})`);
                             
                             // Make it available for immediate grading if game is already over
                             pendingGameIds.add(game.id);

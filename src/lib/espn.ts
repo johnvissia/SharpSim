@@ -64,6 +64,7 @@ interface EspnCompetition {
         };
     };
     odds?: any[];
+    notes?: { type: string; headline: string }[];
 }
 
 interface EspnEvent {
@@ -116,6 +117,10 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
         { url: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard', slug: 'mlb', sport: 'MLB' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard', slug: 'college-football', sport: 'NCAAF' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard', slug: 'mens-college-basketball', sport: 'NCAAM' as SportName },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard', slug: 'epl', sport: 'EPL' as SportName },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard', slug: 'mls', sport: 'MLS' as SportName },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard', slug: 'ucl', sport: 'UCL' as SportName },
+        { url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/scoreboard', slug: 'liga-mx', sport: 'Liga MX' as SportName },
     ];
 
     try {
@@ -200,6 +205,10 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
                     startingPitcher: sport === 'MLB' ? getPitcher(away) : undefined,
                 };
 
+                const leagueName = data.leagues?.[0]?.name || '';
+                const compNotes = comp.notes?.[0]?.headline || '';
+                const leagueContext = [leagueName, compNotes].filter(Boolean).join(' • ');
+
                 return {
                     id: event.id,
                     sport: sport,
@@ -207,6 +216,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
                     startTime: event.date,
                     homeTeam,
                     awayTeam,
+                    leagueContext: leagueContext,
                     liveScore: {
                         home: parseInt(home.score, 10),
                         away: parseInt(away.score, 10),

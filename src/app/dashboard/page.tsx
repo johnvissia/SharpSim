@@ -125,6 +125,7 @@ const transformDailyGamesToGames = (
 export default function DashboardPage() {
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [selectedConference, setSelectedConference] = useState('All');
+    const [selectedSoccerLeague, setSelectedSoccerLeague] = useState('All');
     const [selectedGame, setSelectedGame] = useState<Game | null>(null);
     const [espnGames, setEspnGames] = useState<Game[]>([]);
     const [isLoadingEspn, setIsLoadingEspn] = useState(true);
@@ -144,7 +145,11 @@ export default function DashboardPage() {
 
     useEffect(() => {
         const fetchTeamLogos = async () => {
-            const sports = ['basketball/nba', 'football/nfl', 'hockey/nhl', 'football/college-football', 'basketball/mens-college-basketball', 'baseball/mlb'];
+            const sports = [
+                'basketball/nba', 'football/nfl', 'hockey/nhl', 'football/college-football', 
+                'basketball/mens-college-basketball', 'baseball/mlb',
+                'soccer/eng.1', 'soccer/usa.1', 'soccer/uefa.champions', 'soccer/mex.1'
+            ];
             const newLogoMap = new Map<string, string>();
             const promises = sports.map(async (sport) => {
                 try {
@@ -380,7 +385,14 @@ export default function DashboardPage() {
                     return false;
                 }
             } else if (selectedCategory !== 'All') {
-                if (game.sport !== selectedCategory) {
+                if (selectedCategory === 'Soccer') {
+                    if (!['EPL', 'MLS', 'UCL', 'Liga MX'].includes(game.sport)) {
+                        return false;
+                    }
+                    if (selectedSoccerLeague !== 'All' && game.sport !== selectedSoccerLeague) {
+                        return false;
+                    }
+                } else if (game.sport !== selectedCategory) {
                     return false;
                 }
             }
@@ -452,7 +464,7 @@ export default function DashboardPage() {
 
                 return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
             });
-    }, [mergedGames, selectedCategory, selectedConference, activeBetGameIds, favoriteTeams]);
+    }, [mergedGames, selectedCategory, selectedConference, selectedSoccerLeague, activeBetGameIds, favoriteTeams]);
 
     // Effect to keep the selected game in sync with the master list
     useEffect(() => {
@@ -499,7 +511,7 @@ export default function DashboardPage() {
                 <div className="flex flex-col gap-4 w-full">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900/50 p-3 rounded-xl border border-slate-800 backdrop-blur-sm">
                         <div className="flex gap-2 overflow-x-auto no-scrollbar w-full md:w-auto">
-                            {['All', 'Favorites', 'NBA', 'NCAAM', 'MLB', 'NHL', 'NFL'].map(sport => (
+                            {['All', 'Favorites', 'NBA', 'NCAAM', 'MLB', 'NHL', 'NFL', 'Soccer'].map(sport => (
                                 <button
                                     key={sport}
                                     onClick={() => setSelectedCategory(sport)}
@@ -548,6 +560,25 @@ export default function DashboardPage() {
                     `}
                                 >
                                     {conf}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    
+                    {selectedCategory === 'Soccer' && (
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar w-full md:w-auto">
+                            {['All', 'EPL', 'MLS', 'UCL', 'Liga MX'].map(league => (
+                                <button
+                                    key={league}
+                                    onClick={() => setSelectedSoccerLeague(league)}
+                                    className={`
+                      px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all
+                      ${selectedSoccerLeague === league
+                                            ? 'bg-emerald-400 text-slate-950 shadow-lg'
+                                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}
+                    `}
+                                >
+                                    {league}
                                 </button>
                             ))}
                         </div>

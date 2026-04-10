@@ -152,6 +152,11 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
         <div className="flex items-center gap-4">
           {/* Left Side: Teams, Scores & Status */}
           <div className="flex-grow space-y-3">
+              {game.leagueContext && (
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-[-6px]">
+                      {game.leagueContext}
+                  </div>
+              )}
               <TeamDisplay team={game.awayTeam} sport={game.sport} score={(isLive || isFinal) ? liveScore?.away : undefined} />
               <TeamDisplay team={game.homeTeam} sport={game.sport} score={(isLive || isFinal) ? liveScore?.home : undefined} />
               <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">

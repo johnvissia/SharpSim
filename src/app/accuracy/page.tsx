@@ -59,8 +59,14 @@ export default function AccuracyPage() {
             const res = await fetch('/api/accuracy-data');
             if (!res.ok) throw new Error('Failed to fetch predictions');
             const { predictions: data } = await res.json();
-            setPredictions(data as GradedPrediction[]);
-            setStats(calculateStats(data as GradedPrediction[]));
+            
+            // Filter out "No Play" games since we didn't bet on them
+            const playablePredictions = (data as GradedPrediction[]).filter(
+                p => p.betSignal && p.betSignal.toUpperCase() !== 'NO PLAY'
+            );
+
+            setPredictions(playablePredictions);
+            setStats(calculateStats(playablePredictions));
         } catch (e) {
             console.error('[AccuracyPage] fetch error:', e);
         } finally {
@@ -209,9 +215,13 @@ export default function AccuracyPage() {
                                             <div className="text-xs text-slate-500">{new Date(p.startTime).toLocaleDateString()}</div>
                                         </td>
                                         <td className="px-4 py-4 text-white">
-                                            <Badge variant="outline" className="border-brand-500/50 text-brand-400">
-                                                {p.recommendedSide} {p.marketSpread > 0 ? `+${p.marketSpread}` : p.marketSpread}
-                                            </Badge>
+                                            {p.recommendedSide ? (
+                                                <Badge variant="outline" className="border-brand-500/50 text-brand-400">
+                                                    {p.recommendedSide} {p.marketSpread > 0 ? `+${p.marketSpread}` : p.marketSpread === 0 ? 'PK' : p.marketSpread}
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-slate-500">-</span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-4">
                                             <div className="flex flex-col gap-1">
@@ -222,7 +232,7 @@ export default function AccuracyPage() {
                                                     {p.betSignal || 'NO SIGNAL'}
                                                 </Badge>
                                                 <div className="text-[10px] text-slate-500">
-                                                    Proj: {p.projectedSpread} (Line: {p.marketSpread})
+                                                    Proj: {p.projectedSpread} | Line: {p.marketSpread > 0 ? `+${p.marketSpread}` : p.marketSpread}
                                                 </div>
                                             </div>
                                         </td>
