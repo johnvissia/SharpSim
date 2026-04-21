@@ -130,7 +130,29 @@ export default function DashboardPage() {
     const [espnGames, setEspnGames] = useState<Game[]>([]);
     const [isLoadingEspn, setIsLoadingEspn] = useState(true);
     const [isSyncingLines, setIsSyncingLines] = useState(false);
+    const [selectedDateOffset, setSelectedDateOffset] = useState(0);
     const [teamLogos, setTeamLogos] = useState<Map<string, string>>(new Map());
+
+    const dateOptions = useMemo(() => {
+        const options = [];
+        for (let i = -1; i <= 1; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() + i);
+            let label = '';
+            if (i === -1) label = 'Yesterday';
+            else if (i === 0) label = 'Today';
+            else if (i === 1) label = 'Tomorrow';
+
+            options.push({
+                offset: i,
+                label,
+                dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
+                dateNum: d.getDate(),
+                fullDate: d.toLocaleDateString('en-CA') // YYYY-MM-DD in local time
+            });
+        }
+        return options;
+    }, []);
 
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser();
@@ -297,7 +319,9 @@ export default function DashboardPage() {
         espnGames.forEach(espnGame => {
             const homeName = normalizeTeamName(espnGame.homeTeam.name);
             const awayName = normalizeTeamName(espnGame.awayTeam.name);
-            const key = `${espnGame.sport}-${homeName}-${awayName}`;
+            // Include date in the key to prevent multi-day series from colliding
+            const dateStr = new Date(espnGame.startTime).toLocaleDateString('en-CA');
+            const key = `${espnGame.sport}-${homeName}-${awayName}-${dateStr}`;
 
             const homeRankingInfo = rankingsMap.get(espnGame.homeTeam.name);
             const awayRankingInfo = rankingsMap.get(espnGame.awayTeam.name);
@@ -320,7 +344,8 @@ export default function DashboardPage() {
         oddsGames.forEach(oddsGame => {
             const homeName = normalizeTeamName(oddsGame.homeTeam.name);
             const awayName = normalizeTeamName(oddsGame.awayTeam.name);
-            const key = `${oddsGame.sport}-${homeName}-${awayName}`;
+            const dateStr = new Date(oddsGame.startTime).toLocaleDateString('en-CA');
+            const key = `${oddsGame.sport}-${homeName}-${awayName}-${dateStr}`;
             const existingGame = finalGames.get(key);
 
             if (existingGame) {
@@ -376,8 +401,8 @@ export default function DashboardPage() {
 
     const filteredAndSortedGames = useMemo(() => {
         const now = new Date();
-        // Keep games for 4 hours after they start, unless they are marked as 'in' (live).
-        const staleCutoff = now.getTime() - (4 * 60 * 60 * 1000);
+        // Keep games for 12 hours after they start, unless they are marked as 'in' (live).
+        const staleCutoff = now.getTime() - (12 * 60 * 60 * 1000);
 
         return mergedGames.filter(game => {
             if (selectedCategory === 'Favorites') {
@@ -403,15 +428,22 @@ export default function DashboardPage() {
                 }
             }
 
-            const gameTime = new Date(game.startTime).getTime();
+            const gameDate = new Date(game.startTime);
+            const gameDateStr = gameDate.toLocaleDateString('en-CA');
+            const selectedDay = dateOptions.find(o => o.offset === selectedDateOffset);
+
+            // Filter by selected date
+            if (selectedDay && gameDateStr !== selectedDay.fullDate) {
+                return false;
+            }
 
             // Always show live games.
             if (game.statusState === 'in') {
                 return true;
             }
 
-            // Hide games that started more than 4 hours ago and are not live.
-            if (gameTime < staleCutoff) {
+            // Hide games that started more than 12 hours ago only if we are looking at Today
+            if (selectedDateOffset === 0 && gameDate.getTime() < staleCutoff) {
                 return false;
             }
 
@@ -420,9 +452,7 @@ export default function DashboardPage() {
             .sort((a, b) => {
                 const isGameToday = (gameDateStr: string) => {
                     const gameDate = new Date(gameDateStr);
-                    return gameDate.getDate() === now.getDate() &&
-                        gameDate.getMonth() === now.getMonth() &&
-                        gameDate.getFullYear() === now.getFullYear();
+                    return gameDate.toLocaleDateString('en-CA') === now.toLocaleDateString('en-CA');
                 };
 
                 const isFavA = favoriteTeams.includes(a.homeTeam.name) || favoriteTeams.includes(a.awayTeam.name);
@@ -464,7 +494,19 @@ export default function DashboardPage() {
 
                 return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
             });
-    }, [mergedGames, selectedCategory, selectedConference, selectedSoccerLeague, activeBetGameIds, favoriteTeams]);
+    }, [mergedGames, selectedCategory, selectedConference, selectedSoccerLeague, activeBetGameIds, favoriteTeams, selectedDateOffset, dateOptions]);
+
+    const groupedGames = useMemo(() => {
+        const groups: Record<string, Game[]> = {};
+        filteredAndSortedGames.forEach(game => {
+            const sport = game.sport;
+            if (!groups[sport]) groups[sport] = [];
+            groups[sport].push(game);
+        });
+        // Sort sports alphabetically but maybe keep some priority? 
+        // For now, let's just use the keys.
+        return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+    }, [filteredAndSortedGames]);
 
     // Effect to keep the selected game in sync with the master list
     useEffect(() => {
@@ -546,6 +588,32 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
+                    {/* Date Navigation Strip */}
+                    <div className="flex justify-center w-full">
+                        <div className="flex gap-2 p-1 bg-slate-900/80 rounded-2xl border border-slate-800 backdrop-blur-md shadow-inner">
+                            {dateOptions.map((opt) => (
+                                <button
+                                    key={opt.offset}
+                                    onClick={() => setSelectedDateOffset(opt.offset)}
+                                    className={`
+                                        flex flex-col items-center min-w-[100px] px-6 py-3 rounded-xl transition-all duration-300
+                                        ${selectedDateOffset === opt.offset
+                                            ? 'bg-gradient-to-br from-brand-500 to-indigo-600 text-white shadow-lg shadow-brand-500/30 scale-105'
+                                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}
+                                    `}
+                                >
+                                    <span className={`text-[10px] font-bold uppercase tracking-[0.2em] mb-1 ${selectedDateOffset === opt.offset ? 'text-brand-100' : 'text-slate-500'}`}>
+                                        {opt.label}
+                                    </span>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-xl font-black">{opt.dateNum}</span>
+                                        <span className="text-xs font-medium opacity-60 uppercase">{opt.dayName}</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     {selectedCategory === 'NCAAM' && (
                         <div className="flex gap-2 overflow-x-auto no-scrollbar w-full md:w-auto">
                             {['All', 'ACC', 'Big 10', 'Big 12', 'SEC'].map(conf => (
@@ -584,26 +652,66 @@ export default function DashboardPage() {
                         </div>
                     )}
 
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-8">
                         {isLoading && filteredAndSortedGames.length === 0 ? (
-                            <div className="grid grid-cols-1 gap-4">
-                                {Array.from({ length: 8 }).map((_, i) => (
-                                    <Skeleton key={i} className="h-32 w-full" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+                                {Array.from({ length: 9 }).map((_, i) => (
+                                    <Skeleton key={i} className="h-64 w-full rounded-2xl bg-slate-900/40" />
                                 ))}
                             </div>
                         ) : filteredAndSortedGames.length > 0 ? (
-                            filteredAndSortedGames.map((game) => (
-                                <GameCard
-                                    key={`${game.id}-${game.homeTeam.name}`}
-                                    game={game}
-                                    onGameClick={setSelectedGame}
-                                    hasActiveBet={!!game.oddsApiId && activeBetGameIds.has(game.oddsApiId)}
-                                />
+                            groupedGames.map(([sport, games]) => (
+                                <div key={sport} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="flex items-center gap-4">
+                                        <h3 className="text-sm font-black uppercase tracking-[0.3em] text-slate-500 whitespace-nowrap">
+                                            {sport}
+                                        </h3>
+                                        <div className="h-px w-full bg-gradient-to-r from-slate-800 to-transparent" />
+                                    </div>
+
+                                    {/* Live / Final Games - Denser Grid */}
+                                    {games.filter(g => g.statusState === 'in' || g.statusState === 'post').length > 0 && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                                            {games
+                                                .filter(g => g.statusState === 'in' || g.statusState === 'post')
+                                                .map((game) => (
+                                                    <GameCard
+                                                        key={`${game.id}-${game.homeTeam.name}`}
+                                                        game={game}
+                                                        onGameClick={setSelectedGame}
+                                                        hasActiveBet={!!game.oddsApiId && activeBetGameIds.has(game.oddsApiId)}
+                                                    />
+                                                ))}
+                                        </div>
+                                    )}
+
+                                    {/* Upcoming Games - Original Wide Grid for Odds */}
+                                    {games.filter(g => g.statusState !== 'in' && g.statusState !== 'post').length > 0 && (
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+                                            {games
+                                                .filter(g => g.statusState !== 'in' && g.statusState !== 'post')
+                                                .map((game) => (
+                                                    <GameCard
+                                                        key={`${game.id}-${game.homeTeam.name}`}
+                                                        game={game}
+                                                        onGameClick={setSelectedGame}
+                                                        hasActiveBet={!!game.oddsApiId && activeBetGameIds.has(game.oddsApiId)}
+                                                    />
+                                                ))}
+                                        </div>
+                                    )}
+                                </div>
                             ))
                         ) : (
-                            <p className="text-muted-foreground text-center py-8">
-                                No games match your filter.
-                            </p>
+                            <div className="flex flex-col items-center justify-center py-20 text-center gap-4 bg-slate-900/20 rounded-3xl border border-dashed border-slate-800">
+                                <Activity className="h-12 w-12 text-slate-700" />
+                                <div className="space-y-1">
+                                    <h3 className="text-lg font-bold text-slate-400">No scheduled games found</h3>
+                                    <p className="text-sm text-slate-600 max-w-[280px]">
+                                        Try selecting a different date or sport category.
+                                    </p>
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>

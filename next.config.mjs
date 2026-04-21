@@ -8,6 +8,9 @@ const nextConfig = {
       },
     ],
   },
+  experimental: {
+    serverExternalPackages: ['genkit', 'express'],
+  },
 };
 
 export default nextConfig;

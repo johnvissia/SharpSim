@@ -10,7 +10,6 @@ export const sportKeyMapping: { [key: string]: string } = {
     'UCL': 'soccer_uefa_champs_league',
     'Liga MX': 'soccer_mexico_ligamx',
     'WNBA': 'basketball_wnba',
-    'NCAAF': 'americanfootball_ncaaf',
     'NCAAM': 'basketball_ncaab',
 };
 

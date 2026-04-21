@@ -16,7 +16,6 @@ import {
   Store,
   BookUser,
   Ticket,
-  Shield,
   BarChart3,
   Zap,
   Target,
@@ -34,7 +33,6 @@ const navItems = [
   { href: '/stats', label: 'Stats', icon: BarChart3 },
   { href: '/store', label: 'Store', icon: Store },
   { href: '/coaching', label: 'Coaching', icon: BookUser },
-  { href: '/admin', label: 'Admin', icon: Shield },
 ];
 
 export function AppSidebar() {

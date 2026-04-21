@@ -48,12 +48,6 @@ const libertyPlayers = [createPlayer('p17', 'Breanna Stewart', 'F'), createPlaye
 const aces = createTeam('t7', 'Las Vegas Aces', '10-2', acesPlayers);
 const liberty = createTeam('t8', 'New York Liberty', '9-3', libertyPlayers);
 
-// NCAAF Teams
-const alabamaPlayers = [createPlayer('p19', 'Jalen Milroe', 'QB')];
-const georgiaPlayers = [createPlayer('p20', 'Carson Beck', 'QB')];
-const alabama = createTeam('t9', 'Alabama Crimson Tide', '3-0', alabamaPlayers);
-const georgia = createTeam('t10', 'Georgia Bulldogs', '3-0', georgiaPlayers);
-
 // --- NHL Teams from image ---
 const sharksPlayers = [createPlayer('p25', 'Tomas Hertl', 'C'), createPlayer('p26', 'Logan Couture', 'C')];
 const redWingsPlayers = [createPlayer('p27', 'Dylan Larkin', 'C'), createPlayer('p28', 'Lucas Raymond', 'RW')];
@@ -200,18 +194,6 @@ const mockGames: Game[] = [
     }),
     get odds() { return getBestOdds(this.allOdds) }
   },
-  {
-    id: 'g5',
-    sport: 'NCAAF',
-    startTime: new Date('2026-01-16T13:00:00-05:00').toISOString(),
-    awayTeam: alabama,
-    homeTeam: georgia,
-    allOdds: generateOdds({
-      moneyline: { away: 110, home: -130 },
-      spread: { points: -2.5, home: -110, away: -110 },
-      total: { points: 55.5, over: -110, under: -110 },
-    }),
-    get odds() { return getBestOdds(this.allOdds) }
   },
 ];
 
@@ -220,7 +202,6 @@ const mockSports: Sport[] = [
     { id: 's1', name: 'NBA' },
     { id: 's2', name: 'NFL' },
     { id: 's4', name: 'NHL' },
-    { id: 's7', name: 'NCAAF' },
     { id: 's8', name: 'NCAAM' },
 ]
 

@@ -333,9 +333,9 @@ export default function MyPicksPage() {
         </Button>
       </div>
 
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredBets.length === 0 ? (
-            <Card>
+            <Card className="col-span-full">
                 <CardContent className="p-6 text-center text-muted-foreground">
                     No active bets or slips for this date.
                 </CardContent>

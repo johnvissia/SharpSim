@@ -74,22 +74,7 @@ const TeamDisplay = ({ team, sport, score }: { team: Team, sport: SportName, sco
     );
 };
 
-const LiveLeaders = ({ team }: { team: Team }) => (
-    <div className="space-y-2 text-xs text-muted-foreground">
-        {team.leadingScorer && (
-            <div className="flex items-center gap-1.5 truncate" title={`Points Leader: ${team.leadingScorer}`}>
-                <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <span className="truncate">{team.leadingScorer}</span>
-            </div>
-        )}
-        {team.leadingAssister && (
-            <div className="flex items-center gap-1.5 truncate" title={`Assists Leader: ${team.leadingAssister}`}>
-                <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <span className="truncate">{team.leadingAssister}</span>
-            </div>
-        )}
-    </div>
-);
+// LiveLeaders removed as per user request
 
 
 export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGameClick: (game: Game) => void, hasActiveBet: boolean }) {
@@ -101,7 +86,6 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
 
   const isPickInSlip = (betType: BetSlipPick['betType'], pick: string) => {
     const marketId = `${game.id}-${betType}`;
-    // This logic must exactly match the ID generation in BetSlipContext
     const pickId = `${marketId}-${pick.replace(/\s/g, '')}`;
     return picks.some(p => p.id === pickId);
   };
@@ -109,9 +93,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
   const gameDate = new Date(game.startTime);
   const now = new Date();
   const isToday =
-    now.getFullYear() === gameDate.getFullYear() &&
-    now.getMonth() === gameDate.getMonth() &&
-    now.getDate() === gameDate.getDate();
+    now.toLocaleDateString('en-CA') === gameDate.toLocaleDateString('en-CA');
 
   const gameTimeOrStatus = isLive || isFinal
     ? game.statusDetail
@@ -143,117 +125,187 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
   const { odds, liveScore } = game;
   const homeSpreadPoints = odds?.spread?.points ?? 0;
   const awaySpreadPoints = -homeSpreadPoints;
+
+  const isAwayFav = (odds?.spread?.away ?? 0) < 0;
+  const isHomeFav = (odds?.spread?.home ?? 0) < 0;
   
-  return (
-      <Card 
-        className="shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer p-4 bg-card"
-        onClick={() => onGameClick(game)}
-      >
-        <div className="flex items-center gap-4">
-          {/* Left Side: Teams, Scores & Status */}
-          <div className="flex-grow space-y-3">
-              {game.leagueContext && (
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-[-6px]">
-                      {game.leagueContext}
-                  </div>
-              )}
-              <TeamDisplay team={game.awayTeam} sport={game.sport} score={(isLive || isFinal) ? liveScore?.away : undefined} />
-              <TeamDisplay team={game.homeTeam} sport={game.sport} score={(isLive || isFinal) ? liveScore?.home : undefined} />
-              <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
-                  <div className="flex items-center gap-2">
-                      <span>{gameTimeOrStatus}</span>
-                      {isLive && (
-                          <Badge variant="destructive" className="animate-pulse text-xs">
-                              LIVE
-                          </Badge>
-                      )}
-                  </div>
-                  {hasActiveBet && (
-                      <TooltipProvider>
-                          <Tooltip>
-                              <TooltipTrigger>
-                                  <Ticket className="h-5 w-5 text-primary" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                  <p>You have a pending bet on this game.</p>
-                              </TooltipContent>
-                          </Tooltip>
-                      </TooltipProvider>
-                  )}
-              </div>
+  const TeamRow = ({ 
+    team, 
+    score, 
+    isFav, 
+    mlOdds, 
+    spreadPoints, 
+    spreadOdds, 
+    totalType,
+    totalPoints,
+    totalOdds 
+  }: { 
+    team: Team, 
+    score?: number, 
+    isFav: boolean,
+    mlOdds?: number,
+    spreadPoints?: number,
+    spreadOdds?: number,
+    totalType?: 'Over' | 'Under',
+    totalPoints?: number,
+    totalOdds?: number
+  }) => {
+    const FallbackIcon = sportIconMap[game.sport] || sportIconMap.Default;
+    const showScore = isLive || isFinal;
+    
+    return (
+      <div className={`flex items-center ${showScore ? 'gap-2' : 'gap-3'} w-full`}>
+        {/* Team Identity */}
+        <div className={`flex-grow flex items-center ${showScore ? 'gap-2' : 'gap-3'} min-w-0 ${showScore ? 'pr-0' : 'pr-2'}`}>
+          <div className={`${showScore ? 'w-7 h-7' : 'w-9 h-9'} flex-shrink-0 flex items-center justify-center bg-slate-900/40 rounded-full border border-slate-800/50`}>
+            {team.logo ? (
+              <Image src={team.logo} alt={team.name} width={showScore ? 28 : 36} height={showScore ? 28 : 36} className={`${showScore ? 'w-7 h-7' : 'w-9 h-9'} object-contain p-1`} />
+            ) : (
+              <FallbackIcon className={`${showScore ? 'w-5 h-5' : 'w-7 h-7'} text-muted-foreground`} />
+            )}
           </div>
-
-          {/* Right Side: Odds or Leaders */}
-          {canBet && odds ? (
-            <div className="flex-none grid grid-cols-3 gap-2 text-xs md:text-sm w-1/2 lg:w-2/5">
-                {/* Spread Column */}
-                <div className="flex flex-col gap-2">
-                    <div className="text-center font-semibold text-xs text-muted-foreground">Spread</div>
-                    <OddsButton 
-                        onClick={(e) => handleBetSelection(e, `${game.awayTeam.name} ${awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}`, odds.spread.away, 'spread')} 
-                        disabled={!canBet}
-                        isSelected={isPickInSlip('spread', `${game.awayTeam.name} ${awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}`)}
-                    >
-                        <span className="font-semibold text-brand-500">{awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}</span>
-                        <span className="text-xs text-muted-foreground">{odds.spread.away > 0 ? `+${odds.spread.away}` : odds.spread.away}</span>
-                    </OddsButton>
-                    <OddsButton 
-                        onClick={(e) => handleBetSelection(e, `${game.homeTeam.name} ${homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}`, odds.spread.home, 'spread')} 
-                        disabled={!canBet}
-                        isSelected={isPickInSlip('spread', `${game.homeTeam.name} ${homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}`)}
-                    >
-                        <span className="font-semibold text-brand-500">{homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}</span>
-                        <span className="text-xs text-muted-foreground">{odds.spread.home > 0 ? `+${odds.spread.home}` : odds.spread.home}</span>
-                    </OddsButton>
-                </div>
-
-                {/* Total Column */}
-                <div className="flex flex-col gap-2">
-                    <div className="text-center font-semibold text-xs text-muted-foreground">Total</div>
-                    <OddsButton 
-                        onClick={(e) => handleBetSelection(e, `Over ${odds.total.points}`, odds.total.over, 'total')} 
-                        disabled={!canBet}
-                        isSelected={isPickInSlip('total', `Over ${odds.total.points}`)}
-                    >
-                       <span className="font-semibold text-brand-500">O {odds.total.points}</span>
-                       <span className="text-xs text-muted-foreground">{odds.total.over > 0 ? `+${odds.total.over}` : odds.total.over}</span>
-                    </OddsButton>
-                    <OddsButton 
-                        onClick={(e) => handleBetSelection(e, `Under ${odds.total.points}`, odds.total.under, 'total')} 
-                        disabled={!canBet}
-                        isSelected={isPickInSlip('total', `Under ${odds.total.points}`)}
-                    >
-                        <span className="font-semibold text-brand-500">U {odds.total.points}</span>
-                        <span className="text-xs text-muted-foreground">{odds.total.under > 0 ? `+${odds.total.under}` : odds.total.under}</span>
-                    </OddsButton>
-                </div>
-
-                {/* Moneyline Column */}
-                <div className="flex flex-col gap-2">
-                    <div className="text-center font-semibold text-xs text-muted-foreground">Moneyline</div>
-                    <OddsButton 
-                        onClick={(e) => handleBetSelection(e, game.awayTeam.name, odds.moneyline.away, 'moneyline')} 
-                        disabled={!canBet}
-                        isSelected={isPickInSlip('moneyline', game.awayTeam.name)}
-                    >
-                        <span className="font-semibold text-brand-500">{odds.moneyline.away > 0 ? `+${odds.moneyline.away}` : odds.moneyline.away}</span>
-                    </OddsButton>
-                    <OddsButton 
-                        onClick={(e) => handleBetSelection(e, game.homeTeam.name, odds.moneyline.home, 'moneyline')} 
-                        disabled={!canBet}
-                        isSelected={isPickInSlip('moneyline', game.homeTeam.name)}
-                    >
-                        <span className="font-semibold text-brand-500">{odds.moneyline.home > 0 ? `+${odds.moneyline.home}` : odds.moneyline.home}</span>
-                    </OddsButton>
-                </div>
-            </div>
-            ) : (isLive || isFinal) ? (
-            <div className="flex-none grid grid-cols-2 gap-4 text-xs w-1/2 lg:w-2/5">
-                <LiveLeaders team={game.awayTeam} />
-                <LiveLeaders team={game.homeTeam} />
-            </div>
-          ) : null}
+          <div className="flex flex-col min-w-0 flex-shrink">
+            <span className={`${showScore ? 'text-[10px] md:text-xs' : 'text-xs md:text-sm'} font-black truncate leading-tight text-white uppercase tracking-tight`}>
+              {team.name}
+            </span>
+            {game.sport === 'MLB' && canBet && team.startingPitcher && (
+              <span className="text-[9px] text-slate-500 truncate font-medium">
+                {team.startingPitcher.name} ({team.startingPitcher.era} ERA)
+              </span>
+            )}
+          </div>
+          {showScore && (typeof score === 'number') && (
+            <span className="ml-auto text-xl md:text-2xl font-black text-white px-1 italic tracking-tighter">
+              {score}
+            </span>
+          )}
         </div>
-      </Card>
+
+        {/* Odds Grid for this team */}
+        {canBet && odds ? (
+          <div className="flex gap-2 flex-shrink-0">
+            {/* Moneyline */}
+            <div className="w-[68px]">
+              <OddsButton 
+                onClick={(e) => handleBetSelection(e, team.name, mlOdds!, 'moneyline')}
+                isSelected={isPickInSlip('moneyline', team.name)}
+                className="h-11 text-xs"
+              >
+                <span className="font-bold text-white uppercase">{mlOdds! > 0 ? `+${mlOdds}` : mlOdds}</span>
+              </OddsButton>
+            </div>
+
+            {/* Spread */}
+            <div className="w-[78px]">
+              <OddsButton 
+                onClick={(e) => handleBetSelection(e, `${team.name} ${spreadPoints! > 0 ? `+${spreadPoints}` : spreadPoints}`, spreadOdds!, 'spread')}
+                isSelected={isPickInSlip('spread', `${team.name} ${spreadPoints! > 0 ? `+${spreadPoints}` : spreadPoints}`)}
+                className={`h-11 text-xs ${isFav ? 'border-brand-500/50 bg-brand-500/5' : ''}`}
+              >
+                <div className="flex flex-col items-center leading-none">
+                  <span className="font-bold text-white uppercase">{spreadPoints! > 0 ? `+${spreadPoints}` : spreadPoints}</span>
+                  <span className="text-[10px] opacity-60">({spreadOdds! > 0 ? `+${spreadOdds}` : spreadOdds})</span>
+                </div>
+              </OddsButton>
+            </div>
+
+            {/* Total (Shared Column) */}
+            <div className="w-[78px]">
+              <OddsButton 
+                onClick={(e) => handleBetSelection(e, `${totalType} ${totalPoints}`, totalOdds!, 'total')}
+                isSelected={isPickInSlip('total', `${totalType} ${totalPoints}`)}
+                className="h-11 text-xs"
+              >
+                <div className="flex flex-col items-center leading-none">
+                  <span className="font-bold text-white uppercase">{totalType === 'Over' ? 'O' : 'U'} {totalPoints}</span>
+                  <span className="text-[10px] opacity-60">({totalOdds! > 0 ? `+${totalOdds}` : totalOdds})</span>
+                </div>
+              </OddsButton>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <Card 
+      className={`group relative shadow-lg hover:shadow-brand-500/10 transition-all duration-300 cursor-pointer overflow-hidden border-slate-800 bg-slate-900/40 backdrop-blur-md flex flex-col ${isLive || isFinal ? 'min-h-[110px]' : 'min-h-[140px]'} hover:border-slate-700`}
+      onClick={() => onGameClick(game)}
+    >
+      {/* Active Bet Indicator */}
+      {hasActiveBet && (
+        <div className="absolute top-1 right-1 z-20">
+          <Ticket className="h-3 w-3 text-brand-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+        </div>
+      )}
+
+       {/* Live Glow Effect */}
+       {isLive && (
+        <div className="absolute inset-0 bg-gradient-to-r from-rose-500/5 to-transparent pointer-events-none" />
+      )}
+
+      {/* Top Header */}
+      <div className="px-3 py-1 flex justify-between items-center bg-slate-950/40 border-b border-slate-800/50">
+        <div className="flex items-center gap-2">
+           <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
+             {game.leagueContext || game.sport}
+           </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {isLive && <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />}
+          <span className={`text-[9px] font-black uppercase tracking-wider ${isLive ? 'text-rose-500 animate-pulse' : 'text-slate-400'}`}>
+            {gameTimeOrStatus}
+          </span>
+        </div>
+      </div>
+
+      <div className="p-3 flex flex-col gap-2">
+        {/* Column Labels */}
+        {canBet && odds && (
+          <div className="flex w-full justify-end mb-[-12px]">
+             <div className="flex gap-2 text-[8px] font-black text-slate-600 uppercase tracking-tighter w-[240px] justify-around pr-2">
+                <span className="w-[68px] text-center">Moneyline</span>
+                <span className="w-[78px] text-center">Spread</span>
+                <span className="w-[78px] text-center">Total</span>
+             </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <TeamRow 
+            team={game.awayTeam} 
+            score={liveScore?.away} 
+            isFav={isAwayFav}
+            mlOdds={odds?.moneyline?.away}
+            spreadPoints={awaySpreadPoints}
+            spreadOdds={odds?.spread?.away}
+            totalType="Over"
+            totalPoints={odds?.total?.points}
+            totalOdds={odds?.total?.over}
+          />
+          <TeamRow 
+            team={game.homeTeam} 
+            score={liveScore?.home} 
+            isFav={isHomeFav}
+            mlOdds={odds?.moneyline?.home}
+            spreadPoints={homeSpreadPoints}
+            spreadOdds={odds?.spread?.home}
+            totalType="Under"
+            totalPoints={odds?.total?.points}
+            totalOdds={odds?.total?.under}
+          />
+        </div>
+      </div>
+
+      {/* Live/Final Details */}
+      {(isLive || isFinal) && (
+        <div className="px-3 pb-2 flex justify-between items-center mt-auto border-t border-slate-800/30 pt-2">
+           <span className="text-[10px] font-bold text-slate-500 italic">
+             {game.statusDetail}
+           </span>
+        </div>
+      )}
+    </Card>
   );
 }

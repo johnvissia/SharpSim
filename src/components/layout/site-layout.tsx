@@ -16,7 +16,6 @@ import {
   Target,
   ShoppingCart,
   GraduationCap,
-  ShieldCheck,
   Coins,
   LogIn,
   LogOut,
@@ -38,7 +37,6 @@ const navItems = [
   { href: '/accuracy',   id: 'accuracy',  label: 'Accuracy',   icon: Target },
   { href: '/store',      id: 'store',     label: 'Store',      icon: ShoppingCart },
   { href: '/coaching',   id: 'coaching',  label: 'Coaching',   icon: GraduationCap },
-  { href: '/admin',      id: 'admin',     label: 'Admin',      icon: ShieldCheck },
 ];
 
 export function SiteLayout({ children }: { children: React.ReactNode }) {

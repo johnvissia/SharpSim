@@ -131,49 +131,47 @@ export function BetTicket({ bet }: { bet: UserBet }) {
             return (
               <div key={index}>
                 <div className="flex items-start gap-3">
-                  <Icon className={cn("h-5 w-5 flex-shrink-0 mt-1", iconColor)} />
+                  <Icon className={cn("h-5 w-5 flex-shrink-0 mt-0.5", iconColor)} />
                   <div className="flex-grow min-w-0">
-                    <div className="flex justify-between items-center">
-                      <p className="text-lg font-bold truncate pr-2">{leg.pick}</p>
-                      <p className="font-mono tabular-nums text-base font-semibold">
+                    <div className="flex justify-between items-start">
+                      <p className="text-base font-black truncate pr-2 leading-tight uppercase tracking-tight text-white">{leg.pick}</p>
+                      <p className="font-mono tabular-nums text-sm font-black text-white">
                         {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
                       </p>
                     </div>
-                    <div className="flex items-center gap-x-2 flex-wrap text-xs text-muted-foreground">
-                      <span className="truncate">{leg.matchup}</span>
-                      <span className="text-muted-foreground/50">•</span>
+                    <div className="flex items-center gap-x-1.5 flex-wrap text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
+                      <span className="truncate max-w-[120px]">{leg.matchup}</span>
+                      <span className="text-slate-700">•</span>
                       <span>{gameTime}</span>
-                      <span className="text-muted-foreground/50">•</span>
-                      <span className="uppercase tracking-wider">{leg.betType}</span>
                     </div>
                   </div>
                 </div>
-                {index < legs.length - 1 && <Separator className="my-2" />}
+                {index < legs.length - 1 && <Separator className="my-3 bg-slate-800/50" />}
               </div>
             );
           })}
         </div>
-        <div className="border-t-2 border-dashed border-border/50 mx-4" />
-        <div className="p-4">
-          <div className="flex justify-between items-center font-bold text-base">
+        <div className="border-t border-dashed border-slate-800 mx-4" />
+        <div className="p-4 bg-slate-950/20">
+          <div className="flex justify-between items-center font-black text-sm uppercase tracking-wider text-slate-400">
             <p>{ticketLabel}</p>
-            <div className="flex items-center gap-4">
-              <p className="font-semibold font-mono tabular-nums">{ticketOdds > 0 ? `+${ticketOdds}` : ticketOdds}</p>
+            <div className="flex items-center gap-3">
+              <p className="font-black font-mono tabular-nums text-slate-200">{ticketOdds > 0 ? `+${ticketOdds}` : ticketOdds}</p>
               <div className="flex items-center gap-2">
                 {isParlay && bet.status !== 'pending' && <LegProgressBadge legs={legs} />}
                 {getBetStatusBadge(bet.status)}
               </div>
             </div>
           </div>
-          <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-800">
+          <div className="flex justify-between items-end mt-4 pt-4 border-t border-slate-800/50">
             <div className="flex flex-col">
-              <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">Risk</span>
-              <span className="text-lg font-bold text-white font-mono tabular-nums">${bet.stake.toFixed(2)}</span>
+              <span className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em]">Risk</span>
+              <span className="text-base font-black text-white font-mono tabular-nums drop-shadow-sm">${bet.stake.toFixed(2)}</span>
             </div>
 
             <div className="text-right flex flex-col">
-              <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">{toWinLabel}</span>
-              <span className="text-xl font-black text-emerald-400 drop-shadow-sm font-mono tabular-nums">
+              <span className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em]">{toWinLabel}</span>
+              <span className="text-xl font-black text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.2)] font-mono tabular-nums italic">
                 ${toWinAmount.toFixed(2)}
               </span>
             </div>

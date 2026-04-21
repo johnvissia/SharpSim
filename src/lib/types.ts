@@ -39,7 +39,7 @@ export type SportsbookOdds = {
   odds: Odds;
 };
 
-export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'EPL' | 'MLS' | 'UCL' | 'Liga MX' | 'WNBA' | 'NCAAF' | 'NCAAM';
+export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'EPL' | 'MLS' | 'UCL' | 'Liga MX' | 'WNBA' | 'NCAAM';
 
 export type Game = {
   id: string;

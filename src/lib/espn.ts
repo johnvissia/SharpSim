@@ -115,7 +115,6 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
         { url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard', slug: 'nfl', sport: 'NFL' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard', slug: 'nhl', sport: 'NHL' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard', slug: 'mlb', sport: 'MLB' as SportName },
-        { url: 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard', slug: 'college-football', sport: 'NCAAF' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard', slug: 'mens-college-basketball', sport: 'NCAAM' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard', slug: 'epl', sport: 'EPL' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard', slug: 'mls', sport: 'MLS' as SportName },
@@ -173,7 +172,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
                 const getPitcher = (competitor: EspnCompetitor) => {
                     const probable = (competitor as any).probables?.[0]; // Types are tricky here as we didn't fully mock probables
                     if (!probable || !probable.athlete) return undefined;
-                    
+
                     const name = probable.athlete.shortName || probable.athlete.displayName;
                     const stats = probable.statistics || [];
                     const wins = stats.find((s: any) => s.name === 'wins')?.displayValue || '0';
@@ -223,7 +222,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
                     },
                     statusDetail: comp.status.type.detail,
                     statusState: comp.status.type.state,
-                    };
+                };
             }).filter((g: Game | null): g is Game => g !== null);
 
             cleanGames = [...cleanGames, ...mapped];
