@@ -83,7 +83,14 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
           // When a user signs in, check if they have a profile document.
           // If not, create one for them with a starting balance.
           const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-          const docSnap = await getDoc(userDocRef);
+          let docSnap;
+          try {
+            docSnap = await getDoc(userDocRef);
+          } catch (e) {
+            console.error("DEBUG: getDoc failed in FirebaseProvider:", e);
+            setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
+            return;
+          }
           if (!docSnap.exists()) {
             try {
               await setDoc(userDocRef, {
@@ -92,6 +99,14 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
                 balance: 100, // Default starting balance
                 createdAt: serverTimestamp(),
                 lastCoinCollection: new Date(0).toISOString(), // Initialize to epoch
+                preferences: {
+                  sports: {},
+                  betTypes: {},
+                  teams: {},
+                  players: {},
+                  conferences: {},
+                  performance: { wins: 0, losses: 0, pushes: 0 }
+                }
               });
             } catch (error) {
               console.error("Failed to create user profile:", error);

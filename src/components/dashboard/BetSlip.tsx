@@ -296,7 +296,43 @@ export function BetSlip() {
 
       const newBetRef = doc(betsCollectionRef);
       batch.set(newBetRef, newBet);
-      batch.update(userDocRef, { balance: increment(-stakeNum) });
+      
+      const userUpdate: any = { balance: increment(-stakeNum) };
+
+      // Update preferences based on picks
+      picks.forEach(p => {
+        if (p.game.sport) {
+          userUpdate[`preferences.sports.${p.game.sport}`] = increment(1);
+        }
+        if (p.betType) {
+          userUpdate[`preferences.betTypes.${p.betType}`] = increment(1);
+        }
+        
+        if (p.betType === 'player_prop') {
+          // Extract player name from pick (e.g., "LeBron James Over 22.5 Points" -> "LeBron James")
+          const playerNameMatch = p.pick.match(/^(.*?)\s+(Over|Under)/i);
+          if (playerNameMatch && playerNameMatch[1]) {
+            userUpdate[`preferences.players.${playerNameMatch[1].trim()}`] = increment(1);
+          } else {
+             userUpdate[`preferences.players.${p.pick}`] = increment(1);
+          }
+        } else {
+          // Team bets
+          if (p.game.homeTeam && p.pick.includes(p.game.homeTeam.name)) {
+             userUpdate[`preferences.teams.${p.game.homeTeam.name}`] = increment(1);
+             if (p.game.sport === 'NCAAM' && p.game.homeTeam.conference) {
+               userUpdate[`preferences.conferences.${p.game.homeTeam.conference}`] = increment(1);
+             }
+          } else if (p.game.awayTeam && p.pick.includes(p.game.awayTeam.name)) {
+             userUpdate[`preferences.teams.${p.game.awayTeam.name}`] = increment(1);
+             if (p.game.sport === 'NCAAM' && p.game.awayTeam.conference) {
+               userUpdate[`preferences.conferences.${p.game.awayTeam.conference}`] = increment(1);
+             }
+          }
+        }
+      });
+
+      batch.update(userDocRef, userUpdate);
 
       await batch.commit();
 

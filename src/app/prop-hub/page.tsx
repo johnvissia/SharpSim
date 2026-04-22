@@ -139,8 +139,7 @@ export default function PropHubPage() {
     const [debugLoading, setDebugLoading] = useState(false);
     const [debugResponse, setDebugResponse] = useState<string | null>(null);
 
-    const [gradingDebugLoading, setGradingDebugLoading] = useState(false);
-    const [gradingDebugResponse, setGradingDebugResponse] = useState<string | null>(null);
+
 
     const propsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -194,7 +193,6 @@ export default function PropHubPage() {
     const handleSyncProps = async () => {
         setLoading(true);
         setError(null);
-        setGradingDebugResponse(null);
         setDebugResponse(null);
         try {
             const response = await fetch('/api/sync-player-props');
@@ -221,7 +219,6 @@ export default function PropHubPage() {
     const handleDebug = async () => {
         setDebugLoading(true);
         setDebugResponse(null);
-        setGradingDebugResponse(null);
         try {
             const response = await fetch('/api/debug-tank01');
             const result = await response.json();
@@ -234,20 +231,7 @@ export default function PropHubPage() {
         }
     };
 
-    const handleGradingDebug = async () => {
-        setGradingDebugLoading(true);
-        setGradingDebugResponse(null);
-        setDebugResponse(null);
-        try {
-            const response = await fetch('/api/debug-grading');
-            const result = await response.json();
-            setGradingDebugResponse(JSON.stringify(result, null, 2));
-        } catch (err: any) {
-            setGradingDebugResponse(`Error: ${err.message}`);
-        } finally {
-            setGradingDebugLoading(false);
-        }
-    };
+
 
     return (
         <div className="p-4 md:p-8">
@@ -264,10 +248,6 @@ export default function PropHubPage() {
                   <Button onClick={handleDebug} disabled={debugLoading} variant="destructive">
                      <span role="img" aria-label="tools" className="mr-2">🛠️</span>
                      {debugLoading ? 'Testing...' : 'Test API Connection'}
-                  </Button>
-                  <Button onClick={handleGradingDebug} disabled={gradingDebugLoading} variant="outline" className="text-purple-400 border-purple-400/50 hover:bg-purple-400/10 hover:text-purple-300">
-                     <span role="img" aria-label="ladybug" className="mr-2">🐞</span>
-                     {gradingDebugLoading ? 'Debugging...' : 'Debug Grading'}
                   </Button>
               </div>
             </header>
@@ -291,24 +271,7 @@ export default function PropHubPage() {
                 </Card>
             )}
 
-            {gradingDebugResponse && (
-                 <Card className="my-6 bg-slate-800 border-purple-500/50">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg text-purple-400">
-                            <span role="img" aria-label="ladybug">🐞</span>
-                            Grading Debug Report
-                        </CardTitle>
-                        <CardDescription>
-                            This is a dry run report for a single pending bet from the <strong>`/api/debug-grading`</strong> route. No data was actually changed.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <pre className="text-xs bg-slate-900 p-4 rounded-md overflow-x-auto text-white max-h-[500px]">
-                            {gradingDebugResponse}
-                        </pre>
-                    </CardContent>
-                </Card>
-            )}
+
 
             {(isLoadingProps) && (
                  <div className="flex flex-col items-center justify-center gap-4 text-center h-64">

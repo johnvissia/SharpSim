@@ -94,6 +94,14 @@ service cloud.firestore {
       match /bets/{betId} {
         allow get, list, create, update, delete: if isOwner(userId);
       }
+
+      /**
+       * @description Controls access to a user's activity tracking data.
+       * @path /users/{userId}/activity/{activityId}
+       */
+      match /activity/{activityId} {
+        allow get, list, create, update, delete: if isOwner(userId);
+      }
     }
   }
 }

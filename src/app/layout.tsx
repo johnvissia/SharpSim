@@ -5,6 +5,7 @@ import { SiteLayout } from '@/components/layout/site-layout';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { BetSlipProvider } from '@/context/BetSlipContext';
 import { AppModeProvider } from '@/context/AppModeContext';
+import { ActivityTracker } from '@/components/analytics/ActivityTracker';
 
 export const metadata: Metadata = {
   title: 'SharpSim: SportsEdge Trainer',
@@ -28,6 +29,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
         <FirebaseClientProvider>
+          <ActivityTracker />
           <AppModeProvider>
             <BetSlipProvider>
               <SiteLayout>{children}</SiteLayout>

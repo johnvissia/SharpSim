@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
 import { useAppMode } from '@/context/AppModeContext';
 import { signOut } from 'firebase/auth';
@@ -22,7 +23,18 @@ import {
   Zap,
   Wallet,
   Gamepad2,
+  Settings,
+  User as UserIcon,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -45,6 +57,15 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const firestore = useFirestore();
   const pathname = usePathname();
+  const router = useRouter();
+
+  const isPublicPath = pathname === '/' || pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
+
+  useEffect(() => {
+    if (!isUserLoading && !user && !isPublicPath) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, isPublicPath, router]);
 
   const userProfileRef = useMemoFirebase(
     () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
@@ -58,7 +79,19 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
     return navItems.find(item => item.href === `/${segment}`)?.id ?? '';
   };
   const activeId = getActiveId();
-  const showNav = pathname !== '/';
+  const showNav = !isPublicPath;
+
+  let content = children;
+
+  if (isUserLoading) {
+    content = (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  } else if (!user && !isPublicPath) {
+    content = null;
+  }
 
   return (
     <div className={cn(
@@ -186,15 +219,35 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
                 {isUserLoading ? (
                   <Skeleton className="h-8 w-20 rounded-lg" />
                 ) : user ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => signOut(auth)}
-                    className="text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg h-8 px-3 text-[13px]"
-                  >
-                    <LogOut className="h-3.5 w-3.5 mr-1.5" />
-                    Logout
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="relative h-8 w-8 rounded-full border border-slate-700/50 hover:bg-slate-800">
+                        <Avatar className="h-7 w-7">
+                          {user.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || 'User'} />}
+                          <AvatarFallback className="bg-slate-800 text-slate-300">
+                            <UserIcon className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56 mt-1 border-slate-800/80 bg-slate-950/95 backdrop-blur-xl text-slate-200 shadow-xl" align="end" forceMount>
+                      <DropdownMenuLabel className="font-normal">
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-medium leading-none text-slate-100">{user.isAnonymous ? "Anonymous User" : user.displayName || 'User'}</p>
+                          {user.email && <p className="text-xs leading-none text-slate-400">{user.email}</p>}
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator className="bg-slate-800/80" />
+                      <DropdownMenuItem className="cursor-pointer hover:bg-slate-800/80 focus:bg-slate-800/80 text-slate-300" onClick={() => router.push('/settings')}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Settings</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="cursor-pointer hover:bg-slate-800/80 focus:bg-slate-800/80 text-rose-400 focus:text-rose-400" onClick={() => signOut(auth)}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Log out</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 ) : (
                   <Button
                     asChild
@@ -218,7 +271,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
       )}
-      <main className="mx-auto max-w-[1400px] px-6 py-6">{children}</main>
+      <main className="mx-auto max-w-[1400px] px-6 py-6">{content}</main>
     </div>
   );
 }

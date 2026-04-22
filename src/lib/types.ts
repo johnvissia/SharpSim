@@ -80,6 +80,19 @@ export interface ParlayLeg {
   line?: number;
 }
 
+export interface BettingPreferences {
+  sports: Record<string, number>;
+  betTypes: Record<string, number>;
+  teams: Record<string, number>;
+  players: Record<string, number>;
+  conferences: Record<string, number>;
+  performance: {
+    wins: number;
+    losses: number;
+    pushes: number;
+  };
+}
+
 export interface UserProfile {
   uid: string;
   isAnonymous: boolean;
@@ -87,6 +100,7 @@ export interface UserProfile {
   createdAt: any; // Firestore ServerTimestamp
   lastCoinCollection?: string; // ISO 8601 string
   favoriteTeams?: string[];
+  preferences?: BettingPreferences;
 }
 
 export interface UserBet {

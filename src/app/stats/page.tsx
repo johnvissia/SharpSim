@@ -1,10 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import { collection } from 'firebase/firestore';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { UserBet, SportName } from '@/lib/types';
+import type { UserBet, SportName, UserProfile } from '@/lib/types';
 import { PerformanceChart } from '@/components/dashboard/PerformanceChart';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -18,6 +18,12 @@ import {
     Activity
 } from 'lucide-react';
 import { sportIconMap } from '@/lib/team-logos';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 type BreakdownStats = {
     wins: number;
@@ -40,7 +46,13 @@ export default function StatsPage() {
 
     const { data: bets, isLoading: isLoadingBets } = useCollection<UserBet>(betsQuery);
 
-    const loading = isUserLoading || isLoadingBets;
+    const userProfileRef = useMemoFirebase(
+        () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
+        [user, firestore]
+    );
+    const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+    const loading = isUserLoading || isLoadingBets || isProfileLoading;
 
     const stats = useMemo(() => {
         const initialBreakdownStats = (): BreakdownStats => ({
@@ -183,6 +195,21 @@ export default function StatsPage() {
         });
     }, [stats.breakdown]);
 
+    const sortedPreferences = useMemo(() => {
+        if (!userProfile?.preferences) return null;
+        const p = userProfile.preferences;
+        const sortRecord = (record: Record<string, number> = {}) => 
+            Object.entries(record).sort((a, b) => b[1] - a[1]).slice(0, 5); // top 5
+        
+        return {
+            sports: sortRecord(p.sports),
+            betTypes: sortRecord(p.betTypes),
+            teams: sortRecord(p.teams),
+            players: sortRecord(p.players),
+            conferences: sortRecord(p.conferences),
+        };
+    }, [userProfile]);
+
 
     if (loading) {
         return (
@@ -262,43 +289,84 @@ export default function StatsPage() {
                     </div>
                 </div>
 
-                {/* Side Card: Quick Insights */}
+                {/* Side Card: Betting Habits */}
                 <div className="bg-slate-900/50 rounded-xl overflow-hidden flex flex-col border border-slate-800">
                     <div className="p-6 border-b border-slate-800">
-                        <h2 className="text-lg font-bold tracking-tight">Ledger Insights</h2>
+                        <h2 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                            <Lightbulb className="w-5 h-5 text-brand-400" />
+                            Your Betting Habits
+                        </h2>
                     </div>
-                    <div className="flex-1 p-6 space-y-6">
-                        <div className="flex gap-4">
-                            <div className="w-10 h-10 rounded bg-brand-500/10 flex items-center justify-center text-brand-400 shrink-0">
-                                <Lightbulb className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-foreground mb-1">High Volatility Detected</p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">NBA parlays have shown a 22% variance increase this week. Consider reducing stake size.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className="w-10 h-10 rounded bg-brand-500/10 flex items-center justify-center text-brand-400 shrink-0">
-                                <Verified className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-foreground mb-1">System Proficiency</p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">Your MLB Underdog strategy is operating at +14.2% ROI over 40 units.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className="w-10 h-10 rounded bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0">
-                                <AlertTriangle className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-foreground mb-1">Exposure Alert</p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">65% of current bankroll is allocated to NHL outcomes tonight.</p>
-                            </div>
-                        </div>
-                    </div>
-                    {/* Placeholder action btn */}
-                    <div className="p-4 bg-slate-900/80 mt-auto border-t border-slate-800">
-                        <button className="w-full py-2 text-xs font-black uppercase text-brand-400 border border-brand-400/20 rounded hover:bg-brand-400 hover:text-white transition-all">View All Alerts</button>
+                    <div className="flex-1 p-6 overflow-y-auto max-h-[450px]">
+                        {!sortedPreferences ? (
+                            <p className="text-sm text-slate-500">No betting history found.</p>
+                        ) : (
+                            <Accordion type="multiple" defaultValue={["teams"]} className="w-full">
+                                {sortedPreferences.teams.length > 0 && (
+                                    <AccordionItem value="teams" className="border-slate-800">
+                                        <AccordionTrigger className="text-[10px] font-black uppercase text-slate-500 tracking-widest hover:text-slate-300 py-3">Most Bet Teams</AccordionTrigger>
+                                        <AccordionContent>
+                                            <div className="space-y-2 pt-2 pb-2">
+                                                {sortedPreferences.teams.map(([team, count]) => (
+                                                    <div key={team} className="flex justify-between items-center text-sm p-2 rounded-lg bg-slate-800/30 border border-slate-800/50 hover:bg-slate-800/60 transition-colors">
+                                                        <span className="font-semibold text-slate-200">{team}</span>
+                                                        <span className="text-brand-400 font-bold bg-brand-500/10 px-2 py-0.5 rounded text-xs">{count} bets</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                )}
+                                
+                                {sortedPreferences.players.length > 0 && (
+                                    <AccordionItem value="players" className="border-slate-800">
+                                        <AccordionTrigger className="text-[10px] font-black uppercase text-slate-500 tracking-widest hover:text-slate-300 py-3">Favorite Players</AccordionTrigger>
+                                        <AccordionContent>
+                                            <div className="space-y-2 pt-2 pb-2">
+                                                {sortedPreferences.players.map(([player, count]) => (
+                                                    <div key={player} className="flex justify-between items-center text-sm p-2 rounded-lg bg-slate-800/30 border border-slate-800/50 hover:bg-slate-800/60 transition-colors">
+                                                        <span className="font-semibold text-slate-200">{player}</span>
+                                                        <span className="text-blue-400 font-bold bg-blue-500/10 px-2 py-0.5 rounded text-xs">{count} bets</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                )}
+
+                                {sortedPreferences.betTypes.length > 0 && (
+                                    <AccordionItem value="betTypes" className="border-slate-800">
+                                        <AccordionTrigger className="text-[10px] font-black uppercase text-slate-500 tracking-widest hover:text-slate-300 py-3">Preferred Markets</AccordionTrigger>
+                                        <AccordionContent>
+                                            <div className="space-y-2 pt-2 pb-2">
+                                                {sortedPreferences.betTypes.map(([type, count]) => (
+                                                    <div key={type} className="flex justify-between items-center text-sm p-2 rounded-lg bg-slate-800/30 border border-slate-800/50 hover:bg-slate-800/60 transition-colors">
+                                                        <span className="font-semibold text-slate-200 capitalize">{type.replace('_', ' ')}</span>
+                                                        <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded text-xs">{count} bets</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                )}
+                                
+                                {sortedPreferences.conferences.length > 0 && (
+                                    <AccordionItem value="conferences" className="border-slate-800 border-b-0">
+                                        <AccordionTrigger className="text-[10px] font-black uppercase text-slate-500 tracking-widest hover:text-slate-300 py-3">Top Conferences</AccordionTrigger>
+                                        <AccordionContent>
+                                            <div className="space-y-2 pt-2 pb-2">
+                                                {sortedPreferences.conferences.map(([conf, count]) => (
+                                                    <div key={conf} className="flex justify-between items-center text-sm p-2 rounded-lg bg-slate-800/30 border border-slate-800/50 hover:bg-slate-800/60 transition-colors">
+                                                        <span className="font-semibold text-slate-200">{conf}</span>
+                                                        <span className="text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded text-xs">{count} bets</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                )}
+                            </Accordion>
+                        )}
                     </div>
                 </div>
             </section>
