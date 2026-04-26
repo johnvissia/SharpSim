@@ -46,6 +46,7 @@ const navItems = [
   { href: '/stats',      id: 'stats',     label: 'Stats',      icon: BarChart3 },
   { href: '/data',       id: 'data',      label: 'Data',       icon: Database },
   { href: '/model',      id: 'model',     label: 'Model',      icon: BrainCircuit },
+  { href: '/player-props',id: 'player-props', label: 'Prop Insights', icon: UserIcon },
   { href: '/accuracy',   id: 'accuracy',  label: 'Accuracy',   icon: Target },
   { href: '/store',      id: 'store',     label: 'Store',      icon: ShoppingCart },
   { href: '/coaching',   id: 'coaching',  label: 'Coaching',   icon: GraduationCap },

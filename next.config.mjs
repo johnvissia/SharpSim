@@ -9,7 +9,7 @@ const nextConfig = {
     ],
   },
   experimental: {
-    serverExternalPackages: ['genkit', 'express'],
+    serverExternalPackages: ['genkit', 'express', 'firebase-admin'],
   },
 };
 

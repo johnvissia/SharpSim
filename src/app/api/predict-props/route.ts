@@ -6,10 +6,10 @@ export async function GET(request: NextRequest) {
         const propsSnapshot = await db.collection('player_props').get();
         const allProps = propsSnapshot.docs.map(doc => doc.data());
 
-        // Filter for Detroit Pistons only to save quota
-        const activeProps = allProps.filter(p => p.matchup.includes('Detroit Pistons'));
+        // Use all props
+        const activeProps = allProps;
 
-        console.log(`[PREDICT PROPS API] Analyzing ${activeProps.length} Pistons props...`);
+        console.log(`[PREDICT PROPS API] Analyzing ${activeProps.length} props...`);
 
         const predictions = [];
 
@@ -52,7 +52,11 @@ export async function GET(request: NextRequest) {
                 edge: parseFloat(edge.toFixed(1)),
                 recommendation: edge > 10 ? 'Over' : (edge < -10 ? 'Under' : 'No Play'),
                 confidence: Math.min(Math.abs(edge) * 2, 100), // Scaled confidence
-                sampleSize: games.length
+                sampleSize: games.length,
+                recentGames: games.map(g => ({
+                    date: g.gameDate,
+                    points: g.stats.points
+                })).reverse() // Reverse so oldest is first for the chart (left to right)
             });
         }
 

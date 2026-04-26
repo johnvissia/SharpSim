@@ -192,5 +192,43 @@ export interface PlayerProp {
   market: string;
   line: number;
   overOdds: number;
-  underOdds: number;
+// Coaching & Analytics Types
+export interface PerformanceSplit {
+  category: string;
+  label: string;
+  roi: number;
+  winRate: number;
+  totalBets: number;
+  profit: number;
+}
+
+export interface CoachingAnalysis {
+  summary: string;
+  splits: {
+    betType: PerformanceSplit[];
+    sport: PerformanceSplit[];
+    tendency: PerformanceSplit[]; // Favorite vs Underdog
+  };
+  modelAlignment: {
+    grade: 'A' | 'B' | 'C' | 'D' | 'F';
+    alignmentPercentage: number;
+    alternativeBankroll: number; // What they would have if they followed the model
+    actualBankrollDelta: number;
+  };
+  bankrollDiscipline: {
+    grade: 'A' | 'B' | 'C' | 'D' | 'F';
+    isLossChasing: boolean;
+    sizingConsistencyScore: number; // 0-100
+  };
+  clvTracking: {
+    beatTheLineRate: number;
+    averageEdge: number;
+  };
+  biasAlerts: {
+    teamName: string;
+    winRate: number;
+    description: string;
+    severity: 'low' | 'medium' | 'high';
+  }[];
+  improvementTips: string[];
 }

@@ -8,8 +8,7 @@
  * - CalculateExpectedValueOutput - The return type for the calculateExpectedValue function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'zod';
 
 const CalculateExpectedValueInputSchema = z.object({
   sportsbookLine: z.number().describe('The betting line from a specific sportsbook.'),
@@ -40,53 +39,34 @@ export type CalculateExpectedValueOutput = z.infer<
   typeof CalculateExpectedValueOutputSchema
 >;
 
+/**
+ * Calculates the expected value of a bet without LLM/Genkit overhead.
+ */
 export async function calculateExpectedValue(
   input: CalculateExpectedValueInput
 ): Promise<CalculateExpectedValueOutput> {
-  return calculateExpectedValueFlow(input);
+  const { sportsbookLine, marketConsensus } = input;
+  
+  // Simple mathematical EV calculation (difference between lines)
+  const expectedValue = sportsbookLine - marketConsensus;
+  
+  const percentageDifference = marketConsensus !== 0 
+    ? ((sportsbookLine - marketConsensus) / Math.abs(marketConsensus)) * 100 
+    : 0;
+    
+  const hasValueEdge = Math.abs(percentageDifference) > 5;
+
+  let valueEdgeDescription = '';
+  if (hasValueEdge) {
+    valueEdgeDescription = `Value Edge: The sportsbook line is ${percentageDifference.toFixed(2)}% better than the market consensus.`;
+  } else {
+    valueEdgeDescription = 'No significant value edge detected.';
+  }
+
+  return {
+    expectedValue,
+    hasValueEdge,
+    valueEdgeDescription,
+  };
 }
 
-const prompt = ai.definePrompt({
-  name: 'calculateExpectedValuePrompt',
-  input: {schema: CalculateExpectedValueInputSchema},
-  output: {schema: CalculateExpectedValueOutputSchema},
-  prompt: `You are an expert sports betting analyst. You will calculate the expected value (EV) of a betting line from a sportsbook, compared to the market consensus.
-
-Calculate the expected value of the bet based on the following information:
-
-Sportsbook Line: {{{sportsbookLine}}}
-Market Consensus: {{{marketConsensus}}}
-
-Determine if the sportsbook line has a significant value edge compared to the market consensus. A value edge exists if the sportsbook line is significantly better (higher if positive, lower if negative) than the market consensus. If the difference is greater than 5%, highlight it as a Value Edge.
-
-Output the expected value, a boolean indicating whether a value edge exists, and a description of the value edge (including the percentage difference).`,
-});
-
-const calculateExpectedValueFlow = ai.defineFlow(
-  {
-    name: 'calculateExpectedValueFlow',
-    inputSchema: CalculateExpectedValueInputSchema,
-    outputSchema: CalculateExpectedValueOutputSchema,
-  },
-  async input => {
-    const {sportsbookLine, marketConsensus} = input;
-    const expectedValue = sportsbookLine - marketConsensus;
-    const percentageDifference = ((sportsbookLine - marketConsensus) / marketConsensus) * 100;
-    const hasValueEdge = Math.abs(percentageDifference) > 5;
-
-    let valueEdgeDescription = '';
-    if (hasValueEdge) {
-      valueEdgeDescription = `Value Edge: The sportsbook line is ${percentageDifference.toFixed(2)}% better than the market consensus.`;
-    } else {
-      valueEdgeDescription = 'No significant value edge detected.';
-    }
-
-    const output: CalculateExpectedValueOutput = {
-      expectedValue,
-      hasValueEdge,
-      valueEdgeDescription,
-    };
-
-    return output;
-  }
-);
