@@ -6,12 +6,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
 import { syncGameLinesAndScores, syncNBAPlayerStats } from '@/lib/api';
-import { fetchEspnSchedule } from '@/lib/espn';
+import { fetchEspnSchedule, fetchAllTeamLogos } from '@/lib/espn';
 import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader, RefreshCw, Users, Activity } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { BetSlip } from '@/components/dashboard/BetSlip';
 import { GameDetailModal } from '@/components/dashboard/GameDetailModal';
 import { sportNameMapping } from '@/lib/sports';
 import { getConference } from '@/lib/ncaa-conferences';
@@ -166,33 +165,15 @@ export default function DashboardPage() {
     }, [user, isUserLoading, router]);
 
     useEffect(() => {
-        const fetchTeamLogos = async () => {
-            const sports = [
-                'basketball/nba', 'football/nfl', 'hockey/nhl', 'football/college-football', 
-                'basketball/mens-college-basketball', 'baseball/mlb',
-                'soccer/eng.1', 'soccer/usa.1', 'soccer/uefa.champions', 'soccer/mex.1'
-            ];
-            const newLogoMap = new Map<string, string>();
-            const promises = sports.map(async (sport) => {
-                try {
-                    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/teams?limit=1000`);
-                    if (!res.ok) return;
-                    const data = await res.json();
-                    const teams = data?.sports?.[0]?.leagues?.[0]?.teams;
-                    teams?.forEach((t: any) => {
-                        const teamData = t.team;
-                        if (teamData.displayName && teamData.logos && teamData.logos.length > 0) {
-                            newLogoMap.set(teamData.displayName, teamData.logos[0].href);
-                        }
-                    });
-                } catch (e) {
-                    console.error(`Failed to fetch teams for ${sport}`, e);
-                }
-            });
-            await Promise.all(promises);
-            setTeamLogos(newLogoMap);
+        const loadLogos = async () => {
+            try {
+                const logosRecord = await fetchAllTeamLogos();
+                setTeamLogos(new Map(Object.entries(logosRecord)));
+            } catch (e) {
+                console.error('Failed to load logos:', e);
+            }
         };
-        fetchTeamLogos();
+        loadLogos();
     }, []);
 
     const handleSyncLines = async () => {
@@ -569,14 +550,7 @@ export default function DashboardPage() {
                             ))}
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={handleUpdateInjuries}
-                                disabled={isUpdatingInjuries}
-                                className="flex items-center gap-2 bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-rose-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Activity className={`w-4 h-4 ${isUpdatingInjuries ? 'animate-pulse' : ''}`} />
-                                {isUpdatingInjuries ? 'Updating...' : 'Update Injuries'}
-                            </button>
+
                             <button
                                 onClick={handleSyncLines}
                                 disabled={isSyncingLines}
@@ -716,7 +690,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
             )}
-            <BetSlip />
             <GameDetailModal game={selectedGame} isOpen={!!selectedGame} onClose={() => setSelectedGame(null)} />
         </>
     );

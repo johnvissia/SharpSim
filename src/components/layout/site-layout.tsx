@@ -25,6 +25,7 @@ import {
   Gamepad2,
   Settings,
   User as UserIcon,
+  History,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -39,17 +40,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { BetSlip } from '@/components/dashboard/BetSlip';
 
 const navItems = [
-  { href: '/dashboard',  id: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard },
-  { href: '/my-picks',   id: 'picks',     label: 'Picks',      icon: Ticket },
-  { href: '/stats',      id: 'stats',     label: 'Stats',      icon: BarChart3 },
-  { href: '/data',       id: 'data',      label: 'Data',       icon: Database },
-  { href: '/model',      id: 'model',     label: 'Model',      icon: BrainCircuit },
+  { href: '/dashboard',   id: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
+  { href: '/my-picks',    id: 'picks',        label: 'Picks',         icon: Ticket },
+  { href: '/stats',       id: 'stats',        label: 'Stats',         icon: BarChart3 },
+  { href: '/data',        id: 'data',         label: 'Data',          icon: Database },
+  { href: '/model',       id: 'model',        label: 'Model',         icon: BrainCircuit },
+  { href: '/prop-hub',    id: 'prop-hub',     label: 'Prop Hub',      icon: Target },
   { href: '/player-props',id: 'player-props', label: 'Prop Insights', icon: UserIcon },
-  { href: '/accuracy',   id: 'accuracy',  label: 'Accuracy',   icon: Target },
-  { href: '/store',      id: 'store',     label: 'Store',      icon: ShoppingCart },
-  { href: '/coaching',   id: 'coaching',  label: 'Coaching',   icon: GraduationCap },
+  { href: '/accuracy',    id: 'accuracy',     label: 'Accuracy',      icon: History },
+  { href: '/store',       id: 'store',        label: 'Store',         icon: ShoppingCart },
+  { href: '/coaching',    id: 'coaching',     label: 'Coaching',      icon: GraduationCap },
 ];
 
 export function SiteLayout({ children }: { children: React.ReactNode }) {
@@ -63,8 +66,12 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const isPublicPath = pathname === '/' || pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
 
   useEffect(() => {
-    if (!isUserLoading && !user && !isPublicPath) {
-      router.push('/login');
+    if (!isUserLoading) {
+      if (!user && !isPublicPath) {
+        router.push('/login');
+      } else if (user && isPublicPath) {
+        router.push('/dashboard');
+      }
     }
   }, [user, isUserLoading, isPublicPath, router]);
 
@@ -273,6 +280,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
         </header>
       )}
       <main className="mx-auto max-w-[1400px] px-6 py-6">{content}</main>
+      {showNav && <BetSlip />}
     </div>
   );
 }

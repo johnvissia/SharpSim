@@ -194,7 +194,6 @@ const mockGames: Game[] = [
     }),
     get odds() { return getBestOdds(this.allOdds) }
   },
-  },
 ];
 
 

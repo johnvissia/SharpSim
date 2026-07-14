@@ -29,7 +29,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutGrid },
   { href: '/model', label: 'Model', icon: Zap },
   { href: '/accuracy', label: 'Accuracy', icon: History },
-  { href: '/props', label: 'Prop Hub', icon: Target },
+  { href: '/prop-hub', label: 'Prop Hub', icon: Target },
   { href: '/player-props', label: 'Prop Insights', icon: UserRound },
   { href: '/my-picks', label: 'My Picks', icon: Ticket },
   { href: '/stats', label: 'Stats', icon: BarChart3 },

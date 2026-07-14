@@ -147,11 +147,11 @@
 .ball-path {
   stroke-dasharray: 250;
   stroke-dashoffset: 250;
-  animation: draw-line 3.5s ease-in-out forwards;
+  animation: draw-line 1.5s ease-in-out forwards;
 }
 
-.ball-2 .ball-path { animation-delay: 0.5s; }
-.ball-3 .ball-path { animation-delay: 1.0s; }
+.ball-2 .ball-path { animation-delay: 0.25s; }
+.ball-3 .ball-path { animation-delay: 0.5s; }
 
 @keyframes draw-line {
   to {
@@ -167,7 +167,7 @@
   fill: transparent;
   stroke-dasharray: 950;
   stroke-dashoffset: 950;
-  animation: write-signature 1.5s ease-in-out forwards 4.8s;
+  animation: write-signature 1.0s ease-in-out forwards 2.0s;
 }
 
 @keyframes write-signature {
@@ -191,8 +191,8 @@
   white-space: nowrap;
   width: 0;
   animation:
-    typing 1s steps(18, end) 6.5s forwards,
-    blink-caret .75s step-end infinite 6.5s;
+    typing 1s steps(18, end) 3.0s forwards,
+    blink-caret .75s step-end infinite 3.0s;
 }
 
 @keyframes typing {
@@ -210,7 +210,7 @@
     bottom: -100px; /* Start off screen */
     left: 50%;
     transform: translateX(-50%);
-    animation: slide-up 0.75s ease-out forwards 8s;
+    animation: slide-up 0.5s ease-out forwards 4.0s;
 }
 
 @keyframes slide-up {

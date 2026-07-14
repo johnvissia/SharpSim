@@ -101,6 +101,8 @@ export interface UserProfile {
   lastCoinCollection?: string; // ISO 8601 string
   favoriteTeams?: string[];
   preferences?: BettingPreferences;
+  isPro?: boolean;
+  membershipTier?: string;
 }
 
 export interface UserBet {
@@ -190,8 +192,13 @@ export interface PlayerProp {
   matchup: string;
   commenceTime: string;
   market: string;
+  marketKey: string;
+  sport: SportName;
   line: number;
   overOdds: number;
+  underOdds: number;
+}
+
 // Coaching & Analytics Types
 export interface PerformanceSplit {
   category: string;
@@ -223,6 +230,7 @@ export interface CoachingAnalysis {
   clvTracking: {
     beatTheLineRate: number;
     averageEdge: number;
+    dailyTrend: { day: string; rate: number }[];
   };
   biasAlerts: {
     teamName: string;

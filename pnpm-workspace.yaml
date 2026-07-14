@@ -2,4 +2,6 @@ allowBuilds:
   '@firebase/util': false
   esbuild: false
   protobufjs: false
+  puppeteer: set this to true or false
   sharp: false
+  tesseract.js: set this to true or false

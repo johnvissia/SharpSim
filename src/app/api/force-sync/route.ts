@@ -1,12 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { sportKeyMapping } from '@/lib/sports';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // Allow 5 minutes for syncing odds from 8 sports sequentially
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
+        // Auth check (if CRON_SECRET is configured)
+        const authHeader = request.headers.get('Authorization');
+        const cronSecret = process.env.CRON_SECRET;
+        if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
         if (!API_KEY) throw new Error("Missing odds API key");
 

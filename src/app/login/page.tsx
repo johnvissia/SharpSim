@@ -53,13 +53,11 @@ export default function LoginPage() {
           title: 'Bypass Successful',
           description: 'Logged in as guest.',
         });
-        router.push('/dashboard');
       } catch (error: any) {
         if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials') {
           try {
              await createUserWithEmailAndPassword(auth, 'john@sharpsim.com', 'john123!');
              toast({ title: 'Bypass Created', description: 'Bypass account created and logged in.' });
-             router.push('/dashboard');
              return;
           } catch (createError: any) {
              toast({ variant: 'destructive', title: 'Bypass Failed', description: createError.message });
@@ -88,7 +86,6 @@ export default function LoginPage() {
         title: 'Login Successful',
         description: 'Welcome back!',
       });
-      router.push('/dashboard');
     } catch (error: any) {
       console.error(error);
       toast({
@@ -110,7 +107,6 @@ export default function LoginPage() {
         title: 'Login Successful',
         description: 'Welcome back!',
       });
-      router.push('/dashboard');
     } catch (error: any) {
       console.error(error);
       if (error.code === 'auth/popup-closed-by-user') return;

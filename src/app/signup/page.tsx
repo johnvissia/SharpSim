@@ -51,7 +51,6 @@ export default function SignUpPage() {
         title: 'Account Created',
         description: 'You have been successfully signed up.',
       });
-      router.push('/dashboard');
     } catch (error: any) {
       console.error(error);
       toast({
@@ -73,7 +72,6 @@ export default function SignUpPage() {
         title: 'Account Created',
         description: 'You have been successfully signed up.',
       });
-      router.push('/dashboard');
     } catch (error: any) {
       console.error(error);
       if (error.code === 'auth/popup-closed-by-user') return;

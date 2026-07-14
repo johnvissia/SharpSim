@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 export default function MyPicksPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<Date>();
 
 
@@ -35,7 +36,7 @@ export default function MyPicksPage() {
 
   const betsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    return query(collection(firestore, 'users', user.uid, 'bets'), orderBy('placedAt', 'desc'));
+    return query(collection(firestore, 'users', user.uid, 'bets'));
   }, [user, firestore]);
 
   const { data: bets, isLoading: isLoadingBets } = useCollection<UserBet>(betsQuery);

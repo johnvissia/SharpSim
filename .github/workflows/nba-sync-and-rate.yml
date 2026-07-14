@@ -1,9 +1,10 @@
 name: NBA Daily Sync & Ratings
 
 on:
-  schedule:
-    # 6:00 AM UTC (1:00 AM EST / 2:00 AM EDT)
-    - cron: '0 6 * * *'
+  # Temporarily disabled while testing locally
+  # schedule:
+  #   # 6:00 AM UTC (1:00 AM EST / 2:00 AM EDT)
+  #   - cron: '0 6 * * *'
   workflow_dispatch:
 
 jobs:

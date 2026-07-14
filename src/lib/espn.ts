@@ -238,3 +238,30 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
         return [];
     }
 }
+
+export async function fetchAllTeamLogos(): Promise<Record<string, string>> {
+    const sports = [
+        'basketball/nba', 'football/nfl', 'hockey/nhl', 'football/college-football', 
+        'basketball/mens-college-basketball', 'baseball/mlb',
+        'soccer/eng.1', 'soccer/usa.1', 'soccer/uefa.champions', 'soccer/mex.1'
+    ];
+    const newLogoMap: Record<string, string> = {};
+    const promises = sports.map(async (sport) => {
+        try {
+            const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/teams?limit=1000`, { cache: 'force-cache' });
+            if (!res.ok) return;
+            const data = await res.json();
+            const teams = data?.sports?.[0]?.leagues?.[0]?.teams;
+            teams?.forEach((t: any) => {
+                const teamData = t.team;
+                if (teamData.displayName && teamData.logos && teamData.logos.length > 0) {
+                    newLogoMap[teamData.displayName] = teamData.logos[0].href;
+                }
+            });
+        } catch (e) {
+            console.error(`Failed to fetch teams for ${sport}`, e);
+        }
+    });
+    await Promise.all(promises);
+    return newLogoMap;
+}

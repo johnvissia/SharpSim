@@ -95,9 +95,19 @@ export default function PlayerPropsPage() {
           ))}
         </div>
 
-        {actionableProps.length === 0 && !loading && (
+        {predictions.length === 0 && !loading && (
           <div className="bg-slate-900/30 border border-dashed border-slate-800 rounded-2xl p-12 flex flex-col items-center gap-4 text-center">
             <AlertCircle className="w-10 h-10 text-slate-700" />
+            <div>
+              <h3 className="text-slate-400 font-bold uppercase italic">No Active Games</h3>
+              <p className="text-sm text-slate-600">There are no props available, or all games have already started.</p>
+            </div>
+          </div>
+        )}
+
+        {predictions.length > 0 && actionableProps.length === 0 && !loading && (
+          <div className="bg-slate-900/30 border border-dashed border-slate-800 rounded-2xl p-12 flex flex-col items-center gap-4 text-center">
+            <Target className="w-10 h-10 text-slate-700" />
             <div>
               <h3 className="text-slate-400 font-bold uppercase italic">No Actionable Props</h3>
               <p className="text-sm text-slate-600">No edges found against the market currently.</p>

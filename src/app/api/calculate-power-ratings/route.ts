@@ -1,5 +1,5 @@
 // src/app/api/calculate-power-ratings/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import {
   applyBayesianShrinkage,
@@ -457,12 +457,19 @@ function calculateKellyStake(coverProb: number, decimalOdds: number, useConserva
 // MAIN CALCULATION FUNCTION
 // ============================================================================
 
-export async function GET() {
-  return POST();
+export async function GET(request: NextRequest) {
+  return POST(request);
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // Auth check (if CRON_SECRET is configured)
+    const authHeader = request.headers.get('Authorization');
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     console.log('🔢 Starting Complete Power Ratings Calculation...');
 
     // Step 1: Fetch all teams from Firestore

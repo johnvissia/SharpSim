@@ -136,18 +136,19 @@ export default function DataPage() {
     }
   };
 
-  const handleSyncProps = async () => {
-    setLoading('sync-props');
+  const handleSyncProps = async (sport: 'NBA' | 'MLB') => {
+    const loadingKey = sport === 'NBA' ? 'sync-props-nba' : 'sync-props-mlb';
+    setLoading(loadingKey);
     try {
-      toast({ title: 'Syncing Props', description: 'Fetching player points lines from Odds API...' });
-      const res = await fetch('/api/sync-player-props', { method: 'POST' });
+      toast({ title: `Syncing ${sport} Props`, description: `Fetching ${sport} player props from Odds API...` });
+      const res = await fetch(`/api/sync-player-props?sport=${sport.toLowerCase()}`, { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Prop sync failed');
+      if (!res.ok) throw new Error(data.error || `${sport} Prop sync failed`);
 
-      setResults(prev => ({ ...prev, 'sync-props': data }));
-      toast({ title: 'Prop Sync Complete', description: `Successfully synced ${data.count} player props.` });
+      setResults(prev => ({ ...prev, [loadingKey]: data }));
+      toast({ title: `${sport} Prop Sync Complete`, description: `Successfully synced ${data.count} ${sport} player props.` });
     } catch (error: any) {
-      toast({ title: 'Prop Sync Failed', description: error.message, variant: 'destructive' });
+      toast({ title: `${sport} Prop Sync Failed`, description: error.message, variant: 'destructive' });
     } finally {
       setLoading(null);
     }
@@ -279,6 +280,15 @@ export default function DataPage() {
                           <th className="px-2 py-2 text-right">Rest</th>
                           <th className="px-2 py-2 text-right">Pace</th>
                         </tr>
+                      ) : sport === 'MLB' ? (
+                        <tr>
+                          <th className="px-3 py-2">Team</th>
+                          <th className="px-2 py-2 text-right">Rating</th>
+                          <th className="px-2 py-2 text-right">SRS</th>
+                          <th className="px-2 py-2 text-right">Wins</th>
+                          <th className="px-2 py-2 text-right">Losses</th>
+                          <th className="px-2 py-2 text-right">Avg Margin</th>
+                        </tr>
                       ) : (
                         <tr>
                           <th className="px-3 py-2">Team</th>
@@ -306,6 +316,14 @@ export default function DataPage() {
                               <td className={`px-2 py-2 text-right ${parseFloat(team.injuries) < 0 ? 'text-red-400' : 'text-slate-500'}`}>{team.injuries}</td>
                               <td className={`px-2 py-2 text-right ${parseFloat(team.rest) < 0 ? 'text-amber-400' : 'text-slate-500'}`}>{team.rest}</td>
                               <td className="px-2 py-2 text-right text-slate-500">{team.pace}</td>
+                            </>
+                          ) : sport === 'MLB' ? (
+                            <>
+                              <td className="px-2 py-2 text-right font-black text-indigo-400">{team.rating}</td>
+                              <td className="px-2 py-2 text-right text-slate-400">{team.srs}</td>
+                              <td className="px-2 py-2 text-right text-slate-400">{team.wins}</td>
+                              <td className="px-2 py-2 text-right text-slate-400">{team.losses}</td>
+                              <td className="px-2 py-2 text-right text-slate-500">{team.avgMargin}</td>
                             </>
                           ) : (
                             <>
@@ -389,30 +407,51 @@ export default function DataPage() {
               </div>
               <div>
                 <CardTitle>Player Prop Engine</CardTitle>
-                <CardDescription>Market lines for NBA player points totals.</CardDescription>
+                <CardDescription>Market lines for NBA player points and MLB props (Strikeouts, Hits, etc.)</CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="flex items-center justify-between">
-            <div className="text-sm text-slate-400">
-              Fetch active over/under lines for tonight's NBA slate.
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-xl">
+              <div className="space-y-1">
+                <h4 className="font-bold text-white uppercase italic tracking-tight">NBA Player Props</h4>
+                <p className="text-xs text-slate-400">Fetch Points totals lines.</p>
+                {results['sync-props-nba'] && (
+                  <Badge variant="outline" className="mt-1 bg-green-500/10 text-green-400 border-green-500/20">
+                    ✓ {results['sync-props-nba'].count} NBA Props Synced
+                  </Badge>
+                )}
+              </div>
+              <Button
+                onClick={() => handleSyncProps('NBA')}
+                disabled={!!loading}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-black"
+              >
+                {loading === 'sync-props-nba' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                Sync NBA
+              </Button>
             </div>
-            <Button
-              onClick={handleSyncProps}
-              disabled={!!loading}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-black"
-            >
-              {loading === 'sync-props' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              Sync Player Props
-            </Button>
+
+            <div className="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-xl">
+              <div className="space-y-1">
+                <h4 className="font-bold text-white uppercase italic tracking-tight">MLB Player Props</h4>
+                <p className="text-xs text-slate-400">Fetch Strikeouts, Hits, Home Runs, etc.</p>
+                {results['sync-props-mlb'] && (
+                  <Badge variant="outline" className="mt-1 bg-green-500/10 text-green-400 border-green-500/20">
+                    ✓ {results['sync-props-mlb'].count} MLB Props Synced
+                  </Badge>
+                )}
+              </div>
+              <Button
+                onClick={() => handleSyncProps('MLB')}
+                disabled={!!loading}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-black"
+              >
+                {loading === 'sync-props-mlb' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                Sync MLB
+              </Button>
+            </div>
           </CardContent>
-          {results['sync-props'] && (
-            <CardContent className="pt-0">
-              <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/20">
-                ✓ {results['sync-props'].count} Props Synced
-              </Badge>
-            </CardContent>
-          )}
         </Card>
       </div>
 
