@@ -86,12 +86,17 @@ export default function ModelPage() {
           }).catch(e => console.error('[ModelPage] Auto-snapshot error:', e));
         }
 
+        const todayStr = new Date().toLocaleDateString('en-CA');
         const filteredGames = allGames.filter(g => {
           if (g.sport !== selectedSport) return false;
 
+          const gameDate = new Date(g.startTime);
+          const gameDateStr = gameDate.toLocaleDateString('en-CA');
+          if (gameDateStr !== todayStr && g.statusState !== 'in') return false;
+
           // Hide games that started more than 4 hours ago and are not live
           const now = new Date();
-          const gameTime = new Date(g.startTime).getTime();
+          const gameTime = gameDate.getTime();
           const staleCutoff = now.getTime() - (4 * 60 * 60 * 1000);
 
           if (g.statusState === 'post' && gameTime < staleCutoff) return false;
@@ -167,7 +172,20 @@ export default function ModelPage() {
             return Math.abs(zB) - Math.abs(zA);
           });
 
-        setRankedPredictions(validResults);
+        // Deduplicate so each team only appears once
+        const seenTeams = new Set<string>();
+        const uniquePredictions: PredictionResult[] = [];
+        for (const r of validResults) {
+          const home = r.game.homeTeam.name;
+          const away = r.game.awayTeam.name;
+          if (!seenTeams.has(home) && !seenTeams.has(away)) {
+            seenTeams.add(home);
+            seenTeams.add(away);
+            uniquePredictions.push(r);
+          }
+        }
+
+        setRankedPredictions(uniquePredictions);
         setStats({
           today: { w: 0, l: 0, u: 0, t: 0, wr: 0 } as any, // Placeholder until stats are fixed
           week: { wins: 12, losses: 7, units: 4.2, totalGames: 19, winRate: 63 }

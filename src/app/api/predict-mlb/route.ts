@@ -280,6 +280,18 @@ export async function GET(request: NextRequest) {
           away: parseFloat(expectedRunsAway.toFixed(1))
         },
         logicTrace
+      },
+      injuries: {
+        home: (homeStats.injuries || []).map((i: any) => ({
+          name: i.name,
+          status: i.status || 'Out',
+          impact: i.status || 'IL'
+        })),
+        away: (awayStats.injuries || []).map((i: any) => ({
+          name: i.name,
+          status: i.status || 'Out',
+          impact: i.status || 'IL'
+        }))
       }
     });
 

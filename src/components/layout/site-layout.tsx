@@ -69,11 +69,11 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
     if (!isUserLoading) {
       if (!user && !isPublicPath) {
         router.push('/login');
-      } else if (user && isPublicPath) {
+      } else if (user && isPublicPath && pathname !== '/') {
         router.push('/dashboard');
       }
     }
-  }, [user, isUserLoading, isPublicPath, router]);
+  }, [user, isUserLoading, isPublicPath, pathname, router]);
 
   const userProfileRef = useMemoFirebase(
     () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
