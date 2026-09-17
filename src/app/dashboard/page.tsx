@@ -252,6 +252,12 @@ export default function DashboardPage() {
     }, [firestore]);
     const { data: rankings, isLoading: isLoadingRankings } = useCollection<TeamRanking>(rankingsQuery);
 
+    const modelPredictionsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collection(firestore, 'model_predictions');
+    }, [firestore]);
+    const { data: rawModelPredictions } = useCollection<any>(modelPredictionsQuery);
+
     const pendingBetsQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
         return query(collection(firestore, 'users', user.uid, 'bets'), where('status', '==', 'pending'));
@@ -295,6 +301,18 @@ export default function DashboardPage() {
         const rankingsMap = new Map(rankings?.map(r => [r.teamName, { rank: r.rank, conference: r.conference }]) || []);
         const oddsGames = transformDailyGamesToGames(dailyGames, rankingsMap, teamLogos);
 
+        const predictionsMap = new Map<string, any>();
+        if (rawModelPredictions) {
+            rawModelPredictions.forEach((p: any) => {
+                if (p.gameId) predictionsMap.set(p.gameId, p);
+                const hName = normalizeTeamName(p.homeTeam || '');
+                const aName = normalizeTeamName(p.awayTeam || '');
+                if (hName && aName) {
+                    predictionsMap.set(`${p.sport}-${hName}-${aName}`, p);
+                }
+            });
+        }
+
         const finalGames = new Map<string, Game>();
 
         espnGames.forEach(espnGame => {
@@ -306,8 +324,16 @@ export default function DashboardPage() {
 
             const homeRankingInfo = rankingsMap.get(espnGame.homeTeam.name);
             const awayRankingInfo = rankingsMap.get(espnGame.awayTeam.name);
-            const enrichedEspnGame = {
+            const pred = predictionsMap.get(espnGame.id) || predictionsMap.get(`${espnGame.sport}-${homeName}-${awayName}`);
+
+            const enrichedEspnGame: Game = {
                 ...espnGame,
+                modelPrediction: pred ? {
+                    recommendedSide: pred.recommendedSide,
+                    projectedSpread: pred.projectedSpread,
+                    betSignal: pred.betSignal,
+                    zScore: pred.zScore
+                } : undefined,
                 homeTeam: {
                     ...espnGame.homeTeam,
                     rank: homeRankingInfo?.rank,
@@ -328,6 +354,7 @@ export default function DashboardPage() {
             const dateStr = new Date(oddsGame.startTime).toLocaleDateString('en-CA');
             const key = `${oddsGame.sport}-${homeName}-${awayName}-${dateStr}`;
             const existingGame = finalGames.get(key);
+            const pred = predictionsMap.get(oddsGame.id) || predictionsMap.get(`${oddsGame.sport}-${homeName}-${awayName}`);
 
             if (existingGame) {
                 finalGames.set(key, {
@@ -336,6 +363,12 @@ export default function DashboardPage() {
                     allOdds: oddsGame.allOdds,
                     id: existingGame.id,
                     oddsApiId: oddsGame.id,
+                    modelPrediction: existingGame.modelPrediction || (pred ? {
+                        recommendedSide: pred.recommendedSide,
+                        projectedSpread: pred.projectedSpread,
+                        betSignal: pred.betSignal,
+                        zScore: pred.zScore
+                    } : undefined)
                 });
             } else {
                 // For NCAAM, ESPN is the authoritative source for game schedules.
@@ -343,7 +376,17 @@ export default function DashboardPage() {
                 // data can contain stale or incorrect bracket matchups.
                 if (oddsGame.sport === 'NCAAM') return;
 
-                finalGames.set(key, { ...oddsGame, id: oddsGame.id, oddsApiId: oddsGame.id });
+                finalGames.set(key, {
+                    ...oddsGame,
+                    id: oddsGame.id,
+                    oddsApiId: oddsGame.id,
+                    modelPrediction: pred ? {
+                        recommendedSide: pred.recommendedSide,
+                        projectedSpread: pred.projectedSpread,
+                        betSignal: pred.betSignal,
+                        zScore: pred.zScore
+                    } : undefined
+                });
             }
         });
 

@@ -104,12 +104,12 @@ export function BetTicket({ bet }: { bet: UserBet }) {
 
   return (
     <Card className={cn(
-      "ticket transition-colors",
-      { 'bg-green-100 dark:bg-green-500/10': bet.status === 'won' },
-      { 'bg-red-100/50 dark:bg-red-500/10': bet.status === 'lost' }
+      "relative overflow-hidden transition-colors border-slate-800 bg-slate-900/90 shadow-xl rounded-2xl",
+      { 'bg-green-500/10 border-green-500/30': bet.status === 'won' },
+      { 'bg-red-500/10 border-red-500/30': bet.status === 'lost' }
     )}>
       <CardContent className="!p-0">
-        <div className="p-4 space-y-3">
+        <div className="p-5 space-y-3">
           {legs.map((leg, index) => {
             const getLegIconDetails = (status: ParlayLeg['status']) => {
               switch (status) {
@@ -135,12 +135,12 @@ export function BetTicket({ bet }: { bet: UserBet }) {
                   <div className="flex-grow min-w-0">
                     <div className="flex justify-between items-start">
                       <p className="text-base font-black truncate pr-2 leading-tight uppercase tracking-tight text-white">{leg.pick}</p>
-                      <p className="font-mono tabular-nums text-sm font-black text-white">
+                      <p className="font-mono tabular-nums text-sm font-black text-white pl-2">
                         {leg.odds > 0 ? `+${leg.odds}` : leg.odds}
                       </p>
                     </div>
                     <div className="flex items-center gap-x-1.5 flex-wrap text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
-                      <span className="truncate max-w-[120px]">{leg.matchup}</span>
+                      <span className="truncate max-w-[140px]">{leg.matchup}</span>
                       <span className="text-slate-700">•</span>
                       <span>{gameTime}</span>
                     </div>
@@ -151,8 +151,15 @@ export function BetTicket({ bet }: { bet: UserBet }) {
             );
           })}
         </div>
-        <div className="border-t border-dashed border-slate-800 mx-4" />
-        <div className="p-4 bg-slate-950/20">
+
+        {/* Ticket Perforation & Notch Circles */}
+        <div className="relative py-1">
+          <div className="border-t border-dashed border-slate-700/60 mx-6" />
+          <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-950 border-r border-slate-800/40" />
+          <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-950 border-l border-slate-800/40" />
+        </div>
+
+        <div className="p-5 bg-slate-950/40">
           <div className="flex justify-between items-center font-black text-sm uppercase tracking-wider text-slate-400">
             <p>{ticketLabel}</p>
             <div className="flex items-center gap-3">

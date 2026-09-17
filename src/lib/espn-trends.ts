@@ -150,9 +150,9 @@ export async function fetchTeamTrends(teamId: string, sport: string): Promise<Te
             opponent: {
                 name: opponent.team.displayName,
                 logo: opponentLogo,
-                at: myTeam.homeAway === 'home' ? 'vs' : '@',
+                at: (myTeam.homeAway === 'home' ? 'vs' : '@') as '@' | 'vs',
             },
-            result: myTeam.winner ? 'W' : 'L',
+            result: (myTeam.winner ? 'W' : 'L') as 'W' | 'L' | 'Upcoming',
             score: `${myScore}-${opponentScore}`,
             ats: atsResult,
             ou: ouResult,

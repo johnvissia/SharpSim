@@ -7,15 +7,16 @@ import { useRouter } from 'next/navigation';
 import { Settings as SettingsIcon, User, Moon, Sun, DollarSign, Bell, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ManagePlanModal } from '@/components/dashboard/ManagePlanModal';
+import { useAppMode } from '@/context/AppModeContext';
 
 export default function SettingsPage() {
     const { user, isUserLoading } = useUser();
     const router = useRouter();
     const { toast } = useToast();
+    const { isRealMoneyMode, toggleRealMoneyMode: toggleAppRealMoneyMode } = useAppMode();
 
     // Basic state for some dummy/local settings
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-    const [realMoneyMode, setRealMoneyMode] = useState(false);
     const [notifications, setNotifications] = useState(true);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
@@ -40,9 +41,6 @@ export default function SettingsPage() {
         if (typeof document !== 'undefined') {
             const isDark = document.documentElement.classList.contains('dark');
             setTheme(isDark ? 'dark' : 'light');
-            
-            const isRealMoney = document.documentElement.classList.contains('real-money-mode');
-            setRealMoneyMode(isRealMoney);
         }
     }, []);
 
@@ -57,14 +55,12 @@ export default function SettingsPage() {
         toast({ title: "Theme updated", description: `Switched to ${newTheme} mode.` });
     };
 
-    const toggleRealMoneyMode = () => {
-        const newMode = !realMoneyMode;
-        setRealMoneyMode(newMode);
-        if (newMode) {
-            document.documentElement.classList.add('real-money-mode');
+    const handleToggleRealMoneyMode = () => {
+        const nextMode = !isRealMoneyMode;
+        toggleAppRealMoneyMode();
+        if (nextMode) {
             toast({ title: "Real Money Mode Enabled", description: "You are now tracking real sportsbook odds and balances." });
         } else {
-            document.documentElement.classList.remove('real-money-mode');
             toast({ title: "Free Play Mode", description: "You are back to simulated betting." });
         }
     };
@@ -199,16 +195,16 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-white font-semibold flex items-center gap-2">
-                                <DollarSign className={`w-4 h-4 ${realMoneyMode ? 'text-emerald-400' : 'text-slate-400'}`} />
+                                <DollarSign className={`w-4 h-4 ${isRealMoneyMode ? 'text-emerald-400' : 'text-slate-400'}`} />
                                 Real Money Mode
                             </p>
                             <p className="text-sm text-slate-400">Track actual sportsbook bets instead of virtual currency.</p>
                         </div>
                         <button 
-                            onClick={toggleRealMoneyMode}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${realMoneyMode ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                            onClick={handleToggleRealMoneyMode}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isRealMoneyMode ? 'bg-emerald-500' : 'bg-slate-600'}`}
                         >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${realMoneyMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isRealMoneyMode ? 'translate-x-6' : 'translate-x-1'}`} />
                         </button>
                     </div>
 

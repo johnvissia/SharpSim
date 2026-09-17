@@ -1,8 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/force-sync",
-      "schedule": "0 */6 * * *"
+      "path": "/api/auto-sync",
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/update-injuries",
@@ -15,10 +15,6 @@
     {
       "path": "/api/calculate-power-ratings",
       "schedule": "10 6 * * *"
-    },
-    {
-      "path": "/api/sync-accuracy",
-      "schedule": "20 6 * * *"
     }
   ]
 }

@@ -269,7 +269,7 @@ export async function GET(request: NextRequest) {
         projectedSpread: parseFloat(projectedSpread.toFixed(2)),
         zScore: parseFloat(zScore.toFixed(2)),
         edge: parseFloat(edge.toFixed(2)),
-        recommendedSide: (hasMarketSpread && absZ >= 0.55) ? recommendedSide : null,
+        recommendedSide: hasMarketSpread ? recommendedSide : null,
         betSignal,
         confidence: hasMarketSpread ? Math.min(absZ * 25, 99).toFixed(0) + '%' : '0%',
         expectedValue: 0,

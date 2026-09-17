@@ -1,21 +1,21 @@
-name: Scheduled API Sync
+name: Scheduled Auto-Sync & Grading
 
 on:
-  # Temporarily disabled while testing locally
-  # schedule:
-  #   # Runs every 6 hours
-  #   - cron: '0 */6 * * *'
-  # Allows you to trigger this workflow manually from the Actions tab
+  schedule:
+    # Runs every 15 minutes automatically
+    - cron: '*/15 * * * *'
+  # Allows triggering manually from the Actions tab
   workflow_dispatch:
 
 jobs:
-  sync_jobs:
+  auto_sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Game Lines Sync
+      - name: Trigger Auto-Sync (Odds & Grading)
         run: |
-          curl -X GET "${{ secrets.PROD_URL }}/api/force-sync"
-      
-      - name: Trigger Injury Updates
-        run: |
-          curl -X GET "${{ secrets.PROD_URL }}/api/update-injuries"
+          URL="${{ secrets.PROD_URL }}"
+          if [ -z "$URL" ]; then
+            URL="https://sharpsim.vercel.app"
+          fi
+          curl -s -X GET "$URL/api/auto-sync"
+

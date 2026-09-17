@@ -75,7 +75,18 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const teams: TeamDoc[] = snapshot.docs.map(doc => doc.data() as TeamDoc);
+    const teams: TeamDoc[] = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const abbrev = data.abbreviation || doc.id || 'UNK';
+      return {
+        ...data,
+        teamName: data.teamName || abbrev,
+        abbreviation: abbrev,
+        games: Array.isArray(data.games) ? data.games : [],
+        summary: data.summary || { wins: 0, losses: 0, avgAdjustedMargin: 0 }
+      } as TeamDoc;
+    });
+
     const teamMap = new Map<string, TeamDoc>();
     teams.forEach(t => {
       t.or = 1.0;
@@ -88,7 +99,7 @@ export async function POST(request: NextRequest) {
     // ─── STEP 1: Find most recent game date (anchor for decay) ───
     let latestTime = 0;
     teams.forEach(team => {
-      team.games.forEach(g => {
+      (team.games || []).forEach(g => {
         const time = new Date(g.date).getTime();
         if (time > latestTime) latestTime = time;
       });
@@ -103,7 +114,7 @@ export async function POST(request: NextRequest) {
     // ─── STEP 2: Calculate double decay weights ───
     const gameWeightsMap = new Map<string, number>();
     teams.forEach(team => {
-      team.games.forEach(g => {
+      (team.games || []).forEach(g => {
         const gameTime = new Date(g.date).getTime();
         const tDays = Math.max(0, (latestTime - gameTime) / (1000 * 60 * 60 * 24));
         const weight = 0.6 * Math.exp(-LAMBDA_LONG * tDays) + 0.4 * Math.exp(-LAMBDA_SHORT * tDays);
@@ -112,9 +123,9 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`\n[STEP 2] Calculated decay weights for all ${teams.length} teams' games.`);
-    // Print a sample: first 3 games of first team
-    const sampleTeam = teams[0];
-    if (sampleTeam && sampleTeam.games.length > 0) {
+    // Print a sample: first 3 games of first team with games
+    const sampleTeam = teams.find(t => t.games && t.games.length > 0) || teams[0];
+    if (sampleTeam && sampleTeam.games && sampleTeam.games.length > 0) {
       console.log(`  Sample weights for ${sampleTeam.abbreviation}:`);
       sampleTeam.games.slice(0, 3).forEach(g => {
         const tDays = Math.max(0, (latestTime - new Date(g.date).getTime()) / (1000 * 60 * 60 * 24));
@@ -135,10 +146,10 @@ export async function POST(request: NextRequest) {
       let rawWeightedRA = 0;
       let sumWeights = 0;
 
-      team.games.forEach(g => {
+      (team.games || []).forEach(g => {
         const weight = gameWeightsMap.get(`${team.abbreviation}-${g.gameId}`) || 1.0;
-        rawWeightedRS += weight * g.bsrFor;
-        rawWeightedRA += weight * g.bsrAgainst;
+        rawWeightedRS += weight * (g.bsrFor || 0);
+        rawWeightedRA += weight * (g.bsrAgainst || 0);
         sumWeights += weight;
       });
 
@@ -150,7 +161,7 @@ export async function POST(request: NextRequest) {
       const den = num + Math.pow(rawWeightedRA, xExponent);
       const expectedWinPct = den > 0 ? num / den : 0.500;
 
-      console.log(`  ${team.abbreviation.padEnd(4)} | Games: ${team.games.length} | G_eff: ${sumWeights.toFixed(2)} | WRS: ${rawWeightedRS.toFixed(2)} | WRA: ${rawWeightedRA.toFixed(2)} | avgRS/G: ${avgRS.toFixed(3)} | avgRA/G: ${avgRA.toFixed(3)} | exp: ${xExponent.toFixed(3)} | ExpWin: ${expectedWinPct.toFixed(3)}`);
+      console.log(`  ${(team.abbreviation || '').padEnd(4)} | Games: ${(team.games || []).length} | G_eff: ${sumWeights.toFixed(2)} | WRS: ${rawWeightedRS.toFixed(2)} | WRA: ${rawWeightedRA.toFixed(2)} | avgRS/G: ${avgRS.toFixed(3)} | avgRA/G: ${avgRA.toFixed(3)} | exp: ${xExponent.toFixed(3)} | ExpWin: ${expectedWinPct.toFixed(3)}`);
 
       return {
         abbrev: team.abbreviation,
@@ -176,7 +187,9 @@ export async function POST(request: NextRequest) {
     });
 
     // Check 1 on raw expectancies
-    const rawLeagueAvgExpWin = rawTeamStats.reduce((s, t) => s + t.expectedWinPct, 0) / rawTeamStats.length;
+    const rawLeagueAvgExpWin = rawTeamStats.length > 0
+      ? rawTeamStats.reduce((s, t) => s + t.expectedWinPct, 0) / rawTeamStats.length
+      : 0.500;
     console.log(`  [Check 1] League Average Raw ExpWin: ${rawLeagueAvgExpWin.toFixed(4)} (should be ~0.500)\n`);
 
     // ─── STEP 4: Calculate SOS adjustment ───
@@ -192,7 +205,7 @@ export async function POST(request: NextRequest) {
       let weightedOppExpWinSum = 0;
       let opponentWeightSum = 0;
 
-      team.games.forEach(g => {
+      (team.games || []).forEach(g => {
         const weight = gameWeightsMap.get(`${team.abbreviation}-${g.gameId}`) || 1.0;
         const opponent = teamMap.get(g.opponent);
         if (opponent) {
@@ -211,7 +224,7 @@ export async function POST(request: NextRequest) {
         sosAdjustment
       });
 
-      console.log(`  ${team.abbreviation.padEnd(4)} | avgOppExpWin: ${avgOpponentExpWin.toFixed(3)} | rawSOS: ${rawSosAdj >= 0 ? '+' : ''}${rawSosAdj.toFixed(4)} | cappedSOS: ${sosAdjustment >= 0 ? '+' : ''}${sosAdjustment.toFixed(4)} | rating: ${((team.expectedWinPct || 0.500) + sosAdjustment).toFixed(3)}`);
+      console.log(`  ${(team.abbreviation || '').padEnd(4)} | avgOppExpWin: ${avgOpponentExpWin.toFixed(3)} | rawSOS: ${rawSosAdj >= 0 ? '+' : ''}${rawSosAdj.toFixed(4)} | cappedSOS: ${sosAdjustment >= 0 ? '+' : ''}${sosAdjustment.toFixed(4)} | rating: ${((team.expectedWinPct || 0.500) + sosAdjustment).toFixed(3)}`);
     });
 
     // ─── STEP 5: Apply SOS + Compute OR/DR ───
@@ -220,16 +233,16 @@ export async function POST(request: NextRequest) {
     console.log(`  Formula: DR = 4.5 / avgRA   (>1.0 = above avg defense)\n`);
 
     teams.forEach(team => {
-      const sosInfo = sosAdjustments.get(team.abbreviation)!;
+      const sosInfo = sosAdjustments.get(team.abbreviation) || { avgOpponentExpWin: 0.500, rawSosAdj: 0, sosAdjustment: 0 };
       team.srsRating = (team.expectedWinPct || 0.500) + sosInfo.sosAdjustment;
 
       let weightedRS = 0;
       let weightedRA = 0;
       let sumWeights = 0;
-      team.games.forEach(g => {
+      (team.games || []).forEach(g => {
         const weight = gameWeightsMap.get(`${team.abbreviation}-${g.gameId}`) || 1.0;
-        weightedRS += weight * g.bsrFor;
-        weightedRA += weight * g.bsrAgainst;
+        weightedRS += weight * (g.bsrFor || 0);
+        weightedRA += weight * (g.bsrAgainst || 0);
         sumWeights += weight;
       });
 
@@ -238,11 +251,11 @@ export async function POST(request: NextRequest) {
       team.or = avgRS / 4.5;
       team.dr = 4.5 / avgRA;
 
-      console.log(`  ${team.abbreviation.padEnd(4)} | ExpWin: ${(team.expectedWinPct || 0.500).toFixed(3)} + SOS: ${sosInfo.sosAdjustment >= 0 ? '+' : ''}${sosInfo.sosAdjustment.toFixed(4)} = ${team.srsRating.toFixed(3)} | OR: ${team.or.toFixed(3)} | DR: ${team.dr.toFixed(3)}`);
+      console.log(`  ${(team.abbreviation || '').padEnd(4)} | ExpWin: ${(team.expectedWinPct || 0.500).toFixed(3)} + SOS: ${sosInfo.sosAdjustment >= 0 ? '+' : ''}${sosInfo.sosAdjustment.toFixed(4)} = ${team.srsRating.toFixed(3)} | OR: ${team.or.toFixed(3)} | DR: ${team.dr.toFixed(3)}`);
     });
 
     // ─── STEP 6: Normalize league average to exactly 0.500 ───
-    const rawAvgExpWin = teams.reduce((sum, t) => sum + (t.srsRating || 0.500), 0) / teams.length;
+    const rawAvgExpWin = teams.length > 0 ? teams.reduce((sum, t) => sum + (t.srsRating || 0.500), 0) / teams.length : 0.500;
     const shiftOffset = 0.500 - rawAvgExpWin;
 
     console.log(`\n[STEP 6] Normalizing league average to exactly 0.500...`);
@@ -256,14 +269,20 @@ export async function POST(request: NextRequest) {
       const ratingBeforeShift = t.srsRating || 0.500;
       t.srsRating = Math.min(0.999, Math.max(0.001, ratingBeforeShift + shiftOffset));
 
-      const sosInfo = sosAdjustments.get(t.abbreviation)!;
-      const raw = rawTeamStats.find(r => r.abbrev === t.abbreviation)!;
+      const sosInfo = sosAdjustments.get(t.abbreviation) || { avgOpponentExpWin: 0.500, rawSosAdj: 0, sosAdjustment: 0 };
+      const raw = rawTeamStats.find(r => r.abbrev === t.abbreviation) || {
+        abbrev: t.abbreviation,
+        expectedWinPct: 0.500,
+        rawWeightedRS: 0,
+        rawWeightedRA: 0,
+        sumWeights: 0
+      };
 
       calcTraces.push({
-        team: t.teamName,
+        team: t.teamName || t.abbreviation,
         abbreviation: t.abbreviation,
-        record: `${t.summary.wins}-${t.summary.losses}`,
-        totalGames: t.games.length,
+        record: `${t.summary?.wins ?? 0}-${t.summary?.losses ?? 0}`,
+        totalGames: (t.games || []).length,
         effectiveGames: raw.sumWeights.toFixed(2),
         weightedRS: raw.rawWeightedRS.toFixed(2),
         weightedRA: raw.rawWeightedRA.toFixed(2),
@@ -282,14 +301,14 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    const shiftedAvgExpWin = teams.reduce((sum, t) => sum + (t.srsRating || 0.500), 0) / teams.length;
+    const shiftedAvgExpWin = teams.length > 0 ? teams.reduce((sum, t) => sum + (t.srsRating || 0.500), 0) / teams.length : 0.500;
     console.log(`  League avg after shift:  ${shiftedAvgExpWin.toFixed(4)}`);
 
     // Print final table
     console.log(`\n[FINAL RANKINGS] All 30 teams sorted by final rating:\n`);
     const sortedTraces = [...calcTraces].sort((a, b) => parseFloat(b.finalRating) - parseFloat(a.finalRating));
     sortedTraces.forEach((t, i) => {
-      console.log(`  #${(i + 1).toString().padStart(2)} ${t.abbreviation.padEnd(4)} ${t.record.padEnd(6)} | ExpWin: ${t.expectedWinPct} | avgOpp: ${t.avgOpponentExpWin} | SOS: ${t.cappedSosAdj} | shift: ${t.leagueShift} | FINAL: ${t.finalRating} | OR: ${t.offenseRating} DR: ${t.defenseRating}`);
+      console.log(`  #${(i + 1).toString().padStart(2)} ${(t.abbreviation || '').padEnd(4)} ${(t.record || '').padEnd(6)} | ExpWin: ${t.expectedWinPct} | avgOpp: ${t.avgOpponentExpWin} | SOS: ${t.cappedSosAdj} | shift: ${t.leagueShift} | FINAL: ${t.finalRating} | OR: ${t.offenseRating} DR: ${t.defenseRating}`);
     });
 
     console.log('\n[MLB Ratings] Saving final ratings to Firestore...');
@@ -314,13 +333,13 @@ export async function POST(request: NextRequest) {
 
     // Helper to format team for frontend output
     const formatTeamForDashboard = (t: TeamDoc) => ({
-      team: t.teamName,
+      team: t.teamName || t.abbreviation,
       abbreviation: t.abbreviation,
-      logo: t.logo,
+      logo: t.logo || '',
       rating: (t.srsRating || 0.500).toFixed(3),
       srs: (t.srsRating || 0.500).toFixed(3),
-      wins: t.summary.wins,
-      losses: t.summary.losses,
+      wins: t.summary?.wins ?? 0,
+      losses: t.summary?.losses ?? 0,
       avgMargin: `Off: ${(t.or || 1.0).toFixed(2)} | Def: ${(t.dr || 1.0).toFixed(2)}`
     });
 

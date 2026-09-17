@@ -127,7 +127,7 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
         sources.forEach(src => {
             // Fetch past 4 days, today, and tomorrow to ensure we catch old games for grading
             for (let i = -4; i <= 1; i++) {
-                promises.push(fetch(`${src.url}?dates=${getDateStr(i)}&limit=100`, { cache: 'no-store' }).then(r => r.json()).then(d => ({ data: d, slug: src.slug, sport: src.sport })));
+                promises.push(fetch(`${src.url}?dates=${getDateStr(i)}&limit=100`, { next: { revalidate: 60 } }).then(r => r.json()).then(d => ({ data: d, slug: src.slug, sport: src.sport })));
             }
         });
 
@@ -217,11 +217,12 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
                     awayTeam,
                     leagueContext: leagueContext,
                     liveScore: {
-                        home: parseInt(home.score, 10),
-                        away: parseInt(away.score, 10),
+                        home: isNaN(parseInt(home.score, 10)) ? 0 : parseInt(home.score, 10),
+                        away: isNaN(parseInt(away.score, 10)) ? 0 : parseInt(away.score, 10),
                     },
                     statusDetail: comp.status.type.detail,
                     statusState: comp.status.type.state,
+                    completed: comp.status.type.completed ?? (comp.status.type.state === 'post'),
                 };
             }).filter((g: Game | null): g is Game => g !== null);
 

@@ -6,9 +6,12 @@ const createPlayer = (id: string, name: string, position: string, injuryStatus: 
   id, name, position, injuryStatus
 });
 
-const createTeam = (id: string, name: string, record: string, players: Player[]): Team => ({
-  id, name, logo: `/logos/${name.toLowerCase().replace(/ /g, '-')}.svg`, record, players
-});
+const createTeam = (id: string, name: string, recordOrPlayers: string | Player[], players?: Player[]): Team => {
+  const actualPlayers = Array.isArray(recordOrPlayers) ? recordOrPlayers : (players || []);
+  return {
+    id, name, logo: `/logos/${name.toLowerCase().replace(/ /g, '-')}.svg`, players: actualPlayers
+  };
+};
 
 // NBA Teams
 const warriorsPlayers = [
@@ -21,8 +24,8 @@ const lakersPlayers = [
   createPlayer('p5', 'Anthony Davis', 'C'),
   createPlayer('p6', 'Jarred Vanderbilt', 'PF', 'Out'),
 ];
-const warriors = createTeam('t1', 'Golden State Warriors', '46-36', warriorsPlayers);
-const lakers = createTeam('t2', 'Los Angeles Lakers', '47-35', lakersPlayers);
+const warriors = createTeam('t1', 'Golden State Warriors', warriorsPlayers);
+const lakers = createTeam('t2', 'Los Angeles Lakers', lakersPlayers);
 
 // NFL Teams
 const chiefsPlayers = [
@@ -33,20 +36,20 @@ const eaglesPlayers = [
   createPlayer('p9', 'Jalen Hurts', 'QB'),
   createPlayer('p10', 'A.J. Brown', 'WR', 'Questionable'),
 ];
-const chiefs = createTeam('t3', 'Kansas City Chiefs', '11-6', chiefsPlayers);
-const eagles = createTeam('t4', 'Philadelphia Eagles', '11-6', eaglesPlayers);
+const chiefs = createTeam('t3', 'Kansas City Chiefs', chiefsPlayers);
+const eagles = createTeam('t4', 'Philadelphia Eagles', eaglesPlayers);
 
 // Soccer teams
 const manUtdPlayers = [createPlayer('p11', 'Bruno Fernandes', 'MF'), createPlayer('p12', 'Marcus Rashford', 'FW')];
 const liverpoolPlayers = [createPlayer('p13', 'Mohamed Salah', 'FW'), createPlayer('p14', 'Virgil van Dijk', 'DF')];
-const manUtd = createTeam('t5', 'Manchester United', '2-1-0', manUtdPlayers);
-const liverpool = createTeam('t6', 'Liverpool', '2-0-1', liverpoolPlayers);
+const manUtd = createTeam('t5', 'Manchester United', manUtdPlayers);
+const liverpool = createTeam('t6', 'Liverpool', liverpoolPlayers);
 
 // WNBA Teams
 const acesPlayers = [createPlayer('p15', 'A\'ja Wilson', 'F'), createPlayer('p16', 'Kelsey Plum', 'G')];
 const libertyPlayers = [createPlayer('p17', 'Breanna Stewart', 'F'), createPlayer('p18', 'Sabrina Ionescu', 'G')];
-const aces = createTeam('t7', 'Las Vegas Aces', '10-2', acesPlayers);
-const liberty = createTeam('t8', 'New York Liberty', '9-3', libertyPlayers);
+const aces = createTeam('t7', 'Las Vegas Aces', acesPlayers);
+const liberty = createTeam('t8', 'New York Liberty', libertyPlayers);
 
 // --- NHL Teams from image ---
 const sharksPlayers = [createPlayer('p25', 'Tomas Hertl', 'C'), createPlayer('p26', 'Logan Couture', 'C')];
@@ -95,9 +98,14 @@ const generateOdds = (base: Odds): SportsbookOdds[] => {
   }));
 };
 
-const getBestOdds = (allOdds: SportsbookOdds[]): Odds => {
-  // Simplified: just return the first one for now.
-  // A real implementation would compare and find the best line for each bet type.
+const getBestOdds = (allOdds?: SportsbookOdds[]): Odds => {
+  if (!allOdds || allOdds.length === 0) {
+    return {
+      moneyline: { home: 0, away: 0 },
+      spread: { points: 0, home: 0, away: 0 },
+      total: { points: 0, over: 0, under: 0 },
+    };
+  }
   return allOdds[0].odds;
 };
 

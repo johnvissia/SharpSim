@@ -6,7 +6,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { UserBet, CompletedGame } from '@/lib/types';
-import { Ticket, ChevronLeft, ChevronRight, Loader } from 'lucide-react';
+import { Ticket, ChevronLeft, ChevronRight, Loader, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, isSameDay, addDays, subDays } from 'date-fns';
 import { BetTicket } from '@/components/bets/bet-ticket';
@@ -20,8 +20,60 @@ export default function MyPicksPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date>();
+  const [isSyncing, setIsSyncing] = useState(false);
 
+  const triggerBetSync = async (showToast = false) => {
+    if (!user?.uid) return;
+    setIsSyncing(true);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const res = await fetch(`/api/sync-user-bets?userId=${user.uid}`, {
+        signal: controller.signal,
+      }).catch((err) => {
+        console.warn("[MyPicks] Bet sync network issue:", err.message || err);
+        return null;
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res && res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data && showToast) {
+          if (data.gradedCount > 0) {
+            toast({
+              title: "Picks Graded",
+              description: `Graded ${data.gradedCount} pick(s). ${data.totalPayout > 0 ? `+${data.totalPayout} coins credited!` : ''}`,
+            });
+          } else {
+            toast({
+              title: "Sync Complete",
+              description: "All pending picks checked against latest game scores.",
+            });
+          }
+        }
+      } else if (showToast && res && !res.ok) {
+        toast({
+          title: "Sync Warning",
+          description: "Could not sync picks right now. Please try again in a moment.",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      console.warn("[MyPicks] Gracefully handled sync exception:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.uid) {
+      triggerBetSync(false);
+    }
+  }, [user?.uid]);
 
   useEffect(() => {
     // Set the date only on the client-side to prevent hydration mismatch
@@ -157,7 +209,7 @@ export default function MyPicksPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <header className="mb-8">
+      <header className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
               <Ticket className="h-8 w-8 text-primary"/> My Picks
@@ -166,6 +218,16 @@ export default function MyPicksPage() {
             Track your active and settled bets here.
           </p>
         </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => triggerBetSync(true)}
+          disabled={isSyncing}
+          className="flex items-center gap-2 border-slate-700 bg-slate-900/80 text-slate-200 hover:bg-slate-800 self-start sm:self-auto"
+        >
+          <RefreshCw className={cn("h-4 w-4 text-emerald-400", isSyncing && "animate-spin")} />
+          {isSyncing ? "Grading Picks..." : "Sync & Grade Picks"}
+        </Button>
       </header>
 
        <div className="flex items-center justify-center gap-4 mb-8">

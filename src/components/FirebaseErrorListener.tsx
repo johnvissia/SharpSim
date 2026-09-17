@@ -35,7 +35,7 @@ export function FirebaseErrorListener() {
       <div className="fixed top-0 left-0 right-0 z-[999999999] bg-red-600 text-white p-8 text-2xl font-bold border-b-8 border-red-900 flex flex-col justify-center items-center">
         <p>🚨 FIREBASE PATH ERROR 🚨</p>
         <p className="text-yellow-300 bg-black p-4 mt-4 rounded-xl text-3xl font-mono break-all">
-          Operation: {error.operation} | Path: {error.path}
+          Operation: {error.request?.method} | Path: {error.request?.path}
         </p>
         <button onClick={() => setError(null)} className="mt-6 bg-white text-black px-6 py-2 rounded-full text-xl hover:bg-gray-200">
           Dismiss

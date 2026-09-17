@@ -189,7 +189,7 @@ function calculateSRS(teams: TeamWithRating[]): number {
       let totalOpponentRating = 0;
       let opponentCount = 0;
 
-      team.games.forEach(game => {
+      (team.games || []).forEach(game => {
         const opponent = teamMap.get(game.opponent);
         if (opponent) {
           totalOpponentRating += opponent.srsRating;
@@ -491,7 +491,7 @@ export async function POST(request: NextRequest) {
     const teamsWithNetRatings: TeamWithRating[] = teams.map(team => {
       const netRatings: number[] = [];
 
-      team.games.forEach(game => {
+      (team.games || []).forEach(game => {
         // Calculate possessions (use fallback if boxScore missing)
         const possessions = game.boxScore
           ? calculatePossessions(game.boxScore)

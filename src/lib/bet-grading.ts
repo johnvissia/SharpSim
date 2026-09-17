@@ -76,6 +76,63 @@ const isGameGradeable = (game: CompletedGame): boolean => {
 };
 
 /**
+ * Finds a matching completed game for a leg, either by exact game ID or by team names & commence date.
+ */
+const findGameForLeg = (leg: ParlayLeg, completedGamesMap: Map<string, CompletedGame>): CompletedGame | undefined => {
+    // 1. Direct ID lookup
+    if (leg.gameId && completedGamesMap.has(leg.gameId)) {
+        return completedGamesMap.get(leg.gameId);
+    }
+
+    const normMatchup = normalizeName(leg.matchup || '');
+    const normPick = normalizeName(leg.pick || '');
+
+    // 2. Match by both home & away team names
+    for (const game of completedGamesMap.values()) {
+        const homeNorm = normalizeName(game.homeTeam);
+        const awayNorm = normalizeName(game.awayTeam);
+
+        if (!homeNorm || !awayNorm) continue;
+
+        const matchesHome = normMatchup.includes(homeNorm) || homeNorm.includes(normMatchup) || normPick.includes(homeNorm);
+        const matchesAway = normMatchup.includes(awayNorm) || awayNorm.includes(normMatchup) || normPick.includes(awayNorm);
+
+        if (matchesHome && matchesAway) {
+            if (leg.commenceTime && game.commenceTime) {
+                const legTime = new Date(leg.commenceTime).getTime();
+                const gameTime = new Date(game.commenceTime).getTime();
+                const diffHours = Math.abs(legTime - gameTime) / (1000 * 60 * 60);
+                if (diffHours > 48) continue;
+            }
+            return game;
+        }
+    }
+
+    // 3. Fallback match by pick team name & date
+    for (const game of completedGamesMap.values()) {
+        const homeNorm = normalizeName(game.homeTeam);
+        const awayNorm = normalizeName(game.awayTeam);
+
+        // Check if pick contains team name or vice versa
+        const pickTeamMatch = (homeNorm.length >= 3 && normPick.includes(homeNorm)) || 
+                              (awayNorm.length >= 3 && normPick.includes(awayNorm));
+
+        if (pickTeamMatch) {
+            if (leg.commenceTime && game.commenceTime) {
+                const legTime = new Date(leg.commenceTime).getTime();
+                const gameTime = new Date(game.commenceTime).getTime();
+                const diffHours = Math.abs(legTime - gameTime) / (1000 * 60 * 60);
+                if (diffHours <= 36) return game;
+            } else {
+                return game;
+            }
+        }
+    }
+
+    return undefined;
+};
+
+/**
  * Grades all pending bets for a given user against completed games and player stats.
  * This is a pure function that returns a list of required updates.
  * @param pendingBets The user's bets that have a 'pending' status.
@@ -212,24 +269,27 @@ export function gradeUserBets(
 
             } else {
                 // This path handles game lines (moneyline, spread, total)
-                const game = completedGamesMap.get(leg.gameId);
+                const game = findGameForLeg(leg, completedGamesMap);
 
                 if (!game || !isGameGradeable(game)) {
-                    console.log(`[GRADING] Game ${leg.gameId} not found or not gradeable. Leg stays pending.`);
+                    console.log(`[GRADING] Game ${leg.gameId} / ${leg.matchup} not found or not gradeable. Leg stays pending.`);
                     isBetFinalized = false;
                     return leg;
                 }
 
-                console.log(`[GRADING] Grading ${leg.betType} bet on ${leg.pick} for game ${leg.gameId}`);
+                console.log(`[GRADING] Grading ${leg.betType} bet on ${leg.pick} for game ${game.awayTeam} @ ${game.homeTeam} (${game.awayScore}-${game.homeScore})`);
 
                 switch (leg.betType) {
                     case 'moneyline': {
-                        const winner = game.homeScore > game.awayScore ? game.homeTeam : game.homeScore < game.awayScore ? game.awayTeam : null;
-                        if (winner === null) {
+                        if (game.homeScore === game.awayScore) {
                             legResult = 'push';
                             console.log(`[GRADING] Moneyline result: PUSH (tie game)`);
                         } else {
-                            legResult = normalizeName(winner) === normalizeName(leg.pick) ? 'won' : 'lost';
+                            const winner = game.homeScore > game.awayScore ? game.homeTeam : game.awayTeam;
+                            const normWinner = normalizeName(winner);
+                            const normPick = normalizeName(leg.pick);
+                            const isWin = normWinner.includes(normPick) || normPick.includes(normWinner);
+                            legResult = isWin ? 'won' : 'lost';
                             console.log(`[GRADING] Moneyline result: ${legResult.toUpperCase()} (winner: ${winner}, pick: ${leg.pick})`);
                         }
                         break;
@@ -248,8 +308,12 @@ export function gradeUserBets(
                             isBetFinalized = false; return leg;
                         }
 
-                        const isHomePick = normalizeName(game.homeTeam) === normalizeName(teamNameFromPick);
-                        const isAwayPick = normalizeName(game.awayTeam) === normalizeName(teamNameFromPick);
+                        const normPickTeam = normalizeName(teamNameFromPick);
+                        const normHome = normalizeName(game.homeTeam);
+                        const normAway = normalizeName(game.awayTeam);
+
+                        const isHomePick = normHome.includes(normPickTeam) || normPickTeam.includes(normHome);
+                        const isAwayPick = normAway.includes(normPickTeam) || normPickTeam.includes(normAway);
 
                         if (!isHomePick && !isAwayPick) {
                             console.error(`[GRADING] Team name mismatch. Pick: ${teamNameFromPick}, Game: ${game.homeTeam} vs ${game.awayTeam}`);

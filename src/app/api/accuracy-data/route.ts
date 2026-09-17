@@ -1,24 +1,29 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
+        const { searchParams } = new URL(request.url);
+        const sportParam = searchParams.get('sport');
+
+        const limitParam = parseInt(searchParams.get('limit') || '500', 10);
+
         const snapshot = await db
             .collection('model_predictions')
             .orderBy('startTime', 'desc')
-            .limit(200)
+            .limit(limitParam)
             .get();
 
-        const predictions = snapshot.docs
-            .map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }))
-            .filter((p: any) => p.sport === 'NBA')
-            .filter((p: any) => p.marketSpread !== 0) // Exclude bad data where spread wasn't captured
-            .slice(0, 50);
+        let predictions = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+
+        if (sportParam && sportParam !== 'ALL') {
+            predictions = predictions.filter((p: any) => p.sport?.toUpperCase() === sportParam.toUpperCase());
+        }
 
         return NextResponse.json({ predictions });
     } catch (error: any) {

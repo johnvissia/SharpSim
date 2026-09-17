@@ -26,11 +26,11 @@ export const sportNameMapping: { [key: string]: string } = Object.entries(sportK
 async function check() {
   const espnRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?limit=100`);
   const espnData = await espnRes.json();
-  const espnGames = [];
+  const espnGames: any[] = [];
   if (espnData.events) {
-    espnData.events.forEach(event => {
-       const home = event.competitions[0].competitors.find(c => c.homeAway === 'home');
-       const away = event.competitions[0].competitors.find(c => c.homeAway === 'away');
+    espnData.events.forEach((event: any) => {
+       const home = event.competitions[0].competitors.find((c: any) => c.homeAway === 'home');
+       const away = event.competitions[0].competitors.find((c: any) => c.homeAway === 'away');
        espnGames.push({
          sport: 'NBA',
          homeTeam: { name: home.team.displayName },

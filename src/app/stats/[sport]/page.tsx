@@ -26,7 +26,8 @@ function getTeamFromPick(pick: string, betType: UserBet['betType']): string | nu
 
 export default function SportStatsPage() {
     const params = useParams();
-    const sportName = decodeURIComponent(params.sport as string) as SportName;
+    const sportParam = params?.sport ? (params.sport as string) : '';
+    const sportName = decodeURIComponent(sportParam) as SportName;
     const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
 

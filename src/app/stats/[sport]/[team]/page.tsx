@@ -20,9 +20,9 @@ export default function TeamStatsPage() {
     const [isUpdating, setIsUpdating] = useState(false);
 
     // Decode URI-encoded parameters
-    const sportName = params.sport ? decodeURIComponent(params.sport as string) : '';
-    const teamName = params.team ? decodeURIComponent(params.team as string) : '';
-    const teamId = searchParams.get('teamId');
+    const sportName = params?.sport ? decodeURIComponent(params.sport as string) : '';
+    const teamName = params?.team ? decodeURIComponent(params.team as string) : '';
+    const teamId = searchParams?.get('teamId') || null;
 
     const userProfileRef = useMemoFirebase(
         () => (user && firestore ? doc(firestore, 'users', user.uid) : null),

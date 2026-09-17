@@ -10,26 +10,27 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Ticket, User } from 'lucide-react';
+import { Ticket, User, Trophy } from 'lucide-react';
 import { useBetSlip, type BetSlipPick } from '@/context/BetSlipContext';
 import { sportIconMap } from '@/lib/team-logos';
 import Image from 'next/image';
-
 
 const OddsButton = ({
   onClick,
   children,
   disabled = false,
   isSelected = false,
+  className = "",
 }: {
   onClick: (e: React.MouseEvent) => void;
   children: React.ReactNode;
   disabled?: boolean;
   isSelected?: boolean;
+  className?: string;
 }) => (
   <Button
     variant={isSelected ? "secondary" : "outline"}
-    className="w-full h-auto min-h-[3.5rem] flex flex-col items-center justify-center p-1 text-sm leading-tight"
+    className={`w-full h-auto min-h-[3.5rem] flex flex-col items-center justify-center p-1 text-sm leading-tight ${className}`}
     onClick={onClick}
     disabled={disabled}
   >
@@ -37,45 +38,80 @@ const OddsButton = ({
   </Button>
 );
 
-const TeamDisplay = ({ team, sport, score }: { team: Team, sport: SportName, score?: number | null }) => {
-    const FallbackIcon = sportIconMap[sport] || sportIconMap.Default;
-    return (
-        <div className="flex flex-col w-full pb-1">
-            <div className="flex justify-between items-center w-full">
-                <div className="flex items-center gap-3 text-sm font-semibold">
-                    <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
-                        {team.logo ? (
-                            <Image
-                                src={team.logo}
-                                alt={team.name}
-                                width={32}
-                                height={32}
-                                className="w-8 h-8 object-contain"
-                            />
-                        ) : (
-                            <FallbackIcon className="w-6 h-6 text-muted-foreground" />
-                        )}
-                    </div>
+const getMascot = (fullName: string) => {
+  if (!fullName) return '';
+  if (fullName.includes('Red Sox')) return 'Red Sox';
+  if (fullName.includes('White Sox')) return 'White Sox';
+  if (fullName.includes('Blue Jays')) return 'Blue Jays';
+  if (fullName.includes('Trail Blazers')) return 'Trail Blazers';
+  if (fullName.includes('Golden Knights')) return 'Golden Knights';
+  if (fullName.includes('Diamondbacks')) return 'D-Backs';
+  if (fullName.includes('Demon Deacons')) return 'Demon Deacons';
+  if (fullName.includes('Tar Heels')) return 'Tar Heels';
+  if (fullName.includes('Blue Devils')) return 'Blue Devils';
+  if (fullName.includes('Red Raiders')) return 'Red Raiders';
+  if (fullName.includes('Horned Frogs')) return 'Horned Frogs';
+  if (fullName.includes('Cornhuskers')) return 'Cornhuskers';
 
-                    <span className="truncate">{team.name}</span>
-                </div>
-                 {typeof score === 'number' && !isNaN(score) && (
-                    <span className="text-3xl font-bold tracking-tight">{score}</span>
-                )}
-            </div>
-            
-            {sport === 'MLB' && team.startingPitcher && (
-                <div className="pl-11 flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
-                    <span className="font-bold text-slate-300 truncate">{team.startingPitcher.name}</span>
-                    <span className="text-slate-500">({team.startingPitcher.wins}-{team.startingPitcher.losses}, {team.startingPitcher.era} ERA)</span>
-                </div>
-            )}
-        </div>
-    );
+  const parts = fullName.trim().split(' ');
+  return parts[parts.length - 1];
 };
 
-// LiveLeaders removed as per user request
+const getModelPick = (game: Game) => {
+  const isMlb = game.sport === 'MLB';
+  const unit = isMlb ? 'runs' : 'pts';
 
+  // 1. If explicit model prediction from Firestore exists
+  if (game.modelPrediction) {
+    const proj = game.modelPrediction.projectedSpread ?? 0;
+    if (proj < 0) {
+      const mascot = getMascot(game.homeTeam.name);
+      return {
+        teamName: game.homeTeam.name,
+        mascot,
+        text: `${mascot} by ${Math.abs(proj).toFixed(1)} ${unit}`
+      };
+    } else if (proj > 0) {
+      const mascot = getMascot(game.awayTeam.name);
+      return {
+        teamName: game.awayTeam.name,
+        mascot,
+        text: `${mascot} by ${proj.toFixed(1)} ${unit}`
+      };
+    } else if (game.modelPrediction.recommendedSide) {
+      const mascot = getMascot(game.modelPrediction.recommendedSide);
+      return {
+        teamName: game.modelPrediction.recommendedSide,
+        mascot,
+        text: `${mascot} to win`
+      };
+    }
+  }
+
+  // 2. Derive from sportsbook spread odds if available
+  if (game.odds?.spread && game.odds.spread.points !== 0) {
+    const pts = game.odds.spread.points;
+    if (pts < 0) {
+      // Home favored
+      const mascot = getMascot(game.homeTeam.name);
+      return {
+        teamName: game.homeTeam.name,
+        mascot,
+        text: `${mascot} (${pts > 0 ? '+' : ''}${pts} ${unit})`
+      };
+    } else if (pts > 0) {
+      // Away favored
+      const mascot = getMascot(game.awayTeam.name);
+      return {
+        teamName: game.awayTeam.name,
+        mascot,
+        text: `${mascot} (-${pts} ${unit})`
+      };
+    }
+  }
+
+  return null;
+};
 
 export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGameClick: (game: Game) => void, hasActiveBet: boolean }) {
   const { picks, addPick } = useBetSlip();
@@ -128,6 +164,8 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
 
   const isAwayFav = (odds?.spread?.away ?? 0) < 0;
   const isHomeFav = (odds?.spread?.home ?? 0) < 0;
+
+  const modelPick = getModelPick(game);
   
   const TeamRow = ({ 
     team, 
@@ -152,6 +190,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
   }) => {
     const FallbackIcon = sportIconMap[game.sport] || sportIconMap.Default;
     const showScore = isLive || isFinal;
+    const isPickedWinner = canBet && modelPick && modelPick.teamName === team.name;
     
     return (
       <div className={`flex items-center ${showScore ? 'gap-2' : 'gap-3'} w-full`}>
@@ -165,9 +204,16 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
             )}
           </div>
           <div className="flex flex-col min-w-0 flex-shrink">
-            <span className={`${showScore ? 'text-[10px] md:text-xs' : 'text-xs md:text-sm'} font-black truncate leading-tight text-white uppercase tracking-tight`}>
-              {team.name}
-            </span>
+            <div className="flex items-center">
+              <span className={`${showScore ? 'text-[10px] md:text-xs' : 'text-xs md:text-sm'} font-black truncate leading-tight text-white uppercase tracking-tight`}>
+                {team.name}
+              </span>
+              {isPickedWinner && (
+                <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[8px] font-black uppercase tracking-tighter px-1 py-0 ml-1.5 shrink-0">
+                  PICK
+                </Badge>
+              )}
+            </div>
             {game.sport === 'MLB' && canBet && team.startingPitcher && (
               <span className="text-[9px] text-slate-500 truncate font-medium">
                 {team.startingPitcher.name} ({team.startingPitcher.era} ERA)
@@ -259,6 +305,27 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
           </span>
         </div>
       </div>
+
+      {/* Model Pick Sub-Header (Only shown pre-game) */}
+      {canBet && modelPick && (
+        <div className="px-3 py-1 flex items-center justify-between bg-slate-950/70 border-b border-slate-800/40 text-[10px]">
+          <div className="flex items-center gap-1.5 font-bold text-slate-300">
+            <Trophy className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+            <span className="text-slate-400 uppercase tracking-wider text-[9px]">Model Pick:</span>
+            <span className="text-emerald-400 font-extrabold">{modelPick.text}</span>
+          </div>
+          {game.modelPrediction?.betSignal && (
+            <Badge className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0 ${
+              game.modelPrediction.betSignal.includes('ELITE') ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' :
+              game.modelPrediction.betSignal.includes('STRONG') ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' :
+              game.modelPrediction.betSignal.includes('PLAYABLE') ? 'bg-slate-700 text-slate-200' :
+              'bg-slate-800 text-amber-400 border-amber-500/20'
+            }`}>
+              {game.modelPrediction.betSignal}
+            </Badge>
+          )}
+        </div>
+      )}
 
       <div className="p-3 flex flex-col gap-2">
         {/* Column Labels */}

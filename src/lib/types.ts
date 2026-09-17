@@ -54,7 +54,14 @@ export type Game = {
   liveScore?: { home: number; away: number };
   statusDetail?: string; // e.g., "Final", "Q3 10:00" from ESPN
   statusState?: 'pre' | 'in' | 'post';
+  completed?: boolean;
   leagueContext?: string; // e.g., "English Premier League", "UEFA Champions League"
+  modelPrediction?: {
+    recommendedSide?: string;
+    projectedSpread?: number;
+    betSignal?: string;
+    zScore?: number;
+  };
 };
 
 export type Sport = {

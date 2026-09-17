@@ -36,12 +36,36 @@ export async function GET(request: NextRequest) {
         const activePredictionsSnapshot = await db.collection('model_predictions')
             .where('status', '==', 'pending')
             .get();
+
+        // Cleanup check: Re-open predictions that were mistakenly graded as 0-0 for non-soccer sports
+        const SOCCER_SPORTS = ['EPL', 'MLS', 'UCL', 'LIGA MX'];
+        const mistakenZeroZeroSnapshot = await db.collection('model_predictions')
+            .where('status', '==', 'graded')
+            .get();
+
+        for (const doc of mistakenZeroZeroSnapshot.docs) {
+            const data = doc.data();
+            const sportUpper = (data.sport || '').toUpperCase();
+            if (!SOCCER_SPORTS.includes(sportUpper)) {
+                if (data.actualScore && data.actualScore.home === 0 && data.actualScore.away === 0) {
+                    console.log(`[sync-accuracy] Resetting prematurely graded 0-0 prediction for ${data.awayTeam} @ ${data.homeTeam} back to pending`);
+                    await db.collection('model_predictions').doc(doc.id).update({
+                        status: 'pending',
+                        actualScore: null,
+                        actualSpread: null,
+                        correct: null,
+                        gradedAt: null
+                    });
+                    activePredictionsSnapshot.docs.push(doc);
+                }
+            }
+        }
+
         const pendingGameIds = new Set(activePredictionsSnapshot.docs.map(d => d.data().gameId));
 
         for (const game of allGames) {
             const gameTime = new Date(game.startTime);
             const timeUntilStart = gameTime.getTime() - now.getTime();
-            const fifteenMinutes = 15 * 60 * 1000;
             const hName = normalizeTeamName(game.homeTeam.name);
             const aName = normalizeTeamName(game.awayTeam.name);
 
@@ -85,21 +109,27 @@ export async function GET(request: NextRequest) {
                         }
                     }
 
-                    // --- Skip games with no real spread (can't grade without a line) ---
-                    if (spreadPoints === 0) {
-                        console.log(`[sync-accuracy] SKIP ${aName} @ ${hName} — no spread found in daily_games`);
-                        continue;
+                    // --- Skip games with no spread source (can't grade without a line) ---
+                    if (spreadSource === 'none' && spreadPoints === 0) {
+                        if (game.sport === 'MLB') {
+                            spreadSource = 'Default Line';
+                        } else {
+                            console.log(`[sync-accuracy] SKIP ${aName} @ ${hName} — no spread found in daily_games`);
+                            continue;
+                        }
                     }
 
-                    console.log(`[sync-accuracy] Snapshotting ${aName} @ ${hName} | Line: ${spreadPoints} (${spreadSource})`);
+                    console.log(`[sync-accuracy] Snapshotting ${game.sport} game: ${aName} @ ${hName} | Line: ${spreadPoints} (${spreadSource})`);
 
-                    const endpoint = game.sport === 'NBA' ? '/api/predict-game' : '/api/predict-ncaam';
+                    let endpoint = '/api/predict-game';
+                    if (game.sport === 'NCAAM') endpoint = '/api/predict-ncaam';
+                    if (game.sport === 'MLB') endpoint = '/api/predict-mlb';
 
                     try {
-                        const predRes = await fetch(`${baseUrl}${endpoint}?home=${hName}&away=${aName}&marketSpread=${spreadPoints}`);
+                        const predRes = await fetch(`${baseUrl}${endpoint}?home=${encodeURIComponent(hName)}&away=${encodeURIComponent(aName)}&marketSpread=${spreadPoints}`);
                         const predJson = await predRes.json();
 
-                        if (predRes.ok) {
+                        if (predRes.ok && predJson.prediction) {
                             const prediction = predJson.prediction;
                             const predData = {
                                 gameId: game.id,
@@ -120,7 +150,7 @@ export async function GET(request: NextRequest) {
                             };
                             
                             await db.collection('model_predictions').doc(game.id).set(predData);
-                            results.snapshots.push(`${aName} @ ${hName} (Line: ${spreadPoints})`);
+                            results.snapshots.push(`${game.sport}: ${aName} @ ${hName} (Line: ${spreadPoints})`);
                             
                             // Make it available for immediate grading if game is already over
                             pendingGameIds.add(game.id);
@@ -136,12 +166,28 @@ export async function GET(request: NextRequest) {
             }
 
             // --- GRADING LOGIC ---
-            if (game.statusState === 'post' && pendingGameIds.has(game.id)) {
+            const isGameCompleted = game.completed === true || (game.statusState === 'post' && game.statusDetail?.toLowerCase().includes('final'));
+            
+            if (isGameCompleted && pendingGameIds.has(game.id)) {
                 const predDoc = activePredictionsSnapshot.docs.find(d => d.data().gameId === game.id);
                 if (predDoc) {
                     const data = predDoc.data();
-                    const homeScore = game.liveScore?.home || 0;
-                    const awayScore = game.liveScore?.away || 0;
+                    const homeScore = game.liveScore?.home;
+                    const awayScore = game.liveScore?.away;
+
+                    // Require valid numeric scores
+                    if (typeof homeScore !== 'number' || typeof awayScore !== 'number' || isNaN(homeScore) || isNaN(awayScore)) {
+                        console.log(`[sync-accuracy] SKIP GRADING ${aName} @ ${hName} — invalid scores: home=${homeScore}, away=${awayScore}`);
+                        continue;
+                    }
+
+                    // For non-soccer sports, a 0-0 score indicates incomplete data from ESPN
+                    const isSoccer = SOCCER_SPORTS.includes((game.sport || '').toUpperCase());
+                    if (!isSoccer && homeScore === 0 && awayScore === 0) {
+                        console.log(`[sync-accuracy] SKIP GRADING ${game.sport} game: ${aName} @ ${hName} — score is 0-0 (waiting for ESPN final score)`);
+                        continue;
+                    }
+
                     const actualSpread = awayScore - homeScore;
 
                     let correct = false;
@@ -161,7 +207,7 @@ export async function GET(request: NextRequest) {
                         correct: correct,
                         gradedAt: now.toISOString()
                     });
-                    results.graded.push(`${aName} ${awayScore} - ${homeScore} ${hName} (${correct ? 'HIT' : 'MISS'})`);
+                    results.graded.push(`${game.sport}: ${aName} ${awayScore} - ${homeScore} ${hName} (${correct ? 'HIT' : 'MISS'})`);
                 }
             }
         }

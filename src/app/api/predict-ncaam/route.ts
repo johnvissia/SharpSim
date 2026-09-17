@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
                 marketSpread: marketSpread,
                 zScore: parseFloat(zScore.toFixed(2)),
                 betSignal,
-                recommendedSide: absZ >= 0.55 ? recommendedSide : null,
+                recommendedSide: recommendedSide,
                 confidence: Math.min(absZ * 25, 99).toFixed(0) + '%'
             },
             components: {

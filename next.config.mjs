@@ -8,9 +8,7 @@ const nextConfig = {
       },
     ],
   },
-  experimental: {
-    serverExternalPackages: ['genkit', 'express', 'firebase-admin'],
-  },
-};
 
+
+};
 export default nextConfig;

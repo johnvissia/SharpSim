@@ -91,7 +91,7 @@ export async function POST() {
                 let totalOppRating = 0;
                 let oppCount = 0;
 
-                team.games.forEach((g: any) => {
+                (team.games || []).forEach((g: any) => {
                     const opp = teamMap.get(g.opponent);
                     if (opp) {
                         totalOppRating += opp.srsRating;

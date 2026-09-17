@@ -1,5 +1,5 @@
 
-import { updateAllTeamInjuries } from './src/lib/services/nba-injuries';
+import { updateAllTeamInjuries } from '../src/lib/services/nba-injuries';
 
 async function debugSync() {
     console.log('Starting debug sync...');
