@@ -56,3 +56,10 @@ check_error.js
 ocr.js
 eng.traineddata
 *.png
+
+# secrets & service accounts
+*-key.json
+*serviceAccount*.json
+*service-account*.json
+firebase-key.json
+*credentials*.json
