@@ -63,6 +63,8 @@ eng.traineddata
 *service-account*.json
 firebase-key.json
 *credentials*.json
+studio-*.json
+*adminsdk*.json
 
 # python
 __pycache__/
