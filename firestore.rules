@@ -1,15 +1,13 @@
 /**
- * Core Philosophy: This ruleset supports a client-side data caching model for public sports data and user-specific betting.
+ * Core Philosophy: This ruleset supports public sports data reads and authenticated user betting.
  *
- * Public Data (/daily_games, /completed_games, /system, /rankings, /player_props):
+ * Public Data (/daily_games, /completed_games, /system, /rankings, /player_props, /model_predictions, etc.):
  * - Public Read Access: All game, system, ranking, and prop data is public and readable by anyone.
- * - Authenticated Writes: To prevent anonymous abuse, only signed-in users can write to these collections, which is necessary for the client-side data fetching and admin features.
+ * - Admin-Only Client Writes: Only verified administrator accounts can write directly from client.
+ *   Automated ingestion and pipelines use the Firebase Admin SDK (which bypasses rules).
  *
  * User Data (/users):
- * - Owner-Only Access: Users can only read and write their own data. A user can create their own profile and bets, and update them. This is critical for security.
- *
- * Key Security Decisions:
- *   - No Data Validation: In line with prototyping, these rules focus on authorization, not data validation.
+ * - Owner-Only Access: Users can only read and write their own data. A user can create their own profile and bets, and update them.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -26,52 +24,56 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email in ['javissia@icloud.com'];
+    }
+
     // ------------------------------------------------------------------------
     // Public Collections
     // ------------------------------------------------------------------------
     match /daily_games/{gameId} {
       allow get, list: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /completed_games/{gameId} {
       allow get, list: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /system/{statusId} {
       allow get, list: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /rankings/{teamName} {
       allow get, list: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /player_props/{propId} {
       allow get, list: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /model_predictions/{predictionId} {
       allow get, list: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /nba_team_stats/{teamId} {
       allow get, list: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /ncaam_team_stats/{teamId} {
       allow get, list: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /completed_player_stats/{statId} {
       allow get, list: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
     
     // ------------------------------------------------------------------------
