@@ -63,3 +63,8 @@ eng.traineddata
 *service-account*.json
 firebase-key.json
 *credentials*.json
+
+# python
+__pycache__/
+*.pyc
+*.pyo
