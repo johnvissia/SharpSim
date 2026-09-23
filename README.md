@@ -13,7 +13,8 @@ A stats-focused MLB simulation platform built to track and find betting value on
 
 ## Getting Started
 ```bash
-git clone [https://github.com/johnvissia/SharpSim.git](https://github.com/johnvissia/SharpSim.git)
+git clone https://github.com/johnvissia/SharpSim.git
 cd SharpSim
-npm install
-npm run dev
+pnpm install
+pnpm dev
+```

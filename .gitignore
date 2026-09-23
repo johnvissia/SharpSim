@@ -43,3 +43,15 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+
+# crash dumps & logs
+hs_err_pid*.log
+*.log
+
+# scratch & temporary files
+scratch/
+tmp/
+test_props.*
+check_error.js
+eng.traineddata
+*.png
