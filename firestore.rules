@@ -25,7 +25,15 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.token.email in ['javissia@icloud.com'];
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.uid in [
+          'bbISx7lZZiWXWJsdLk2NGjYTSdp2',
+          '8n7fi9dV1LTnHpPUac4EEwxq1pB3',
+          'JadnfCXFFuWsCwT34Ib4FawR8Yr2',
+          'oVf8IM2uGkZv3qmYi5DvyTRqGnz2'
+        ]
+      );
     }
 
     // ------------------------------------------------------------------------
