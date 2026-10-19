@@ -4,12 +4,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { GameCard } from '@/components/dashboard/game-card';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, doc, orderBy, query, where, writeBatch, increment } from 'firebase/firestore';
+import { collection, doc, orderBy, query, where, writeBatch, increment, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { syncGameLinesAndScores, syncNBAPlayerStats } from '@/lib/api';
 import { fetchEspnSchedule, fetchAllTeamLogos } from '@/lib/espn';
 import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader, RefreshCw, Users, Activity } from 'lucide-react';
+import { Loader, RefreshCw, Users, Activity, Star } from 'lucide-react';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { GameDetailModal } from '@/components/dashboard/GameDetailModal';
 import { sportNameMapping } from '@/lib/sports';
@@ -240,6 +240,56 @@ export default function DashboardPage() {
     const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
     const favoriteTeams = useMemo(() => userProfile?.favoriteTeams || [], [userProfile]);
 
+    const [localFavoriteLeagues, setLocalFavoriteLeagues] = useState<string[]>([]);
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('sharpsim_favorite_leagues');
+            if (saved) {
+                setLocalFavoriteLeagues(JSON.parse(saved));
+            }
+        } catch (e) { }
+    }, []);
+
+    const favoriteLeagues = useMemo(() => {
+        const fromProfile = userProfile?.favoriteLeagues || [];
+        return Array.from(new Set([...fromProfile, ...localFavoriteLeagues]));
+    }, [userProfile?.favoriteLeagues, localFavoriteLeagues]);
+
+    const handleToggleFavoriteLeague = async (league: string, e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        const isCurrentlyFavorite = favoriteLeagues.includes(league);
+        const updated = isCurrentlyFavorite
+            ? favoriteLeagues.filter(l => l !== league)
+            : [...favoriteLeagues, league];
+
+        setLocalFavoriteLeagues(updated);
+        try {
+            localStorage.setItem('sharpsim_favorite_leagues', JSON.stringify(updated));
+        } catch (err) { }
+
+        toast({
+            title: isCurrentlyFavorite ? 'Removed from Favorites' : 'Added to Favorites',
+            description: isCurrentlyFavorite
+                ? `${league} removed from your favorite leagues.`
+                : `${league} is now in your favorite leagues!`,
+        });
+
+        if (user && firestore) {
+            try {
+                const userRef = doc(firestore, 'users', user.uid);
+                await updateDoc(userRef, {
+                    favoriteLeagues: isCurrentlyFavorite ? arrayRemove(league) : arrayUnion(league)
+                });
+            } catch (err) {
+                console.warn('Failed to update favoriteLeagues in Firestore:', err);
+            }
+        }
+    };
+
     const dailyGamesQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'daily_games'), orderBy('commenceTime'));
@@ -430,12 +480,14 @@ export default function DashboardPage() {
 
         return mergedGames.filter(game => {
             if (selectedCategory === 'Favorites') {
-                if (!favoriteTeams.includes(game.homeTeam.name) && !favoriteTeams.includes(game.awayTeam.name)) {
+                const isFavTeam = favoriteTeams.includes(game.homeTeam.name) || favoriteTeams.includes(game.awayTeam.name);
+                const isFavLeague = favoriteLeagues.includes(game.sport);
+                if (!isFavTeam && !isFavLeague) {
                     return false;
                 }
             } else if (selectedCategory !== 'All') {
                 if (selectedCategory === 'Soccer') {
-                    if (!['EPL', 'MLS', 'UCL', 'Liga MX'].includes(game.sport)) {
+                    if (!['EPL', 'MLS', 'UCL'].includes(game.sport)) {
                         return false;
                     }
                     if (selectedSoccerLeague !== 'All' && game.sport !== selectedSoccerLeague) {
@@ -479,10 +531,10 @@ export default function DashboardPage() {
                     return gameDate.toLocaleDateString('en-CA') === now.toLocaleDateString('en-CA');
                 };
 
-                const isFavA = favoriteTeams.includes(a.homeTeam.name) || favoriteTeams.includes(a.awayTeam.name);
+                const isFavA = favoriteLeagues.includes(a.sport) || favoriteTeams.includes(a.homeTeam.name) || favoriteTeams.includes(a.awayTeam.name);
                 const isPriorityFavA = isFavA && isGameToday(a.startTime);
 
-                const isFavB = favoriteTeams.includes(b.homeTeam.name) || favoriteTeams.includes(b.awayTeam.name);
+                const isFavB = favoriteLeagues.includes(b.sport) || favoriteTeams.includes(b.homeTeam.name) || favoriteTeams.includes(b.awayTeam.name);
                 const isPriorityFavB = isFavB && isGameToday(b.startTime);
 
                 if (isPriorityFavA !== isPriorityFavB) {
@@ -518,7 +570,7 @@ export default function DashboardPage() {
 
                 return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
             });
-    }, [mergedGames, selectedCategory, selectedConference, selectedSoccerLeague, activeBetGameIds, favoriteTeams, selectedDateOffset, dateOptions]);
+    }, [mergedGames, selectedCategory, selectedConference, selectedSoccerLeague, activeBetGameIds, favoriteTeams, favoriteLeagues, selectedDateOffset, dateOptions]);
 
     const groupedGames = useMemo(() => {
         const groups: Record<string, Game[]> = {};
@@ -576,21 +628,57 @@ export default function DashboardPage() {
             ) : (
                 <div className="flex flex-col gap-4 w-full">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900/50 p-3 rounded-xl border border-slate-800 backdrop-blur-sm">
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar w-full md:w-auto">
-                            {['All', 'Favorites', 'NBA', 'NCAAM', 'MLB', 'NHL', 'NFL', 'Soccer'].map(sport => (
-                                <button
-                                    key={sport}
-                                    onClick={() => setSelectedCategory(sport)}
-                                    className={`
-                            px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all
-                            ${selectedCategory === sport
-                                            ? 'bg-white text-slate-950 shadow-lg'
-                                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}
-                        `}
-                                >
-                                    {sport}
-                                </button>
-                            ))}
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar w-full md:w-auto items-center">
+                            {['All', 'Favorites', 'NBA', 'NCAAM', 'MLB', 'NHL', 'NFL', 'Soccer'].map(sport => {
+                                const isFav = favoriteLeagues.includes(sport);
+                                const isSelected = selectedCategory === sport;
+                                const isSpecial = sport === 'All' || sport === 'Favorites';
+
+                                return (
+                                    <div
+                                        key={sport}
+                                        className={`
+                                            inline-flex items-center rounded-lg text-xs font-bold uppercase tracking-wider transition-all
+                                            ${isSelected
+                                                ? 'bg-white text-slate-950 shadow-lg'
+                                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}
+                                        `}
+                                    >
+                                        <button
+                                            onClick={() => setSelectedCategory(sport)}
+                                            className="px-3.5 py-2 flex items-center gap-1.5"
+                                        >
+                                            {sport === 'Favorites' && (
+                                                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                                            )}
+                                            <span>{sport}</span>
+                                            {sport === 'Favorites' && (favoriteLeagues.length > 0 || favoriteTeams.length > 0) && (
+                                                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-600 dark:text-amber-400 font-black">
+                                                    {favoriteLeagues.length + favoriteTeams.length}
+                                                </span>
+                                            )}
+                                        </button>
+                                        {!isSpecial && (
+                                            <button
+                                                type="button"
+                                                title={isFav ? `Remove ${sport} from favorites` : `Favorite ${sport}`}
+                                                onClick={(e) => handleToggleFavoriteLeague(sport, e)}
+                                                className="pr-2.5 pl-0.5 py-2 transition-transform active:scale-90"
+                                            >
+                                                <Star
+                                                    className={`w-3.5 h-3.5 transition-colors ${
+                                                        isFav
+                                                            ? 'fill-amber-400 text-amber-400'
+                                                            : isSelected
+                                                                ? 'text-slate-400 hover:text-amber-500'
+                                                                : 'text-slate-600 hover:text-amber-400'
+                                                    }`}
+                                                />
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                         <div className="flex items-center gap-2">
 
@@ -651,21 +739,48 @@ export default function DashboardPage() {
                     )}
                     
                     {selectedCategory === 'Soccer' && (
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar w-full md:w-auto">
-                            {['All', 'EPL', 'MLS', 'UCL', 'Liga MX'].map(league => (
-                                <button
-                                    key={league}
-                                    onClick={() => setSelectedSoccerLeague(league)}
-                                    className={`
-                      px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all
-                      ${selectedSoccerLeague === league
-                                            ? 'bg-emerald-400 text-slate-950 shadow-lg'
-                                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}
-                    `}
-                                >
-                                    {league}
-                                </button>
-                            ))}
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar w-full md:w-auto items-center">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pr-1">Soccer Leagues:</span>
+                            {['All', 'EPL', 'MLS', 'UCL'].map(league => {
+                                const isFav = favoriteLeagues.includes(league);
+                                const isSelected = selectedSoccerLeague === league;
+                                return (
+                                    <div
+                                        key={league}
+                                        className={`
+                                            inline-flex items-center rounded-lg text-xs font-bold uppercase tracking-wider transition-all
+                                            ${isSelected
+                                                ? 'bg-emerald-400 text-slate-950 shadow-lg'
+                                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}
+                                        `}
+                                    >
+                                        <button
+                                            onClick={() => setSelectedSoccerLeague(league)}
+                                            className="px-3.5 py-1.5 flex items-center gap-1.5"
+                                        >
+                                            <span>{league}</span>
+                                        </button>
+                                        {league !== 'All' && (
+                                            <button
+                                                type="button"
+                                                title={isFav ? `Remove ${league} from favorites` : `Favorite ${league}`}
+                                                onClick={(e) => handleToggleFavoriteLeague(league, e)}
+                                                className="pr-2.5 pl-0.5 py-1.5 transition-transform active:scale-90"
+                                            >
+                                                <Star
+                                                    className={`w-3.5 h-3.5 transition-colors ${
+                                                        isFav
+                                                            ? 'fill-amber-400 text-amber-400'
+                                                            : isSelected
+                                                                ? 'text-slate-900 hover:text-amber-500'
+                                                                : 'text-slate-600 hover:text-amber-400'
+                                                    }`}
+                                                />
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
 

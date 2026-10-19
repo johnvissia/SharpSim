@@ -26,6 +26,9 @@ import {
   Settings,
   User as UserIcon,
   History,
+  Trophy,
+  Shield,
+  ChevronDown,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -42,18 +45,25 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { BetSlip } from '@/components/dashboard/BetSlip';
 
-const navItems = [
+const modelItems = [
+  { href: '/model',        id: 'model',        label: 'Game Model',     desc: 'MLB & NBA Simulator',          icon: BrainCircuit },
+  { href: '/soccer-cl',    id: 'soccer-cl',    label: 'UCL Model',      desc: 'UEFA Champions League Engine',  icon: Trophy },
+  { href: '/soccer-pl',    id: 'soccer-pl',    label: 'EPL Model',      desc: 'English Premier League Engine', icon: Shield },
+  { href: '/prop-hub',     id: 'prop-hub',     label: 'Prop Hub',       desc: 'Player Props Simulator',       icon: Target },
+  { href: '/player-props', id: 'player-props', label: 'Prop Insights',  desc: 'Individual Prop Trends',       icon: UserIcon },
+];
+
+const mainNavItems = [
   { href: '/dashboard',   id: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
   { href: '/my-picks',    id: 'picks',        label: 'Picks',         icon: Ticket },
   { href: '/stats',       id: 'stats',        label: 'Stats',         icon: BarChart3 },
   { href: '/data',        id: 'data',         label: 'Data',          icon: Database },
-  { href: '/model',       id: 'model',        label: 'Model',         icon: BrainCircuit },
-  { href: '/prop-hub',    id: 'prop-hub',     label: 'Prop Hub',      icon: Target },
-  { href: '/player-props',id: 'player-props', label: 'Prop Insights', icon: UserIcon },
   { href: '/accuracy',    id: 'accuracy',     label: 'Accuracy',      icon: History },
   { href: '/store',       id: 'store',        label: 'Store',         icon: ShoppingCart },
   { href: '/coaching',    id: 'coaching',     label: 'Coaching',      icon: GraduationCap },
 ];
+
+const allNavItems = [...mainNavItems, ...modelItems];
 
 export function SiteLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -84,9 +94,10 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const getActiveId = () => {
     if (!pathname || pathname === '/') return 'home';
     const segment = pathname.split('/')[1];
-    return navItems.find(item => item.href === `/${segment}`)?.id ?? '';
+    return allNavItems.find(item => item.href === `/${segment}`)?.id ?? '';
   };
   const activeId = getActiveId();
+  const isModelActive = modelItems.some(item => activeId === item.id);
   const showNav = !isPublicPath;
 
   let content = children;
@@ -149,8 +160,9 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
             <div className="h-5 w-px bg-slate-800 flex-shrink-0" />
 
             {/* ── Nav links ── */}
-            <nav className="flex items-center gap-0.5 flex-1 min-w-0">
-              {navItems.map((item) => {
+            <nav className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto no-scrollbar py-1">
+              {/* Main items before Models */}
+              {mainNavItems.slice(0, 4).map((item) => {
                 const isActive = activeId === item.id;
                 const Icon = item.icon;
                 return (
@@ -158,7 +170,101 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
                     key={item.id}
                     href={item.href}
                     className={cn(
-                      'group relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium whitespace-nowrap transition-all duration-150',
+                      'group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-all duration-150',
+                      isActive
+                        ? 'text-white bg-slate-800'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        'h-3.5 w-3.5 flex-shrink-0 transition-colors',
+                        isActive 
+                          ? (isRealMoneyMode ? 'text-emerald-400' : 'text-brand-400')
+                          : 'text-slate-500 group-hover:text-slate-300'
+                      )}
+                      strokeWidth={2}
+                    />
+                    {item.label}
+                    {isActive && (
+                      <span className={cn(
+                        "absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full transition-colors",
+                        isRealMoneyMode ? "bg-emerald-400" : "bg-brand-400"
+                      )} />
+                    )}
+                  </Link>
+                );
+              })}
+
+              {/* ── Models Dropdown ── */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={cn(
+                      'group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-all duration-150 outline-none cursor-pointer',
+                      isModelActive
+                        ? 'text-white bg-slate-800'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    )}
+                  >
+                    <BrainCircuit
+                      className={cn(
+                        'h-3.5 w-3.5 flex-shrink-0 transition-colors',
+                        isModelActive 
+                          ? (isRealMoneyMode ? 'text-emerald-400' : 'text-brand-400')
+                          : 'text-slate-500 group-hover:text-slate-300'
+                      )}
+                      strokeWidth={2}
+                    />
+                    <span>Models</span>
+                    <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
+                    {isModelActive && (
+                      <span className={cn(
+                        "absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full transition-colors",
+                        isRealMoneyMode ? "bg-emerald-400" : "bg-brand-400"
+                      )} />
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-64 border-slate-800 bg-slate-950/95 backdrop-blur-xl text-slate-200 p-1.5 shadow-2xl" align="start">
+                  <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2.5 py-1">
+                    Simulation Engines
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-slate-800/60 my-1" />
+                  {modelItems.map((sub) => {
+                    const SubIcon = sub.icon;
+                    const isSubActive = activeId === sub.id;
+                    return (
+                      <DropdownMenuItem key={sub.id} asChild className="cursor-pointer">
+                        <Link
+                          href={sub.href}
+                          className={cn(
+                            "flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs font-medium transition-colors",
+                            isSubActive ? "bg-slate-800 text-white font-bold" : "text-slate-400 hover:text-white hover:bg-slate-900"
+                          )}
+                        >
+                          <SubIcon className={cn("h-4 w-4 shrink-0", isSubActive ? (isRealMoneyMode ? "text-emerald-400" : "text-brand-400") : "text-slate-500")} />
+                          <div className="flex flex-col">
+                            <span className="text-white text-xs">{sub.label}</span>
+                            <span className="text-[10px] text-slate-500">{sub.desc}</span>
+                          </div>
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Main items after Models */}
+              {mainNavItems.slice(4).map((item) => {
+                const isActive = activeId === item.id;
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className={cn(
+                      'group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-all duration-150',
                       isActive
                         ? 'text-white bg-slate-800'
                         : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -186,7 +292,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
             </nav>
 
             {/* ── User controls ── */}
-            <div className="flex-shrink-0 flex items-center gap-4">
+            <div className="flex-shrink-0 flex items-center gap-3 ml-auto pl-3 bg-slate-950 z-20">
               {/* ── Mode Toggle ── */}
               <div className="flex items-center gap-2 bg-slate-900/50 border border-slate-800/50 px-2.5 py-1 rounded-full">
                 <div className={cn(

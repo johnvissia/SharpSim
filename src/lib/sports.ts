@@ -8,7 +8,6 @@ export const sportKeyMapping: { [key: string]: string } = {
     'EPL': 'soccer_epl',
     'MLS': 'soccer_usa_mls',
     'UCL': 'soccer_uefa_champs_league',
-    'Liga MX': 'soccer_mexico_ligamx',
     'WNBA': 'basketball_wnba',
     'NCAAM': 'basketball_ncaab',
 };

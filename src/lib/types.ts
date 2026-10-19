@@ -39,7 +39,7 @@ export type SportsbookOdds = {
   odds: Odds;
 };
 
-export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'EPL' | 'MLS' | 'UCL' | 'Liga MX' | 'WNBA' | 'NCAAM';
+export type SportName = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'EPL' | 'MLS' | 'UCL' | 'WNBA' | 'NCAAM';
 
 export type Game = {
   id: string;
@@ -107,6 +107,7 @@ export interface UserProfile {
   createdAt: any; // Firestore ServerTimestamp
   lastCoinCollection?: string; // ISO 8601 string
   favoriteTeams?: string[];
+  favoriteLeagues?: string[];
   preferences?: BettingPreferences;
   isPro?: boolean;
   membershipTier?: string;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { collection, doc } from 'firebase/firestore';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -38,6 +38,7 @@ type BreakdownStats = {
 export default function StatsPage() {
     const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
+    const [selectedSport, setSelectedSport] = useState<string>('ALL');
 
     const betsQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -45,6 +46,17 @@ export default function StatsPage() {
     }, [user, firestore]);
 
     const { data: bets, isLoading: isLoadingBets } = useCollection<UserBet>(betsQuery);
+
+    const displayBets = useMemo(() => {
+        if (!bets) return [];
+        if (selectedSport === 'ALL') return bets;
+        return bets.filter(b => {
+            if (b.betType === 'parlay') {
+                return b.legs?.some(l => l.sport?.toUpperCase() === selectedSport.toUpperCase());
+            }
+            return b.sport?.toUpperCase() === selectedSport.toUpperCase();
+        });
+    }, [bets, selectedSport]);
 
     const userProfileRef = useMemoFirebase(
         () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
@@ -77,13 +89,13 @@ export default function StatsPage() {
         };
         const breakdown: Record<string, BreakdownStats> = {};
 
-        if (!bets) {
+        if (!displayBets || displayBets.length === 0) {
             return { overall, breakdown, winPercentage: 0, roiPercentage: 0 };
         }
 
-        overall.totalBets = bets.length;
+        overall.totalBets = displayBets.length;
 
-        for (const bet of bets) {
+        for (const bet of displayBets) {
             // Overall ticket-based calculations
             if (bet.status !== 'pending' && bet.status !== 'push') {
                  overall.totalWagered += bet.stake;
@@ -166,12 +178,12 @@ export default function StatsPage() {
         const roiPercentage = overall.totalWagered > 0 ? (overall.netProfit / overall.totalWagered) * 100 : 0;
 
         return { overall, breakdown, winPercentage, roiPercentage };
-    }, [bets]);
+    }, [displayBets]);
 
     const chartData = useMemo(() => {
-        if (!bets) return [];
+        if (!displayBets) return [];
 
-        const settledBets = bets.filter(bet => bet.status === 'won' || bet.status === 'lost');
+        const settledBets = displayBets.filter(bet => bet.status === 'won' || bet.status === 'lost');
         const sortedBets = settledBets.sort((a, b) => new Date(a.placedAt).getTime() - new Date(b.placedAt).getTime());
 
         const dailyMap = new Map<string, number>();
@@ -186,7 +198,7 @@ export default function StatsPage() {
             cumulative += dailyProfit;
             return { date, units: Number(cumulative.toFixed(2)) };
         });
-    }, [bets]);
+    }, [displayBets]);
 
     const sortedBreakdown = useMemo(() => {
         return Object.entries(stats.breakdown).sort(([, a], [, b]) => {
@@ -227,7 +239,7 @@ export default function StatsPage() {
 
     return (
         <div className="p-4 md:p-8 min-h-screen">
-            <header className="mb-10">
+            <header className="mb-6">
                 <div className="flex items-center gap-2 text-xs text-slate-500 mb-2 uppercase tracking-tighter font-bold">
                     <span>Account</span>
                     <span className="text-[10px] mx-1">›</span>
@@ -240,6 +252,25 @@ export default function StatsPage() {
                     </div>
                 </div>
             </header>
+
+            {/* Sport Filter Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider pr-1">Sport:</span>
+                {['ALL', 'UCL', 'EPL', 'NBA', 'MLB', 'NCAAM'].map((sport) => (
+                    <button
+                        key={sport}
+                        onClick={() => setSelectedSport(sport)}
+                        className={cn(
+                            "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                            selectedSport === sport
+                                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/30"
+                                : "bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800"
+                        )}
+                    >
+                        {sport === 'ALL' ? 'All Sports' : sport === 'UCL' ? '🏆 UCL' : sport === 'EPL' ? '🛡️ EPL' : sport}
+                    </button>
+                ))}
+            </div>
 
             {/* KPI Bento Grid */}
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">

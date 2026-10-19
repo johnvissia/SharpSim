@@ -119,15 +119,19 @@ export async function fetchEspnSchedule(): Promise<Game[]> {
         { url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard', slug: 'epl', sport: 'EPL' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard', slug: 'mls', sport: 'MLS' as SportName },
         { url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard', slug: 'ucl', sport: 'UCL' as SportName },
-        { url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/scoreboard', slug: 'liga-mx', sport: 'Liga MX' as SportName },
     ];
 
     try {
         const promises: Promise<{ data: any, slug: string, sport: SportName }>[] = [];
         sources.forEach(src => {
-            // Fetch past 4 days, today, and tomorrow to ensure we catch old games for grading
-            for (let i = -4; i <= 1; i++) {
-                promises.push(fetch(`${src.url}?dates=${getDateStr(i)}&limit=100`, { next: { revalidate: 60 } }).then(r => r.json()).then(d => ({ data: d, slug: src.slug, sport: src.sport })));
+            // Fetch past 4 days, today, and upcoming 5 days to ensure we catch old games for grading and upcoming matchweeks
+            for (let i = -4; i <= 5; i++) {
+                promises.push(
+                    fetch(`${src.url}?dates=${getDateStr(i)}&limit=100`, { next: { revalidate: 60 } })
+                        .then(r => r.json())
+                        .then(d => ({ data: d, slug: src.slug, sport: src.sport }))
+                        .catch(() => ({ data: {}, slug: src.slug, sport: src.sport }))
+                );
             }
         });
 
@@ -244,7 +248,7 @@ export async function fetchAllTeamLogos(): Promise<Record<string, string>> {
     const sports = [
         'basketball/nba', 'football/nfl', 'hockey/nhl', 'football/college-football', 
         'basketball/mens-college-basketball', 'baseball/mlb',
-        'soccer/eng.1', 'soccer/usa.1', 'soccer/uefa.champions', 'soccer/mex.1'
+        'soccer/eng.1', 'soccer/usa.1', 'soccer/uefa.champions'
     ];
     const newLogoMap: Record<string, string> = {};
     const promises = sports.map(async (sport) => {

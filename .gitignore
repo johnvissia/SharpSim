@@ -68,5 +68,16 @@ studio-*.json
 
 # python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.pytest_cache/
+
+# sqlite / local db
+*.db
+*.sqlite
+*.sqlite3

@@ -113,6 +113,8 @@ export const sportIconMap: { [key: string]: React.ElementType<LucideProps> } = {
     'NFL': FootballIcon,
     'NHL': IceSkate,
     'Soccer': FutbolIcon,
+    'UCL': FutbolIcon,
+    'EPL': FutbolIcon,
     'MLB': BaseballIcon,
     'Default': Trophy,
 };

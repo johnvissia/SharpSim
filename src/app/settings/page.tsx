@@ -2,12 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import { Settings as SettingsIcon, User, Moon, Sun, DollarSign, Bell, Shield } from 'lucide-react';
+import { Settings as SettingsIcon, User, Moon, Sun, DollarSign, Bell, Shield, Star, Trophy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ManagePlanModal } from '@/components/dashboard/ManagePlanModal';
 import { useAppMode } from '@/context/AppModeContext';
+
+const AVAILABLE_LEAGUES = [
+    { id: 'EPL', name: 'English Premier League', sport: 'Soccer', badge: '⚽ EPL' },
+    { id: 'UCL', name: 'UEFA Champions League', sport: 'Soccer', badge: '🏆 UCL' },
+    { id: 'MLS', name: 'Major League Soccer', sport: 'Soccer', badge: '⚽ MLS' },
+    { id: 'NBA', name: 'National Basketball Association', sport: 'Basketball', badge: '🏀 NBA' },
+    { id: 'NCAAM', name: "Men's College Basketball", sport: 'Basketball', badge: '🏀 NCAAM' },
+    { id: 'MLB', name: 'Major League Baseball', sport: 'Baseball', badge: '⚾ MLB' },
+    { id: 'NHL', name: 'National Hockey League', sport: 'Hockey', badge: '🏒 NHL' },
+    { id: 'NFL', name: 'National Football League', sport: 'Football', badge: '🏈 NFL' },
+];
 
 export default function SettingsPage() {
     const { user, isUserLoading } = useUser();
@@ -68,6 +79,50 @@ export default function SettingsPage() {
     const toggleNotifications = () => {
         setNotifications(!notifications);
         toast({ title: "Notifications updated", description: `Alerts are now ${!notifications ? 'on' : 'off'}.` });
+    };
+
+    const [localFavoriteLeagues, setLocalFavoriteLeagues] = useState<string[]>([]);
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('sharpsim_favorite_leagues');
+            if (saved) setLocalFavoriteLeagues(JSON.parse(saved));
+        } catch (e) { }
+    }, []);
+
+    const favoriteLeagues = Array.from(new Set([
+        ...(userProfile?.favoriteLeagues || []),
+        ...localFavoriteLeagues
+    ]));
+
+    const handleToggleFavoriteLeague = async (leagueId: string) => {
+        const isCurrentlyFavorite = favoriteLeagues.includes(leagueId);
+        const updated = isCurrentlyFavorite
+            ? favoriteLeagues.filter(l => l !== leagueId)
+            : [...favoriteLeagues, leagueId];
+
+        setLocalFavoriteLeagues(updated);
+        try {
+            localStorage.setItem('sharpsim_favorite_leagues', JSON.stringify(updated));
+        } catch (err) { }
+
+        toast({
+            title: isCurrentlyFavorite ? 'Removed from Favorites' : 'Added to Favorites',
+            description: isCurrentlyFavorite
+                ? `${leagueId} removed from your favorite leagues.`
+                : `${leagueId} is now in your favorite leagues!`,
+        });
+
+        if (user && firestore) {
+            try {
+                const userRef = doc(firestore, 'users', user.uid);
+                await updateDoc(userRef, {
+                    favoriteLeagues: isCurrentlyFavorite ? arrayRemove(leagueId) : arrayUnion(leagueId),
+                });
+            } catch (err) {
+                console.warn('Failed to update favoriteLeagues in Firestore:', err);
+            }
+        }
     };
 
     if (isUserLoading || !user) {
@@ -224,6 +279,59 @@ export default function SettingsPage() {
                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notifications ? 'translate-x-6' : 'translate-x-1'}`} />
                         </button>
                     </div>
+                </div>
+            </div>
+
+            {/* Favorite Leagues Management */}
+            <div className="bg-[#1a1c23] border border-slate-800/60 rounded-2xl p-6 shadow-lg space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="flex items-center gap-2 text-xl font-bold text-slate-100">
+                            <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+                            Favorite Leagues
+                        </div>
+                        <p className="text-sm text-slate-400 mt-1">
+                            Pin leagues to customize your dashboard feeds and easily filter games under the Favorites tab.
+                        </p>
+                    </div>
+                    {favoriteLeagues.length > 0 && (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/20">
+                            {favoriteLeagues.length} Active
+                        </span>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+                    {AVAILABLE_LEAGUES.map(league => {
+                        const isFav = favoriteLeagues.includes(league.id);
+                        return (
+                            <button
+                                key={league.id}
+                                onClick={() => handleToggleFavoriteLeague(league.id)}
+                                className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                                    isFav
+                                        ? 'bg-amber-500/10 border-amber-500/40 text-white shadow-sm'
+                                        : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                                }`}
+                            >
+                                <div className="min-w-0 pr-2">
+                                    <div className="font-bold text-sm truncate flex items-center gap-1.5">
+                                        <span>{league.badge}</span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                                        {league.name}
+                                    </div>
+                                </div>
+                                <Star
+                                    className={`w-4 h-4 shrink-0 transition-colors ${
+                                        isFav
+                                            ? 'fill-amber-400 text-amber-400'
+                                            : 'text-slate-600'
+                                    }`}
+                                />
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
             

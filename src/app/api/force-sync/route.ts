@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import { resilientSetDoc } from '@/lib/firestore-rest';
 import { sportKeyMapping } from '@/lib/sports';
 
 export const dynamic = 'force-dynamic';
@@ -28,15 +28,14 @@ export async function GET(request: NextRequest) {
             const data = await res.json();
             if (!data || data.length === 0) continue;
 
-            const batch = db.batch();
-            data.forEach((game: any) => {
+            for (const game of data) {
                 const gameStart = new Date(game.commence_time).getTime();
                 const now = new Date().getTime();
                 const timeLimitMs = 15 * 60 * 1000;
                 
                 // Freeze the Vegas line 15 minutes before the game time
                 if (now >= gameStart - timeLimitMs) {
-                    return; // Skip this game to keep the line frozen
+                    continue; // Skip this game to keep the line frozen
                 }
 
                 const gameData = {
@@ -47,11 +46,9 @@ export async function GET(request: NextRequest) {
                     awayTeam: game.away_team,
                     bookmakerOdds: game.bookmakers?.map((b: any) => JSON.stringify(b)) || [],
                 };
-                const gameRef = db.collection('daily_games').doc(game.id);
-                batch.set(gameRef, gameData);
+                await resilientSetDoc('daily_games', game.id, gameData);
                 totalGames++;
-            });
-            await batch.commit();
+            }
             console.log(`Saved ${data.length} games for ${sport}`);
         }
 

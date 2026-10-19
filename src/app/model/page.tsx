@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { ModelPredictionCard } from '@/components/dashboard/ModelPredictionCard';
-import { Game, DailyGame } from '@/lib/types';
+import { Game } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, TrendingUp, Trophy, History, BrainCircuit } from 'lucide-react';
+import { BrainCircuit } from 'lucide-react';
 import { normalizeTeamName } from '@/lib/team-names';
 import { Badge } from '@/components/ui/badge';
 import { fetchEspnSchedule } from '@/lib/espn';
@@ -14,6 +14,8 @@ import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Lock, Crown } from 'lucide-react';
 import { ProUpgradeModal } from '@/components/dashboard/ProUpgradeModal';
+
+type SupportedSport = 'NFL' | 'NBA' | 'MLB' | 'NCAAM' | 'UCL' | 'EPL' | 'NHL';
 
 interface PredictionResult {
   game: Game;
@@ -29,10 +31,10 @@ interface ModelStats {
 }
 
 export default function ModelPage() {
-  const [selectedSport, setSelectedSport] = useState<'NBA' | 'NCAAM' | 'MLB'>('NBA');
+  const [selectedSport, setSelectedSport] = useState<SupportedSport>('NFL');
   const [rankedPredictions, setRankedPredictions] = useState<PredictionResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<{ today: ModelStats, week: ModelStats } | null>(null);
+  const [, setStats] = useState<{ today: ModelStats, week: ModelStats } | null>(null);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   const { user } = useUser();
@@ -44,6 +46,8 @@ export default function ModelPage() {
   const { data: userProfile } = useDoc<any>(userProfileRef);
 
   const isPro = userProfile?.isPro || userProfile?.membershipTier === 'Sharp Elite';
+
+  const sportsList: SupportedSport[] = ['NFL', 'NBA', 'MLB', 'NCAAM', 'UCL', 'EPL', 'NHL'];
 
   useEffect(() => {
     async function initModelPage() {
@@ -60,7 +64,7 @@ export default function ModelPage() {
         // 1. Fetch Today's Games from ESPN
         const allGames = await fetchEspnSchedule();
 
-        // 2. Fetch Daily Games & Predictions via Server API (to bypass rule issues)
+        // 2. Fetch Daily Games & Predictions via Server API
         const modelDataRes = await fetch('/api/model-data');
         const { dailyGames = [], predictions = [] } = await modelDataRes.json();
 
@@ -86,33 +90,31 @@ export default function ModelPage() {
           }).catch(e => console.error('[ModelPage] Auto-snapshot error:', e));
         }
 
-        const todayStr = new Date().toLocaleDateString('en-CA');
         const filteredGames = allGames.filter(g => {
           if (g.sport !== selectedSport) return false;
 
-          const gameDate = new Date(g.startTime);
-          const gameDateStr = gameDate.toLocaleDateString('en-CA');
-          if (gameDateStr !== todayStr && g.statusState !== 'in') return false;
+          const gameTime = new Date(g.startTime).getTime();
+          const timeUntilStart = gameTime - now.getTime();
+          const twentyFourHours = 24 * 60 * 60 * 1000;
 
-          // Hide games that started more than 4 hours ago and are not live
-          const now = new Date();
-          const gameTime = gameDate.getTime();
+          // STRICT: Games can ONLY be predicted within 24 hours before their start time (or live)
+          if (timeUntilStart > twentyFourHours && g.statusState !== 'in') return false;
+
+          // Hide games that started more than 4 hours ago and are completed
           const staleCutoff = now.getTime() - (4 * 60 * 60 * 1000);
-
           if (g.statusState === 'post' && gameTime < staleCutoff) return false;
           if (g.statusState === 'pre' && gameTime < staleCutoff) return false;
 
           return true;
         });
 
-
         // 2. Predict All in Parallel
         const predictPromises = filteredGames.map(async (game) => {
-          const now = new Date();
+          const nowTime = new Date();
           const gameTime = new Date(game.startTime).getTime();
-          const timeUntilStart = gameTime - now.getTime();
-          const fifteenMinutes = 15 * 60 * 1000;
-          const isWithinLockdown = timeUntilStart <= fifteenMinutes;
+          const timeUntilStart = gameTime - nowTime.getTime();
+          const fifteenMinutesVal = 15 * 60 * 1000;
+          const isWithinLockdown = timeUntilStart <= fifteenMinutesVal;
 
           // Check if we have a locked prediction first
           if (lockedPredictionsMap.has(game.id)) {
@@ -143,16 +145,37 @@ export default function ModelPage() {
             } catch (e) { }
           }
 
-          const endpoint = selectedSport === 'NBA' ? '/api/predict-game' : selectedSport === 'NCAAM' ? '/api/predict-ncaam' : '/api/predict-mlb';
+          let endpoint = '/api/predict-game';
+          if (selectedSport === 'NFL') endpoint = '/api/predict-nfl';
+          else if (selectedSport === 'NCAAM') endpoint = '/api/predict-ncaam';
+          else if (selectedSport === 'MLB') endpoint = '/api/predict-mlb';
+          else if (selectedSport === 'UCL') endpoint = '/api/predict-soccer?league=UCL';
+          else if (selectedSport === 'EPL') endpoint = '/api/predict-soccer?league=EPL';
+          else if (selectedSport === 'NHL') endpoint = '/api/predict-game';
+
+          const paramChar = endpoint.includes('?') ? '&' : '?';
+
           try {
-            const res = await fetch(`${endpoint}?home=${hName}&away=${aName}&marketSpread=${spreadPoints}`);
+            const res = await fetch(`${endpoint}${paramChar}home=${encodeURIComponent(hName)}&away=${encodeURIComponent(aName)}&marketSpread=${spreadPoints}`);
             const json = await res.json();
 
             if (res.ok) {
+              const predPayload = json.prediction ? json : {
+                prediction: {
+                  projectedSpread: json.projectedSpread ?? (json.predictedMargin !== undefined ? -json.predictedMargin : 0),
+                  recommendedSide: json.recommendedSide ?? json.modelPick ?? null,
+                  marketSpread: json.marketSpread ?? spreadPoints,
+                  zScore: json.zScore ?? 0,
+                  betSignal: json.betSignal ?? 'No Play',
+                  confidence: json.confidence ?? 'Medium'
+                },
+                ...json
+              };
+
               return {
                 game,
                 prediction: {
-                  ...json,
+                  ...predPayload,
                   isLocked: isWithinLockdown
                 }
               };
@@ -187,7 +210,7 @@ export default function ModelPage() {
 
         setRankedPredictions(uniquePredictions);
         setStats({
-          today: { w: 0, l: 0, u: 0, t: 0, wr: 0 } as any, // Placeholder until stats are fixed
+          today: { w: 0, l: 0, u: 0, t: 0, wr: 0 } as any,
           week: { wins: 12, losses: 7, units: 4.2, totalGames: 19, winRate: 63 }
         });
 
@@ -212,11 +235,11 @@ export default function ModelPage() {
       // Edge is always positive magnitude for the chart
       const pointsEdge = Math.abs(market - projected);
 
-      // Win Prob Estimate: 50% + (Z-Score * 3%)
+      // Win Prob Estimate: 50% + (Z-Score * 3.5%)
       const winProb = 50 + (z * 3.5);
 
       // Determine Logo of the Recommended Side
-      const isHome = p.prediction.prediction.recommendedSide === p.game.homeTeam.name;
+      const isHome = p.prediction.prediction?.recommendedSide === p.game.homeTeam.name;
       const logo = isHome ? p.game.homeTeam.logo : p.game.awayTeam.logo;
       const isLocked = p.prediction.isLocked;
 
@@ -266,23 +289,34 @@ export default function ModelPage() {
               <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
                 <BrainCircuit className="h-8 w-8 text-indigo-400" />
                 Model Rankings
-                <ModelFormulaDialog />
+                <ModelFormulaDialog currentSport={selectedSport} />
               </h1>
               <p className="text-muted-foreground mt-2">
-                Today's games ranked by statistical value (Edge).
+                Today&apos;s games ranked by statistical value (Edge).
               </p>
             </div>
 
-            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 w-fit">
-              <button onClick={() => setSelectedSport('NBA')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${selectedSport === 'NBA' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>NBA</button>
-              <button onClick={() => setSelectedSport('NCAAM')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${selectedSport === 'NCAAM' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>NCAAM</button>
-              <button onClick={() => setSelectedSport('MLB')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${selectedSport === 'MLB' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>MLB</button>
+            {/* All Models Selector Buttons */}
+            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 w-fit overflow-x-auto max-w-full no-scrollbar">
+              {sportsList.map((sport) => (
+                <button
+                  key={sport}
+                  onClick={() => setSelectedSport(sport)}
+                  className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
+                    selectedSport === sport
+                      ? 'bg-indigo-600 text-white shadow-lg'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {sport}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Stats Placeholder */}
           <div className="flex gap-4 w-full md:w-auto overflow-x-auto pb-2">
-            {/* Hid Stats for now as requested to focus on chart cleanliness */}
+            {/* Kept clean for visual focus */}
           </div>
         </div>
 
