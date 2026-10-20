@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, Suspense } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
 import { useAppMode } from '@/context/AppModeContext';
 import { signOut } from 'firebase/auth';
@@ -29,6 +29,8 @@ import {
   Trophy,
   Shield,
   ChevronDown,
+  CircleDot,
+  Circle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -45,13 +47,20 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { BetSlip } from '@/components/dashboard/BetSlip';
 
-const modelItems = [
-  { href: '/model',        id: 'model',        label: 'Game Model',     desc: 'MLB & NBA Simulator',          icon: BrainCircuit },
-  { href: '/soccer-cl',    id: 'soccer-cl',    label: 'UCL Model',      desc: 'UEFA Champions League Engine',  icon: Trophy },
-  { href: '/soccer-pl',    id: 'soccer-pl',    label: 'EPL Model',      desc: 'English Premier League Engine', icon: Shield },
-  { href: '/prop-hub',     id: 'prop-hub',     label: 'Prop Hub',       desc: 'Player Props Simulator',       icon: Target },
-  { href: '/player-props', id: 'player-props', label: 'Prop Insights',  desc: 'Individual Prop Trends',       icon: UserIcon },
+export const gameModelItems = [
+  { href: '/model?sport=NFL',   id: 'model-nfl',   sport: 'NFL', label: 'NFL Model',    desc: 'Pro Football Spread Engine',       icon: Trophy },
+  { href: '/model?sport=NBA',   id: 'model-nba',   sport: 'NBA', label: 'NBA Model',    desc: 'Basketball Spread & Totals',       icon: CircleDot },
+  { href: '/model?sport=MLB',   id: 'model-mlb',   sport: 'MLB', label: 'MLB Model',    desc: 'Baseball Run Line Simulator',      icon: Circle },
+  { href: '/soccer-cl',         id: 'soccer-cl',   sport: 'UCL', label: 'UCL Model',    desc: 'UEFA Champions League Engine',     icon: Trophy },
+  { href: '/soccer-pl',         id: 'soccer-pl',   sport: 'EPL', label: 'EPL Model',    desc: 'English Premier League Engine',    icon: Shield },
 ];
+
+export const propModelItems = [
+  { href: '/prop-hub',          id: 'prop-hub',    sport: 'PROPS', label: 'Prop Hub',     desc: 'Player Props Simulator',           icon: Target },
+  { href: '/player-props',      id: 'player-props',sport: 'PROPS', label: 'Prop Insights',desc: 'Individual Prop Trends',          icon: UserIcon },
+];
+
+export const modelItems = [...gameModelItems, ...propModelItems];
 
 const mainNavItems = [
   { href: '/dashboard',   id: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
@@ -64,6 +73,111 @@ const mainNavItems = [
 ];
 
 const allNavItems = [...mainNavItems, ...modelItems];
+
+function ModelsDropdown({ isRealMoneyMode }: { isRealMoneyMode: boolean }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentSport = searchParams?.get('sport')?.toUpperCase();
+
+  const isModelActive = pathname === '/model' || pathname === '/soccer-cl' || pathname === '/soccer-pl' || pathname === '/prop-hub' || pathname === '/player-props';
+
+  const isSubActive = (sub: typeof modelItems[0]) => {
+    if (sub.href.startsWith('/model')) {
+      if (pathname !== '/model') return false;
+      if (sub.sport === currentSport) return true;
+      if (!currentSport && sub.sport === 'NFL') return true;
+      return false;
+    }
+    return pathname === sub.href;
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className={cn(
+            'group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-all duration-150 outline-none cursor-pointer',
+            isModelActive
+              ? 'text-white bg-slate-800'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          )}
+        >
+          <BrainCircuit
+            className={cn(
+              'h-3.5 w-3.5 flex-shrink-0 transition-colors',
+              isModelActive 
+                ? (isRealMoneyMode ? 'text-emerald-400' : 'text-brand-400')
+                : 'text-slate-500 group-hover:text-slate-300'
+            )}
+            strokeWidth={2}
+          />
+          <span>Models</span>
+          <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
+          {isModelActive && (
+            <span className={cn(
+              "absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full transition-colors",
+              isRealMoneyMode ? "bg-emerald-400" : "bg-brand-400"
+            )} />
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-64 border-slate-800 bg-slate-950/95 backdrop-blur-xl text-slate-200 p-1.5 shadow-2xl" align="start">
+        <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2.5 py-1">
+          League Simulators
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-slate-800/60 my-1" />
+        {gameModelItems.map((sub) => {
+          const SubIcon = sub.icon;
+          const active = isSubActive(sub);
+          return (
+            <DropdownMenuItem key={sub.id} asChild className="cursor-pointer">
+              <Link
+                href={sub.href}
+                className={cn(
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs font-medium transition-colors",
+                  active ? "bg-slate-800 text-white font-bold" : "text-slate-400 hover:text-white hover:bg-slate-900"
+                )}
+              >
+                <SubIcon className={cn("h-4 w-4 shrink-0", active ? (isRealMoneyMode ? "text-emerald-400" : "text-brand-400") : "text-slate-500")} />
+                <div className="flex flex-col">
+                  <span className="text-white text-xs">{sub.label}</span>
+                  <span className="text-[10px] text-slate-500">{sub.desc}</span>
+                </div>
+              </Link>
+            </DropdownMenuItem>
+          );
+        })}
+
+        <DropdownMenuSeparator className="bg-slate-800/60 my-1.5" />
+        <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2.5 py-1">
+          Player Props
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-slate-800/60 my-1" />
+        {propModelItems.map((sub) => {
+          const SubIcon = sub.icon;
+          const active = isSubActive(sub);
+          return (
+            <DropdownMenuItem key={sub.id} asChild className="cursor-pointer">
+              <Link
+                href={sub.href}
+                className={cn(
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs font-medium transition-colors",
+                  active ? "bg-slate-800 text-white font-bold" : "text-slate-400 hover:text-white hover:bg-slate-900"
+                )}
+              >
+                <SubIcon className={cn("h-4 w-4 shrink-0", active ? (isRealMoneyMode ? "text-emerald-400" : "text-brand-400") : "text-slate-500")} />
+                <div className="flex flex-col">
+                  <span className="text-white text-xs">{sub.label}</span>
+                  <span className="text-[10px] text-slate-500">{sub.desc}</span>
+                </div>
+              </Link>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function SiteLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -94,10 +208,9 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const getActiveId = () => {
     if (!pathname || pathname === '/') return 'home';
     const segment = pathname.split('/')[1];
-    return allNavItems.find(item => item.href === `/${segment}`)?.id ?? '';
+    return mainNavItems.find(item => item.href === `/${segment}`)?.id ?? '';
   };
   const activeId = getActiveId();
-  const isModelActive = modelItems.some(item => activeId === item.id);
   const showNav = !isPublicPath;
 
   let content = children;
@@ -197,63 +310,15 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
               })}
 
               {/* ── Models Dropdown ── */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={cn(
-                      'group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-all duration-150 outline-none cursor-pointer',
-                      isModelActive
-                        ? 'text-white bg-slate-800'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                    )}
-                  >
-                    <BrainCircuit
-                      className={cn(
-                        'h-3.5 w-3.5 flex-shrink-0 transition-colors',
-                        isModelActive 
-                          ? (isRealMoneyMode ? 'text-emerald-400' : 'text-brand-400')
-                          : 'text-slate-500 group-hover:text-slate-300'
-                      )}
-                      strokeWidth={2}
-                    />
-                    <span>Models</span>
-                    <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
-                    {isModelActive && (
-                      <span className={cn(
-                        "absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full transition-colors",
-                        isRealMoneyMode ? "bg-emerald-400" : "bg-brand-400"
-                      )} />
-                    )}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 border-slate-800 bg-slate-950/95 backdrop-blur-xl text-slate-200 p-1.5 shadow-2xl" align="start">
-                  <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2.5 py-1">
-                    Simulation Engines
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator className="bg-slate-800/60 my-1" />
-                  {modelItems.map((sub) => {
-                    const SubIcon = sub.icon;
-                    const isSubActive = activeId === sub.id;
-                    return (
-                      <DropdownMenuItem key={sub.id} asChild className="cursor-pointer">
-                        <Link
-                          href={sub.href}
-                          className={cn(
-                            "flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs font-medium transition-colors",
-                            isSubActive ? "bg-slate-800 text-white font-bold" : "text-slate-400 hover:text-white hover:bg-slate-900"
-                          )}
-                        >
-                          <SubIcon className={cn("h-4 w-4 shrink-0", isSubActive ? (isRealMoneyMode ? "text-emerald-400" : "text-brand-400") : "text-slate-500")} />
-                          <div className="flex flex-col">
-                            <span className="text-white text-xs">{sub.label}</span>
-                            <span className="text-[10px] text-slate-500">{sub.desc}</span>
-                          </div>
-                        </Link>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Suspense fallback={
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-slate-400 text-[13px] font-medium">
+                  <BrainCircuit className="h-3.5 w-3.5 text-slate-500" strokeWidth={2} />
+                  <span>Models</span>
+                  <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
+                </div>
+              }>
+                <ModelsDropdown isRealMoneyMode={isRealMoneyMode} />
+              </Suspense>
 
               {/* Main items after Models */}
               {mainNavItems.slice(4).map((item) => {

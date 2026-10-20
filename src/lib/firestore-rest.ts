@@ -146,6 +146,25 @@ export async function setRestDoc(collectionName: string, docId: string, data: Re
     return await res.json();
 }
 
+export async function deleteRestDoc(collectionName: string, docId: string): Promise<boolean> {
+    const token = await getFirebaseAuthToken();
+    const docPath = `projects/${PROJECT_ID}/databases/(default)/documents/${collectionName}/${encodeURIComponent(docId)}`;
+    const url = `https://firestore.googleapis.com/v1/${docPath}?key=${API_KEY}`;
+
+    const res = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!res.ok && res.status !== 404) {
+        const err = await res.text();
+        throw new Error(`deleteRestDoc error on ${docId}: ${res.status} ${err}`);
+    }
+    return true;
+}
+
 /**
  * Resilient helper to fetch a collection: tries Admin SDK first, falls back to REST
  */
@@ -183,5 +202,17 @@ export async function resilientSetDoc(collectionName: string, docId: string, dat
     } catch (err: any) {
         console.warn(`[firestore-rest] Admin SDK set failed on ${docId}, falling back to REST:`, err.message);
         await setRestDoc(collectionName, docId, data);
+    }
+}
+
+/**
+ * Resilient helper to delete a document: tries Admin SDK first, falls back to REST
+ */
+export async function resilientDeleteDoc(collectionName: string, docId: string): Promise<void> {
+    try {
+        await db.collection(collectionName).doc(docId).delete();
+    } catch (err: any) {
+        console.warn(`[firestore-rest] Admin SDK delete failed on ${docId}, falling back to REST:`, err.message);
+        await deleteRestDoc(collectionName, docId);
     }
 }

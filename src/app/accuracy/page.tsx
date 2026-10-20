@@ -49,6 +49,8 @@ interface GradedPrediction {
     status: string;
     isFrozen?: boolean;
     frozenAt?: string;
+    snapshotTime?: string;
+    updatedAt?: string;
 }
 
 const getDateString = (d: Date) => d.toLocaleDateString('en-CA');
@@ -70,8 +72,8 @@ export default function AccuracyPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
-    // Date Filtering state
-    const [selectedDateFilter, setSelectedDateFilter] = useState<'ALL' | 'YESTERDAY' | 'TODAY' | 'RANGE'>('ALL');
+    // Date Filtering state - defaults to Last 5 Days to keep data clean and fast
+    const [selectedDateFilter, setSelectedDateFilter] = useState<'LAST_5_DAYS' | 'TODAY' | 'YESTERDAY' | 'RANGE' | 'ALL'>('LAST_5_DAYS');
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
@@ -112,18 +114,25 @@ export default function AccuracyPage() {
 
     // Base filtered predictions by sport and date
     const baseFilteredPredictions = useMemo(() => {
+        const now = Date.now();
+        const fiveDaysAgo = now - 5 * 24 * 60 * 60 * 1000;
+
         return predictions.filter(p => {
             const matchesSport = selectedSport === 'ALL' || p.sport?.toUpperCase() === selectedSport.toUpperCase();
             
             let matchesDate = true;
-            if (selectedDateFilter !== 'ALL' && p.startTime) {
-                const pTime = new Date(p.startTime).getTime();
+            const timeVal = p.startTime || p.snapshotTime || p.updatedAt;
+            if (timeVal) {
+                const pTime = new Date(timeVal).getTime();
 
-                if (selectedDateFilter === 'TODAY') {
-                    const pDateStr = new Date(p.startTime).toLocaleDateString('en-CA');
+                if (selectedDateFilter === 'LAST_5_DAYS') {
+                    // Includes games in the last 5 days and upcoming fixtures
+                    matchesDate = pTime >= fiveDaysAgo;
+                } else if (selectedDateFilter === 'TODAY') {
+                    const pDateStr = new Date(timeVal).toLocaleDateString('en-CA');
                     matchesDate = pDateStr === getTodayDateStr();
                 } else if (selectedDateFilter === 'YESTERDAY') {
-                    const pDateStr = new Date(p.startTime).toLocaleDateString('en-CA');
+                    const pDateStr = new Date(timeVal).toLocaleDateString('en-CA');
                     matchesDate = pDateStr === getYesterdayDateStr();
                 } else if (selectedDateFilter === 'RANGE' && dateRange?.from) {
                     const fromTime = new Date(dateRange.from).setHours(0, 0, 0, 0);
@@ -131,7 +140,15 @@ export default function AccuracyPage() {
                         ? new Date(dateRange.to).setHours(23, 59, 59, 999)
                         : new Date(dateRange.from).setHours(23, 59, 59, 999);
                     matchesDate = pTime >= fromTime && pTime <= toTime;
+                } else if (selectedDateFilter === 'ALL') {
+                    matchesDate = true;
                 }
+            }
+
+            // Do not show pending games that are scheduled more than 36 hours away (too far out to predict/lock)
+            if (p.status === 'pending' && p.startTime) {
+                const timeUntil = new Date(p.startTime).getTime() - now;
+                if (timeUntil > 36 * 3600 * 1000) return false;
             }
 
             return matchesSport && matchesDate;
@@ -439,28 +456,36 @@ export default function AccuracyPage() {
                     <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">Date:</span>
                         <Button
-                            variant={selectedDateFilter === 'ALL' ? 'default' : 'outline'}
+                            variant={selectedDateFilter === 'LAST_5_DAYS' ? 'default' : 'outline'}
                             size="sm"
-                            onClick={() => { setSelectedDateFilter('ALL'); setDateRange(undefined); }}
-                            className={selectedDateFilter === 'ALL' ? 'bg-indigo-600 font-bold hover:bg-indigo-500' : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:text-white'}
+                            onClick={() => { setSelectedDateFilter('LAST_5_DAYS'); setDateRange(undefined); }}
+                            className={selectedDateFilter === 'LAST_5_DAYS' ? 'bg-indigo-600 font-bold hover:bg-indigo-500 text-white' : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:text-white'}
                         >
-                            All Dates
-                        </Button>
-                        <Button
-                            variant={selectedDateFilter === 'YESTERDAY' ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setSelectedDateFilter('YESTERDAY')}
-                            className={selectedDateFilter === 'YESTERDAY' ? 'bg-indigo-600 font-bold hover:bg-indigo-500' : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:text-white'}
-                        >
-                            Yesterday
+                            Last 5 Days
                         </Button>
                         <Button
                             variant={selectedDateFilter === 'TODAY' ? 'default' : 'outline'}
                             size="sm"
                             onClick={() => setSelectedDateFilter('TODAY')}
-                            className={selectedDateFilter === 'TODAY' ? 'bg-indigo-600 font-bold hover:bg-indigo-500' : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:text-white'}
+                            className={selectedDateFilter === 'TODAY' ? 'bg-indigo-600 font-bold hover:bg-indigo-500 text-white' : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:text-white'}
                         >
                             Today
+                        </Button>
+                        <Button
+                            variant={selectedDateFilter === 'YESTERDAY' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setSelectedDateFilter('YESTERDAY')}
+                            className={selectedDateFilter === 'YESTERDAY' ? 'bg-indigo-600 font-bold hover:bg-indigo-500 text-white' : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:text-white'}
+                        >
+                            Yesterday
+                        </Button>
+                        <Button
+                            variant={selectedDateFilter === 'ALL' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => { setSelectedDateFilter('ALL'); setDateRange(undefined); }}
+                            className={selectedDateFilter === 'ALL' ? 'bg-indigo-600 font-bold hover:bg-indigo-500 text-white' : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:text-white'}
+                        >
+                            All History
                         </Button>
 
                         {/* Calendar Popover */}
@@ -669,8 +694,9 @@ export default function AccuracyPage() {
                                         // Edge
                                         const edgeInfo = getEdgeInfo(p);
 
-                                        // Is game locked?
-                                        const isFrozen = p.isFrozen || (p.startTime && new Date(p.startTime).getTime() - Date.now() <= 15 * 60 * 1000);
+                                        // Is game locked? Only locks within 15m of start
+                                        const timeUntilStart = p.startTime ? new Date(p.startTime).getTime() - Date.now() : Infinity;
+                                        const isLocked = timeUntilStart <= 15 * 60 * 1000;
 
                                         return (
                                             <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
@@ -762,7 +788,7 @@ export default function AccuracyPage() {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    ) : isFrozen ? (
+                                                    ) : isLocked ? (
                                                         <div className="space-y-1">
                                                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                                                                 <Lock className="w-3 h-3" />
@@ -803,7 +829,8 @@ export default function AccuracyPage() {
                                 const pickLineDisplay = pickLine > 0 ? `+${pickLine}` : pickLine === 0 ? 'PK' : `${pickLine}`;
                                 const origLineDisplay = p.marketSpread > 0 ? `+${p.marketSpread}` : p.marketSpread === 0 ? 'PK' : `${p.marketSpread}`;
                                 const edgeInfo = getEdgeInfo(p);
-                                const isFrozen = p.isFrozen || (p.startTime && new Date(p.startTime).getTime() - Date.now() <= 15 * 60 * 1000);
+                                const timeUntilStart = p.startTime ? new Date(p.startTime).getTime() - Date.now() : Infinity;
+                                const isLocked = timeUntilStart <= 15 * 60 * 1000;
 
                                 return (
                                     <div key={p.id} className="bg-slate-950/60 rounded-xl border border-slate-800 p-4 space-y-3.5 hover:border-slate-700/80 transition-all shadow-md">
@@ -825,12 +852,14 @@ export default function AccuracyPage() {
                                                     {p.correct ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                                                     {p.correct ? 'Covered' : 'Missed'}
                                                 </span>
-                                            ) : isFrozen ? (
+                                            ) : isLocked ? (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-amber-400 bg-amber-500/10">
                                                     <Lock className="w-3 h-3" /> Locked
                                                 </span>
                                             ) : (
-                                                <span className="text-[11px] text-slate-500">Upcoming</span>
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-slate-400 bg-slate-800/60 border border-slate-700/50">
+                                                    <Clock className="w-3 h-3 text-slate-400" /> Pending
+                                                </span>
                                             )}
                                         </div>
 

@@ -70,6 +70,18 @@ export async function GET(request: NextRequest) {
             predictions = predictions.filter((p: any) => p.sport?.toUpperCase() === sportParam.toUpperCase());
         }
 
+        // Strictly filter out any pending predictions that are scheduled more than 36 hours away (too far out to predict/lock)
+        const now = Date.now();
+        predictions = predictions.filter((p: any) => {
+            if (p.status === 'pending' && p.startTime) {
+                const timeUntilStart = new Date(p.startTime).getTime() - now;
+                if (timeUntilStart > 36 * 3600 * 1000) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
         return NextResponse.json({ predictions });
     } catch (error: any) {
         console.error('[accuracy-data] Error:', error);

@@ -16,7 +16,8 @@ import {
   ChevronDown, 
   ChevronUp,
   Clock,
-  Download
+  Download,
+  Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -109,6 +110,47 @@ export default function DataPage() {
       });
     } catch (err: any) {
       toast({ title: 'EPL Failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  // UCL Actions
+  const handleUCL = async (type: 'rankings' | 'predictions') => {
+    const key = `ucl-${type}`;
+    setLoadingAction(key);
+    try {
+      const res = await fetch('/api/run-ucl-engine', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'UCL execution failed');
+
+      const result: SportOperationResult = {
+        sport: 'UCL',
+        action: type,
+        summary: type === 'rankings'
+          ? 'Updated club attack/defense ratings and UEFA coefficient parameters.'
+          : `Calculated matchday fixtures (${data.fixturesCalculated || 0} matches).`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        topTeams: data.topTeams?.map((t: any) => ({
+          rank: t.rank,
+          team: t.team,
+          rating: `${t.attack} / ${t.defense}`
+        })),
+        games: data.fixtures?.map((f: any) => ({
+          matchup: `${f.awayTeam} @ ${f.homeTeam}`,
+          projectedSpread: f.projectedSpread !== undefined ? f.projectedSpread : `${f.predictedMargin} margin`,
+          signal: f.betSignal
+        }))
+      };
+
+      setActiveResults(prev => ({ ...prev, UCL: result }));
+      setExpandedSport('UCL');
+      toast({
+        title: type === 'rankings' ? 'UCL Rankings Updated' : 'UCL Predictions Generated',
+        description: result.summary,
+      });
+    } catch (err: any) {
+      toast({ title: 'UCL Failed', description: err.message, variant: 'destructive' });
     } finally {
       setLoadingAction(null);
     }
@@ -291,10 +333,22 @@ export default function DataPage() {
       predictionsLoading: loadingAction === 'nfl-predictions',
     },
     {
+      id: 'UCL',
+      name: 'UCL Champions League',
+      modelType: 'Cross-League Dixon-Coles Poisson',
+      icon: Trophy,
+      status: 'Matchday Active',
+      statusColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+      onRankings: () => handleUCL('rankings'),
+      onPredictions: () => handleUCL('predictions'),
+      rankingsLoading: loadingAction === 'ucl-rankings',
+      predictionsLoading: loadingAction === 'ucl-predictions',
+    },
+    {
       id: 'EPL',
       name: 'EPL Premier League',
       modelType: 'Dixon-Coles Bivariate Poisson',
-      icon: Trophy,
+      icon: Shield,
       status: 'Matchweek Active',
       statusColor: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
       onRankings: () => handleEPL('rankings'),

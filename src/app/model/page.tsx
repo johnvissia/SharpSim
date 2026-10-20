@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ModelPredictionCard } from '@/components/dashboard/ModelPredictionCard';
 import { Game } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,12 +31,24 @@ interface ModelStats {
   winRate: number;
 }
 
-export default function ModelPage() {
-  const [selectedSport, setSelectedSport] = useState<SupportedSport>('NFL');
+const sportsList: SupportedSport[] = ['NFL', 'NBA', 'MLB', 'NCAAM', 'UCL', 'EPL', 'NHL'];
+
+function ModelPageContent() {
+  const searchParams = useSearchParams();
+  const sportQuery = searchParams?.get('sport')?.toUpperCase() as SupportedSport | undefined;
+  const initialSport: SupportedSport = (sportQuery && sportsList.includes(sportQuery)) ? sportQuery : 'NFL';
+
+  const [selectedSport, setSelectedSport] = useState<SupportedSport>(initialSport);
   const [rankedPredictions, setRankedPredictions] = useState<PredictionResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [, setStats] = useState<{ today: ModelStats, week: ModelStats } | null>(null);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (sportQuery && sportsList.includes(sportQuery) && sportQuery !== selectedSport) {
+      setSelectedSport(sportQuery);
+    }
+  }, [sportQuery]);
 
   const { user } = useUser();
   const firestore = useFirestore();
@@ -44,21 +57,12 @@ export default function ModelPage() {
       [user, firestore]
   );
   const { data: userProfile } = useDoc<any>(userProfileRef);
-
   const isPro = userProfile?.isPro || userProfile?.membershipTier === 'Sharp Elite';
-
-  const sportsList: SupportedSport[] = ['NFL', 'NBA', 'MLB', 'NCAAM', 'UCL', 'EPL', 'NHL'];
 
   useEffect(() => {
     async function initModelPage() {
       setLoading(true);
       setRankedPredictions([]);
-
-      // 1. Don't load expensive model data if the user isn't Pro
-      if (!isPro) {
-        setLoading(false);
-        return;
-      }
 
       try {
         // 1. Fetch Today's Games from ESPN
@@ -255,33 +259,7 @@ export default function ModelPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8 relative">
-      
-      {/* Paywall Overlay */}
-      {!isPro && !loading && (
-        <div className="absolute top-32 left-0 right-0 z-50 flex flex-col items-center justify-start mx-4">
-          <div className="bg-[#1a1c23] border border-emerald-500/50 p-8 rounded-2xl max-w-md text-center shadow-2xl shadow-emerald-900/20">
-            <div className="w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-emerald-900/40 rounded-xl flex items-center justify-center mx-auto mb-6 border border-emerald-500/30">
-              <Crown className="w-8 h-8 text-emerald-400" />
-            </div>
-            <h2 className="text-2xl font-black text-white mb-3">Unlock the Sharp Model</h2>
-            <p className="text-slate-400 mb-8 leading-relaxed">
-              Get full access to our proprietary predictive models, point edge calculations, and the interactive Value Opportunity Map.
-            </p>
-            <button 
-              onClick={() => setIsUpgradeModalOpen(true)}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-4 px-4 rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)]"
-            >
-              Upgrade to Pro for $17.99
-            </button>
-            <div className="flex items-center justify-center gap-2 mt-4 text-slate-500">
-              <Lock className="w-3 h-3" />
-              <p className="text-[10px] uppercase tracking-widest font-bold">One-time payment</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className={`space-y-8 ${!isPro && !loading ? 'pointer-events-none select-none opacity-40 blur-[3px]' : ''}`}>
+      <div className="space-y-8">
         {/* Header & Stats */}
         <div className="flex flex-col md:flex-row gap-8 justify-between items-start">
           <div className="space-y-4">
@@ -301,7 +279,10 @@ export default function ModelPage() {
               {sportsList.map((sport) => (
                 <button
                   key={sport}
-                  onClick={() => setSelectedSport(sport)}
+                  onClick={() => {
+                    setSelectedSport(sport);
+                    window.history.replaceState(null, '', `/model?sport=${sport}`);
+                  }}
                   className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
                     selectedSport === sport
                       ? 'bg-indigo-600 text-white shadow-lg'
@@ -352,12 +333,7 @@ export default function ModelPage() {
           {/* PREDICTION CARDS */}
           {!loading && (
             <div className="grid gap-6">
-              {!isPro ? (
-                 // Fake Skeleton Cards for Non-Pro Users
-                 <div className="grid gap-4">
-                    {[1, 2, 3].map(i => <Card key={i} className="h-64 bg-slate-900 border-slate-800" />)}
-                 </div>
-              ) : rankedPredictions.length > 0 ? (
+              {rankedPredictions.length > 0 ? (
                 rankedPredictions.map((item, idx) => (
                   <div key={item.game.id} className="relative group">
                     <div className="absolute -left-3 top-[-10px] z-10 bg-indigo-600 text-white font-black text-sm w-8 h-8 flex items-center justify-center rounded-full shadow-lg border-2 border-slate-950">
@@ -382,11 +358,19 @@ export default function ModelPage() {
           )}
         </div>
       </div>
-      
-      <ProUpgradeModal 
-        isOpen={isUpgradeModalOpen} 
-        onClose={() => setIsUpgradeModalOpen(false)} 
-      />
     </div>
+  );
+}
+
+export default function ModelPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto p-4 md:p-8 space-y-8 animate-pulse">
+        <div className="h-10 w-48 bg-slate-900 rounded-lg" />
+        <div className="h-64 bg-slate-900 border border-slate-800 rounded-xl" />
+      </div>
+    }>
+      <ModelPageContent />
+    </Suspense>
   );
 }
