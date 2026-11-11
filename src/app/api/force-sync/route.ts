@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resilientSetDoc } from '@/lib/firestore-rest';
+import { db } from '@/lib/firebase';
 import { sportKeyMapping } from '@/lib/sports';
 import { verifyApiAuth } from '@/lib/api-auth';
 
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
         const API_KEY = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
         if (!API_KEY) throw new Error("Missing odds API key");
 
-        console.log("=== API ROUTE FORCE SYNC ===");
+        console.log("=== API ROUTE FORCE SYNC VIA ADMIN SDK ===");
         let totalGames = 0;
 
         for (const sport of Object.values(sportKeyMapping)) {
@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
 
             const data = await res.json();
             if (!data || data.length === 0) continue;
+
+            const batch = db.batch();
+            let batchCount = 0;
 
             for (const game of data) {
                 const gameStart = new Date(game.commence_time).getTime();
@@ -45,15 +48,27 @@ export async function GET(request: NextRequest) {
                     awayTeam: game.away_team,
                     bookmakerOdds: game.bookmakers?.map((b: any) => JSON.stringify(b)) || [],
                 };
-                await resilientSetDoc('daily_games', game.id, gameData);
+
+                const docRef = db.collection('daily_games').doc(game.id);
+                batch.set(docRef, gameData, { merge: true });
+                batchCount++;
                 totalGames++;
+
+                if (batchCount >= 400) {
+                    await batch.commit();
+                    batchCount = 0;
+                }
+            }
+
+            if (batchCount > 0) {
+                await batch.commit();
             }
             console.log(`Saved ${data.length} games for ${sport}`);
         }
 
         return NextResponse.json({ success: true, totalGames });
     } catch (err: any) {
-        console.error(err);
-        return NextResponse.json({ success: false, error: err.message });
+        console.error("Force sync failed:", err);
+        return NextResponse.json({ success: false, error: err.message }, { status: 500 });
     }
 }
