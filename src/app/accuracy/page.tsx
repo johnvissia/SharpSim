@@ -457,14 +457,10 @@ export default function AccuracyPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <Button
-                        onClick={handleSync}
-                        disabled={syncing}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold gap-2 shadow-lg shadow-indigo-600/20"
-                    >
-                        <RefreshCcw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                        {syncing ? 'Syncing & Grading...' : 'Sync & Grade Predictions'}
-                    </Button>
+                    <span className="text-xs text-slate-400 inline-flex items-center gap-1.5 bg-slate-900/80 px-3 py-2 rounded-lg border border-slate-800">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        Graded Daily at 04:00 AM UTC
+                    </span>
                 </div>
             </div>
 

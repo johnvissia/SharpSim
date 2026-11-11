@@ -461,24 +461,10 @@ export default function PropHubPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3 w-full lg:w-auto">
-                  <Button 
-                    onClick={handleSyncProps} 
-                    disabled={loading || isLoadingProps} 
-                    size="lg"
-                    className="w-full lg:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-wider text-xs px-6 py-5 rounded-xl shadow-lg shadow-indigo-600/10 hover:shadow-indigo-600/20 active:scale-95 transition-all"
-                  >
-                      {loading ? (
-                          <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Syncing...
-                          </>
-                      ) : (
-                          <>
-                              <RefreshCw className="mr-2 h-4 w-4" />
-                              Sync Props
-                          </>
-                      )}
-                  </Button>
+                  <span className="text-xs text-slate-400 inline-flex items-center gap-1.5 bg-slate-900/80 px-4 py-2.5 rounded-xl border border-slate-800">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      Props Auto-Synced Daily
+                  </span>
               </div>
             </header>
 
@@ -560,18 +546,9 @@ export default function PropHubPage() {
                             <p className="text-sm text-slate-500 max-w-sm">
                                 {searchQuery 
                                     ? "No matches found for your search query. Try typing another player, team, or prop market." 
-                                    : "No player props are currently loaded in the database. Click \"Sync Props\" to fetch active lines."}
+                                    : "No player props are currently loaded for upcoming games. Lines will update in the next scheduled morning cycle."}
                             </p>
                         </div>
-                        {!searchQuery && (
-                            <Button 
-                                onClick={handleSyncProps}
-                                className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-xs tracking-wider"
-                            >
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Sync Lines Now
-                            </Button>
-                        )}
                     </CardContent>
                 </Card>
             )}

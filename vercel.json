@@ -2,19 +2,7 @@
   "crons": [
     {
       "path": "/api/auto-sync",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/update-injuries",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/sync-all-nba-teams",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/calculate-power-ratings",
-      "schedule": "10 6 * * *"
+      "schedule": "0 4 * * *"
     }
   ]
 }

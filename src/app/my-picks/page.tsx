@@ -69,12 +69,7 @@ export default function MyPicksPage() {
     }
   };
 
-  useEffect(() => {
-    if (user?.uid) {
-      triggerBetSync(false);
-    }
-  }, [user?.uid]);
-
+  // Grading is handled automatically by the daily automated cron job
   useEffect(() => {
     // Set the date only on the client-side to prevent hydration mismatch
     setSelectedDate(new Date());
@@ -215,19 +210,15 @@ export default function MyPicksPage() {
               <Ticket className="h-8 w-8 text-primary"/> My Picks
           </h1>
           <p className="text-muted-foreground">
-            Track your active and settled bets here.
+            Track your active and settled bets here. Picks are graded automatically by the daily system engine.
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => triggerBetSync(true)}
-          disabled={isSyncing}
-          className="flex items-center gap-2 border-slate-700 bg-slate-900/80 text-slate-200 hover:bg-slate-800 self-start sm:self-auto"
-        >
-          <RefreshCw className={cn("h-4 w-4 text-emerald-400", isSyncing && "animate-spin")} />
-          {isSyncing ? "Grading Picks..." : "Sync & Grade Picks"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400 inline-flex items-center gap-1.5 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            Automated Daily Grading
+          </span>
+        </div>
       </header>
 
        <div className="flex items-center justify-center gap-4 mb-8">
