@@ -69,6 +69,10 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: true, totalGames });
     } catch (err: any) {
         console.error("Force sync failed:", err);
-        return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+        return NextResponse.json({ 
+            success: false, 
+            error: err.message,
+            stack: err.stack 
+        }, { status: 500 });
     }
 }
