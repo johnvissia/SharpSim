@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
 import { useAppMode } from '@/context/AppModeContext';
+import { isUserAdmin } from '@/lib/admin';
 import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
@@ -277,8 +278,8 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
 
             {/* ── Nav links ── */}
             <nav className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto no-scrollbar py-1">
-              {/* Main items before Models */}
-              {mainNavItems.slice(0, 4).map((item) => {
+              {/* Main items before Models (Data hidden for non-admins) */}
+              {mainNavItems.slice(0, 4).filter(item => item.id !== 'data' || isUserAdmin(user?.uid)).map((item) => {
                 const isActive = activeId === item.id;
                 const Icon = item.icon;
                 return (
@@ -386,17 +387,19 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="flex items-center gap-2">
-                {isUserLoading || isProfileLoading ? (
-                  <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg">
-                    <Skeleton className="h-4 w-4 rounded-full" />
-                    <Skeleton className="h-4 w-14" />
-                  </div>
-                ) : userProfile ? (
-                  <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-sm font-semibold text-amber-400">
-                    <Coins className="h-4 w-4" />
-                    <span>{(userProfile.balance ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                  </div>
-                ) : null}
+                {!isRealMoneyMode && (
+                  isUserLoading || isProfileLoading ? (
+                    <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg">
+                      <Skeleton className="h-4 w-4 rounded-full" />
+                      <Skeleton className="h-4 w-14" />
+                    </div>
+                  ) : userProfile ? (
+                    <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-sm font-semibold text-amber-400">
+                      <Coins className="h-4 w-4" />
+                      <span>{(userProfile.balance ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    </div>
+                  ) : null
+                )}
 
                 {isUserLoading ? (
                   <Skeleton className="h-8 w-20 rounded-lg" />

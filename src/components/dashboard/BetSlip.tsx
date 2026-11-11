@@ -505,7 +505,9 @@ export function BetSlip() {
           )}
           <div className="flex justify-between items-center text-sm font-semibold">
             <span className="text-muted-foreground">To Win</span>
-            <span className="font-bold text-brand-400">{potentialPayout.toFixed(2)} coins</span>
+            <span className="font-bold text-brand-400">
+              {potentialPayout.toFixed(2)} {isRealMoneyMode ? '' : 'coins'}
+            </span>
           </div>
           <Button
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"

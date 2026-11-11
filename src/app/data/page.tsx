@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useUser } from '@/firebase';
+import { isUserAdmin } from '@/lib/admin';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Activity, 
@@ -17,7 +20,8 @@ import {
   ChevronUp,
   Clock,
   Download,
-  Shield
+  Shield,
+  Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,10 +37,37 @@ interface SportOperationResult {
 }
 
 export default function DataPage() {
+  const { user, isUserLoading } = useUser();
+  const isAdmin = isUserAdmin(user?.uid);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [activeResults, setActiveResults] = useState<Record<string, SportOperationResult>>({});
   const [expandedSport, setExpandedSport] = useState<string | null>(null);
   const { toast } = useToast();
+
+  if (isUserLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="max-w-md mx-auto py-24 px-6 text-center space-y-4">
+        <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+          <Lock className="w-7 h-7" />
+        </div>
+        <h1 className="text-2xl font-bold text-white">Admin Access Only</h1>
+        <p className="text-sm text-slate-400">
+          Data and model execution pipelines are restricted to system administrators. Model predictions and lines update automatically on schedule.
+        </p>
+        <Button asChild className="mt-4 bg-brand-500 hover:bg-brand-400">
+          <Link href="/dashboard">Return to Dashboard</Link>
+        </Button>
+      </div>
+    );
+  }
 
   const toggleExpand = (sport: string) => {
     setExpandedSport(prev => (prev === sport ? null : sport));
