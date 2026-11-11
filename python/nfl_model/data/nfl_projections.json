@@ -1,108 +1,110 @@
 {
-  "generated_at": "2026-10-19T04:18:07.606626+00:00",
+  "generated_at": "2026-11-06T00:21:52.588661+00:00",
   "sport": "NFL",
   "simulations_per_game": 25000,
   "total_games": 1,
   "games": [
     {
-      "game_id": "401873008",
-      "matchup": "Washington Commanders @ San Francisco 49ers",
-      "home_team": "San Francisco 49ers",
-      "away_team": "Washington Commanders",
-      "start_time": "2026-10-20T00:15Z",
+      "game_id": "401873037",
+      "matchup": "Jacksonville Jaguars @ Baltimore Ravens",
+      "home_team": "Baltimore Ravens",
+      "away_team": "Jacksonville Jaguars",
+      "start_time": "2026-11-06T01:15Z",
       "week": 7,
-      "consensus_spread": -7.5,
-      "projected_spread": -5.55,
-      "spread_edge": -1.95,
-      "consensus_total": 52.0,
-      "projected_total": 72.16,
-      "total_edge": 20.16,
-      "home_win_prob": 60.3,
-      "away_win_prob": 39.7,
-      "primary_signal": "PLAYABLE",
-      "recommended_side": "Washington Commanders",
+      "consensus_spread": 9.0,
+      "projected_spread": -11.89,
+      "spread_edge": 20.89,
+      "consensus_total": 40.0,
+      "projected_total": 56.51,
+      "total_edge": 16.51,
+      "home_win_prob": 74.0,
+      "away_win_prob": 25.9,
+      "primary_signal": "ELITE VALUE",
+      "recommended_side": "Baltimore Ravens",
       "best_bet": {
-        "selection": "Washington Commanders ML (+327)",
+        "selection": "Baltimore Ravens ML (+346)",
         "market_type": "moneyline",
-        "ev_percent": 67.27,
+        "ev_percent": 227.81,
         "quarter_kelly": 5.0,
         "signal_tier": "ELITE VALUE",
-        "rationale": "Model win prob 39.7% vs implied 23.4%. EV=+67.3%."
+        "rationale": "Model win prob 74.0% vs implied 22.4%. EV=+227.8%."
       },
       "all_signals": [
         {
-          "selection": "San Francisco 49ers -7.5",
+          "selection": "Baltimore Ravens +9.0",
           "market": "spread",
-          "ev": -12.22,
-          "p_win": 46.0,
-          "signal": "No Play",
-          "actionable": false
-        },
-        {
-          "selection": "Washington Commanders +7.5",
-          "market": "spread",
-          "ev": 3.13,
-          "p_win": 54.0,
-          "signal": "PLAYABLE",
-          "actionable": true
-        },
-        {
-          "selection": "Over 52.0",
-          "market": "total",
-          "ev": 58.04,
-          "p_win": 82.3,
+          "ev": 66.7,
+          "p_win": 86.9,
           "signal": "ELITE VALUE",
           "actionable": true
         },
         {
-          "selection": "Under 52.0",
-          "market": "total",
-          "ev": -67.04,
-          "p_win": 16.8,
+          "selection": "Jacksonville Jaguars -9.0",
+          "market": "spread",
+          "ev": -75.72,
+          "p_win": 12.3,
           "signal": "No Play",
           "actionable": false
         },
         {
-          "selection": "Washington Commanders ML (+327)",
+          "selection": "Over 40.0",
+          "market": "total",
+          "ev": 54.4,
+          "p_win": 79.9,
+          "signal": "ELITE VALUE",
+          "actionable": true
+        },
+        {
+          "selection": "Under 40.0",
+          "market": "total",
+          "ev": -63.32,
+          "p_win": 18.2,
+          "signal": "No Play",
+          "actionable": false
+        },
+        {
+          "selection": "Baltimore Ravens ML (+346)",
           "market": "moneyline",
-          "ev": 67.27,
-          "p_win": 39.7,
+          "ev": 227.81,
+          "p_win": 74.0,
           "signal": "ELITE VALUE",
           "actionable": true
         }
       ],
       "key_number_shares": {
-        "3": 0.0546,
-        "7": 0.0404,
-        "6": 0.0387,
-        "10": 0.041,
-        "14": 0.0331,
-        "4": 0.0403,
-        "1": 0.0357,
-        "17": 0.0294,
-        "2": 0.0318,
-        "8": 0.0318,
-        "11": 0.0344,
-        "13": 0.0325,
-        "9": 0.0305,
-        "5": 0.031,
-        "16": 0.0246
+        "3": 0.0558,
+        "7": 0.0423,
+        "6": 0.0425,
+        "10": 0.0397,
+        "14": 0.037,
+        "4": 0.0408,
+        "1": 0.0334,
+        "17": 0.0328,
+        "2": 0.0283,
+        "8": 0.0284,
+        "11": 0.0331,
+        "13": 0.0312,
+        "9": 0.0262,
+        "5": 0.0263,
+        "16": 0.0251
       },
       "edge_crosses_primary_key": true,
       "components": {
-        "home_epa_pts": 36.98,
-        "away_epa_pts": 31.12,
-        "hca_pts": 2.75,
+        "home_epa_pts": 31.81,
+        "away_epa_pts": 20.5,
+        "hca_pts": 1.65,
         "situational_hca_breakdown": {
-          "base_hca": 1.65,
-          "travel_timezone_penalty": 1.1
+          "base_hca": 1.65
         },
         "weather_points_deduction": 0.0,
         "home_injuries": [
-          "4 defensive starters OUT (+1.4 pts allowed)"
+          "OL Emery Jones Jr. (OT) OUT",
+          "Starting QB Lamar Jackson is OUT (-7.2 pts)",
+          "OL starter out (-0.50 pts)",
+          "3 defensive starters OUT (+1.0 pts allowed)"
         ],
         "away_injuries": [
-          "3 defensive starters OUT (+1.0 pts allowed)"
+          "5 defensive starters OUT (+1.5 pts allowed)"
         ]
       }
     }

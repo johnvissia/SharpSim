@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import type { TeamRanking } from '@/lib/types';
-import { Shield, UploadCloud, ShieldCheck } from 'lucide-react';
+import { Shield, UploadCloud, ShieldCheck, AlertOctagon, Loader2, ArrowLeft } from 'lucide-react';
+import { isUserAdmin } from '@/lib/admin';
+import Link from 'next/link';
 
 const placeholderJson = JSON.stringify(
   [
@@ -50,10 +52,48 @@ const customRankings = [
 
 export default function AdminPage() {
   const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const [jsonInput, setJsonInput] = useState(placeholderJson);
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
+
+  if (isUserLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-brand-400" />
+        <p className="text-slate-400 text-sm">Verifying administrator privileges...</p>
+      </div>
+    );
+  }
+
+  const isAdmin = isUserAdmin(user?.uid);
+
+  if (!user || !isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] p-4">
+        <Card className="max-w-md w-full border-red-900/50 bg-red-950/20 backdrop-blur-xl text-center p-6">
+          <CardHeader className="flex flex-col items-center">
+            <div className="p-3 bg-red-500/20 text-red-400 rounded-full mb-3">
+              <AlertOctagon className="h-10 w-10" />
+            </div>
+            <CardTitle className="text-2xl text-white">Access Denied</CardTitle>
+            <CardDescription className="text-slate-400 mt-2">
+              You must be a verified administrator to view and manage system-wide application data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="mt-4">
+            <Button asChild className="w-full bg-slate-800 hover:bg-slate-700 text-white">
+              <Link href="/dashboard" className="flex items-center justify-center gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Return to Dashboard
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleUpdateRankings = async () => {
     if (!firestore) return;
@@ -146,23 +186,23 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-8">
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Shield className="h-8 w-8 text-primary" />
+            <Shield className="h-8 w-8 text-brand-400" />
             Admin Dashboard
         </h1>
-        <p className="text-muted-foreground">
-          Manage system-wide application data.
+        <p className="text-muted-foreground mt-1">
+          Manage system-wide application data, rankings, and synchronization.
         </p>
       </header>
 
-    <div className="grid gap-8">
-        <Card>
+      <div className="grid gap-8">
+        <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl">
             <CardHeader>
             <CardTitle>Update Team Rankings</CardTitle>
             <CardDescription>
-                Paste a JSON array of ranked teams to update the Top 25. The document ID in Firestore will be the team's full name.
+                Paste a JSON array of ranked teams to update the Top 25. The document ID in Firestore will be the team&apos;s full name.
                 This will overwrite any existing rankings for the teams provided.
             </CardDescription>
             </CardHeader>
@@ -170,22 +210,22 @@ export default function AdminPage() {
             <Textarea
                 value={jsonInput}
                 onChange={(e) => setJsonInput(e.target.value)}
-                rows={15}
+                rows={12}
                 placeholder='[{"teamName": "Team A", "rank": 1}, ...]'
-                className="font-mono text-sm"
+                className="font-mono text-sm bg-slate-950 border-slate-800"
             />
-            <Button onClick={handleUpdateRankings} disabled={loading} size="lg">
+            <Button onClick={handleUpdateRankings} disabled={loading} size="lg" className="bg-brand-500 hover:bg-brand-400 text-white font-semibold">
                 <UploadCloud className="mr-2 h-5 w-5" />
                 {loading ? 'Updating...' : 'Update Rankings'}
             </Button>
             </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl">
             <CardHeader>
-                <CardTitle>Seed Custom "Top 25" Rankings</CardTitle>
+                <CardTitle>Seed Custom &quot;Top 25&quot; Rankings</CardTitle>
                 <CardDescription>
-                    This is a temporary button to seed the specific Top 25 list for the current simulation.
+                    Seed the specific Top 25 list for the current simulation.
                     This will overwrite any teams with matching names.
                 </CardDescription>
             </CardHeader>

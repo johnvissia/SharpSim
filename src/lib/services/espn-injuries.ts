@@ -1,4 +1,5 @@
 import { db } from '@/lib/firebase';
+import { resilientUpdateDoc, resilientSetDoc } from '@/lib/firestore-rest';
 import { nbaTeamNameToAbbreviation } from '@/lib/nba-data';
 
 const mlbTeamNameToAbbreviation: Record<string, string> = {
@@ -76,18 +77,34 @@ export async function syncAllInjuriesFromESPN(): Promise<{ nbaCount: number, mlb
       nbaTeamsMap.set(abv, injuries);
     });
 
-    // Write to Firestore in batch
-    const batch = db.batch();
-    nbaTeamsMap.forEach((injuries, abv) => {
-      const ref = db.collection('nba_team_stats').doc(abv);
-      batch.set(ref, {
-        injuries,
-        lastInjuryUpdate: new Date().toISOString()
-      }, { merge: true });
-      nbaCount++;
-    });
-    await batch.commit();
-    console.log(`✅ Synced NBA injuries for ${nbaCount} teams.`);
+    // Write to Firestore (try batch first, fallback to REST)
+    try {
+      const batch = db.batch();
+      nbaTeamsMap.forEach((injuries, abv) => {
+        const ref = db.collection('nba_team_stats').doc(abv);
+        batch.set(ref, {
+          injuries,
+          lastInjuryUpdate: new Date().toISOString()
+        }, { merge: true });
+        nbaCount++;
+      });
+      await batch.commit();
+      console.log(`✅ Synced NBA injuries for ${nbaCount} teams.`);
+    } catch (batchErr) {
+      console.warn('[espn-injuries] Admin batch failed for NBA, writing via REST...');
+      nbaCount = 0;
+      for (const [abv, injuries] of nbaTeamsMap.entries()) {
+        const payload = {
+          injuries,
+          lastInjuryUpdate: new Date().toISOString()
+        };
+        await resilientUpdateDoc('nba_team_stats', abv, payload).catch(async () => {
+          await resilientSetDoc('nba_team_stats', abv, payload);
+        });
+        nbaCount++;
+      }
+      console.log(`✅ Synced NBA injuries via REST for ${nbaCount} teams.`);
+    }
 
   } catch (error) {
     console.error('❌ Failed to sync NBA injuries from ESPN:', error);
@@ -129,18 +146,34 @@ export async function syncAllInjuriesFromESPN(): Promise<{ nbaCount: number, mlb
       mlbTeamsMap.set(abv, injuries);
     });
 
-    // Write to Firestore in batch
-    const batch = db.batch();
-    mlbTeamsMap.forEach((injuries, abv) => {
-      const ref = db.collection('mlb_team_stats').doc(abv);
-      batch.set(ref, {
-        injuries,
-        lastInjuryUpdate: new Date().toISOString()
-      }, { merge: true });
-      mlbCount++;
-    });
-    await batch.commit();
-    console.log(`✅ Synced MLB injuries for ${mlbCount} teams.`);
+    // Write to Firestore (try batch first, fallback to REST)
+    try {
+      const batch = db.batch();
+      mlbTeamsMap.forEach((injuries, abv) => {
+        const ref = db.collection('mlb_team_stats').doc(abv);
+        batch.set(ref, {
+          injuries,
+          lastInjuryUpdate: new Date().toISOString()
+        }, { merge: true });
+        mlbCount++;
+      });
+      await batch.commit();
+      console.log(`✅ Synced MLB injuries for ${mlbCount} teams.`);
+    } catch (batchErr) {
+      console.warn('[espn-injuries] Admin batch failed for MLB, writing via REST...');
+      mlbCount = 0;
+      for (const [abv, injuries] of mlbTeamsMap.entries()) {
+        const payload = {
+          injuries,
+          lastInjuryUpdate: new Date().toISOString()
+        };
+        await resilientUpdateDoc('mlb_team_stats', abv, payload).catch(async () => {
+          await resilientSetDoc('mlb_team_stats', abv, payload);
+        });
+        mlbCount++;
+      }
+      console.log(`✅ Synced MLB injuries via REST for ${mlbCount} teams.`);
+    }
 
   } catch (error) {
     console.error('❌ Failed to sync MLB injuries from ESPN:', error);

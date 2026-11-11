@@ -1,3 +1,4 @@
+import { verifyApiAuth } from '@/lib/api-auth';
 // src/app/api/sync-ncaam-teams/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
@@ -210,6 +211,10 @@ async function scrapeTeamNCAAM(teamName: string, teamId: string) {
 
 export async function POST(request: NextRequest) {
     try {
+        const authResult = await verifyApiAuth(request);
+        if (!authResult.authorized) {
+            return authResult.errorResponse!;
+        }
         const { teamId, all, batch } = await request.json().catch(() => ({}));
 
         let teamsToProcess: [string, string][] = [];

@@ -1,13 +1,18 @@
 /**
- * Core Philosophy: This ruleset supports public sports data reads and authenticated user betting.
+ * Production Security Rules for SharpSim
  *
- * Public Data (/daily_games, /completed_games, /system, /rankings, /player_props, /model_predictions, etc.):
- * - Public Read Access: All game, system, ranking, and prop data is public and readable by anyone.
- * - Admin-Only Client Writes: Only verified administrator accounts can write directly from client.
- *   Automated ingestion and pipelines use the Firebase Admin SDK (which bypasses rules).
- *
- * User Data (/users):
- * - Owner-Only Access: Users can only read and write their own data. A user can create their own profile and bets, and update them.
+ * Core Principles:
+ * 1. Public Sports Data: Read-only for all public visitors. Writes restricted strictly to Admins / Backend Pipelines.
+ * 2. User Data Integrity:
+ *    - Users can only read their own profile.
+ *    - Users CANNOT modify `isPro` or `membershipTier` directly from the client.
+ *    - Users CANNOT artificially inflate `balance` (balance can only decrement or stay equal; rewards & bet wins come from Admin SDK).
+ * 3. Bet Protection:
+ *    - Users can ONLY create bets in 'pending' status with positive stakes and matching userId.
+ *    - Users CANNOT alter existing bets or mark them as 'won' (prevents fraudulent payouts).
+ *      Bet grading and settlements are performed exclusively via server-side Admin SDK pipelines.
+ * 4. Promo Code Privacy:
+ *    - Promo codes cannot be listed or read directly by clients; redemption is handled via /api/redeem-promo.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -37,7 +42,7 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------------------------
-    // Public Collections
+    // Public Collections (Read-only for public, writes restricted to Admin)
     // ------------------------------------------------------------------------
     match /daily_games/{gameId} {
       allow get, list: if true;
@@ -79,9 +84,19 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /mlb_team_stats/{teamId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+
     match /completed_player_stats/{statId} {
       allow get, list: if true;
       allow write: if isAdmin();
+    }
+
+    // Promo Codes: Restricted to Admin/Server to prevent database listing/scraping
+    match /promoCodes/{codeId} {
+      allow get, list, write: if isAdmin();
     }
     
     // ------------------------------------------------------------------------
@@ -89,20 +104,34 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
 
     /**
-     * @description Controls access to user profile documents. Users can create, read, and update their own profile, but cannot delete it or access others' profiles.
+     * @description Controls access to user profile documents.
+     * Users can create and read their profile, and update general preferences.
+     * Client cannot spoof `isPro`, `membershipTier`, or increase `balance`.
      * @path /users/{userId}
      */
     match /users/{userId} {
-      allow get, update, create: if isOwner(userId);
-      // Deny reads/writes to the entire collection.
-      allow list, delete: if false;
+      allow get: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if (isOwner(userId) 
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isPro', 'membershipTier']))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance']) || request.resource.data.balance <= resource.data.balance)
+      ) || isAdmin();
+      allow list, delete: if isAdmin();
 
       /**
-       * @description Controls access to a user's subcollection of bets. Users can manage their own bets fully.
+       * @description Controls access to a user's bets.
+       * Users can only create bets in 'pending' status with positive stakes.
+       * Users CANNOT update bets (grading is performed solely by server-side Admin SDK).
        * @path /users/{userId}/bets/{betId}
        */
       match /bets/{betId} {
-        allow get, list, create, update, delete: if isOwner(userId);
+        allow get, list: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) 
+          && request.resource.data.status == 'pending'
+          && request.resource.data.stake > 0
+          && request.resource.data.userId == userId;
+        allow update: if isAdmin();
+        allow delete: if (isOwner(userId) && resource.data.status == 'pending') || isAdmin();
       }
 
       /**
@@ -110,7 +139,7 @@ service cloud.firestore {
        * @path /users/{userId}/activity/{activityId}
        */
       match /activity/{activityId} {
-        allow get, list, create, update, delete: if isOwner(userId);
+        allow get, list, create, update, delete: if isOwner(userId) || isAdmin();
       }
     }
   }

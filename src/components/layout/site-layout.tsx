@@ -46,6 +46,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { BetSlip } from '@/components/dashboard/BetSlip';
+import { FooterDisclaimer } from '@/components/layout/FooterDisclaimer';
 
 export const gameModelItems = [
   { href: '/model?sport=NFL',   id: 'model-nfl',   sport: 'NFL', label: 'NFL Model',    desc: 'Pro Football Spread Engine',       icon: Trophy },
@@ -187,7 +188,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const isPublicPath = pathname === '/' || pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
+  const isPublicPath = pathname === '/' || pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password' || pathname === '/terms' || pathname === '/privacy';
 
   useEffect(() => {
     if (!isUserLoading) {
@@ -391,7 +392,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
                 ) : userProfile ? (
                   <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-sm font-semibold text-amber-400">
                     <Coins className="h-4 w-4" />
-                    <span>{userProfile.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    <span>{(userProfile.balance ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                   </div>
                 ) : null}
 
@@ -402,9 +403,13 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="relative h-8 w-8 rounded-full border border-slate-700/50 hover:bg-slate-800">
                         <Avatar className="h-7 w-7">
-                          {user.photoURL && <AvatarImage src={user.photoURL} alt={user.displayName || 'User'} />}
-                          <AvatarFallback className="bg-slate-800 text-slate-300">
-                            <UserIcon className="h-4 w-4" />
+                          {(user.photoURL || userProfile?.photoURL) && (
+                            <AvatarImage src={user.photoURL || userProfile?.photoURL || ''} alt={user.displayName || userProfile?.displayName || 'User'} />
+                          )}
+                          <AvatarFallback className="bg-slate-800 text-slate-300 font-semibold text-xs">
+                            {(user.displayName || userProfile?.displayName)
+                              ? (user.displayName || userProfile?.displayName)!.slice(0, 2).toUpperCase()
+                              : <UserIcon className="h-4 w-4" />}
                           </AvatarFallback>
                         </Avatar>
                       </Button>
@@ -412,7 +417,11 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
                     <DropdownMenuContent className="w-56 mt-1 border-slate-800/80 bg-slate-950/95 backdrop-blur-xl text-slate-200 shadow-xl" align="end" forceMount>
                       <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
-                          <p className="text-sm font-medium leading-none text-slate-100">{user.isAnonymous ? "Anonymous User" : user.displayName || 'User'}</p>
+                          <p className="text-sm font-medium leading-none text-slate-100">
+                            {user.isAnonymous
+                              ? "Anonymous User"
+                              : (user.displayName || userProfile?.displayName || (user.email ? user.email.split('@')[0] : 'User'))}
+                          </p>
                           {user.email && <p className="text-xs leading-none text-slate-400">{user.email}</p>}
                         </div>
                       </DropdownMenuLabel>
@@ -421,7 +430,17 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
                         <Settings className="mr-2 h-4 w-4" />
                         <span>Settings</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="cursor-pointer hover:bg-slate-800/80 focus:bg-slate-800/80 text-rose-400 focus:text-rose-400" onClick={() => signOut(auth)}>
+                      <DropdownMenuItem
+                        className="cursor-pointer hover:bg-slate-800/80 focus:bg-slate-800/80 text-rose-400 focus:text-rose-400"
+                        onClick={async () => {
+                          try {
+                            await signOut(auth);
+                          } catch (e) {
+                            console.error('Sign out error:', e);
+                          }
+                          router.push('/login');
+                        }}
+                      >
                         <LogOut className="mr-2 h-4 w-4" />
                         <span>Log out</span>
                       </DropdownMenuItem>
@@ -451,6 +470,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
         </header>
       )}
       <main className="mx-auto max-w-[1400px] px-6 py-6">{content}</main>
+      <FooterDisclaimer />
       {showNav && <BetSlip />}
     </div>
   );

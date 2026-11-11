@@ -113,15 +113,18 @@ export async function GET(request: NextRequest) {
         const projectedSpread = -((gapNet / 100) * predictedPace);
 
         // 5. Z-Score & Signal
-        const zScore = (marketSpread - projectedSpread) / BASE_STD_DEV;
+        const edge = marketSpread - projectedSpread;
+        const absEdge = Math.abs(edge);
+        const zScore = edge / BASE_STD_DEV;
         const absZ = Math.abs(zScore);
 
         let betSignal = "No Play";
-        if (absZ >= 1.0) betSignal = "ELITE VALUE";
-        else if (absZ >= 0.75) betSignal = "STRONG VALUE";
-        else if (absZ >= 0.55) betSignal = "PLAYABLE";
+        if (absEdge >= 4.5 || absZ >= 0.40) betSignal = "ELITE VALUE";
+        else if (absEdge >= 2.5 || absZ >= 0.22) betSignal = "STRONG VALUE";
+        else if (absEdge >= 1.5 || absZ >= 0.13) betSignal = "PLAYABLE";
 
-        const recommendedSide = zScore > 0 ? homeNameRaw : awayNameRaw;
+        const rawSide = zScore > 0 ? homeNameRaw : awayNameRaw;
+        const recommendedSide = absEdge >= 1.5 ? rawSide : null;
 
         return NextResponse.json({
             matchup: `${awayNameRaw} @ ${homeNameRaw}`,

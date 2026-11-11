@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       'player_rebounds_assists'
     ].join(',');
 
-    const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/events/${eventId}/odds?apiKey=${process.env.NEXT_PUBLIC_ODDS_API_KEY}&regions=us&markets=${markets}&oddsFormat=american`;
+    const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/events/${eventId}/odds?apiKey=${process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY}&regions=us&markets=${markets}&oddsFormat=american`;
 
     console.log('📡 Calling Odds API...');
 

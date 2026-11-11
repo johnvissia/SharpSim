@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyApiAuth } from '@/lib/api-auth';
 import { fetchEspnSchedule } from '@/lib/espn';
 import { normalizeTeamName } from '@/lib/team-names';
 import { DailyGame } from '@/lib/types';
@@ -62,11 +63,9 @@ async function fetchScoreFromEspnSummary(gameId: string, sport: string) {
 }
 
 export async function GET(request: NextRequest) {
-    // Auth check (if CRON_SECRET is configured)
-    const authHeader = request.headers.get('Authorization');
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authResult = await verifyApiAuth(request);
+    if (!authResult.authorized) {
+        return authResult.errorResponse!;
     }
 
     // Derive base URL from the incoming request so we work on any port
@@ -169,7 +168,9 @@ export async function GET(request: NextRequest) {
                     if (game.sport === 'MLB') {
                         spreadSource = 'Default Line';
                     } else if (game.sport === 'UCL' || game.sport === 'EPL') {
-                        spreadSource = 'Pick\'em (PK)';
+                        spreadSource = 'Consensus Handicap';
+                    } else if (game.sport === 'NBA') {
+                        spreadSource = 'Consensus Line';
                     } else {
                         console.log(`[sync-accuracy] SKIP ${aName} @ ${hName} — no spread found in daily_games`);
                         continue;
@@ -182,7 +183,10 @@ export async function GET(request: NextRequest) {
                 if (game.sport === 'NCAAM') endpoint = `/api/predict-ncaam?home=${encodeURIComponent(hName)}&away=${encodeURIComponent(aName)}&marketSpread=${spreadPoints}`;
                 if (game.sport === 'MLB') endpoint = `/api/predict-mlb?home=${encodeURIComponent(hName)}&away=${encodeURIComponent(aName)}&marketSpread=${spreadPoints}`;
                 if (game.sport === 'NFL') endpoint = `/api/predict-nfl?home=${encodeURIComponent(hName)}&away=${encodeURIComponent(aName)}&marketSpread=${spreadPoints}`;
-                if (game.sport === 'UCL' || game.sport === 'EPL') endpoint = `/api/predict-soccer?home=${encodeURIComponent(hName)}&away=${encodeURIComponent(aName)}&league=${game.sport}`;
+                if (game.sport === 'UCL' || game.sport === 'EPL') {
+                    const spreadQuery = spreadPoints !== 0 ? `&marketSpread=${spreadPoints}` : '';
+                    endpoint = `/api/predict-soccer?home=${encodeURIComponent(hName)}&away=${encodeURIComponent(aName)}&league=${game.sport}${spreadQuery}`;
+                }
 
                 try {
                     const predRes = await fetch(`${baseUrl}${endpoint}`);
@@ -297,22 +301,76 @@ export async function GET(request: NextRequest) {
             if (isFinal && finalHomeScore !== null && finalAwayScore !== null) {
                 const actualSpread = finalAwayScore - finalHomeScore;
                 const marketSpread = Number(pred.marketSpread ?? 0);
-                const recNorm = normalizeTeamName(pred.recommendedSide || '').toLowerCase();
+                const projectedSpread = Number(pred.projectedSpread ?? 0);
+                const sportUpper = (pred.sport || '').toUpperCase();
+                const isSoccerSport = SOCCER_SPORTS.includes(sportUpper);
+                const isMlb = sportUpper === 'MLB';
+                const isBasketballOrFootball = sportUpper === 'NBA' || sportUpper === 'NCAAM' || sportUpper === 'NFL';
 
-                let isHomeSide = recNorm === hNorm || hNorm.includes(recNorm) || recNorm.includes(hNorm);
-                let isAwaySide = recNorm === aNorm || aNorm.includes(recNorm) || recNorm.includes(aNorm);
-                if (!isHomeSide && !isAwaySide) {
-                    if (pred.recommendedSide === pred.homeTeam) isHomeSide = true;
-                    else if (pred.recommendedSide === pred.awayTeam) isAwaySide = true;
+                const edge = marketSpread - projectedSpread;
+                const absEdge = Math.abs(edge);
+
+                // Determine if this game has an actionable edge
+                let isActionableEdge = false;
+                if (isSoccerSport) isActionableEdge = absEdge >= 0.35;
+                else if (isMlb) isActionableEdge = absEdge >= 0.40;
+                else if (isBasketballOrFootball) isActionableEdge = absEdge >= 1.50;
+                else isActionableEdge = absEdge > 0;
+
+                // Resolve recommendedSide: use stored side, or if missing/null but edge is actionable, derive it
+                let effectiveRecSide = pred.recommendedSide;
+                if ((!effectiveRecSide || effectiveRecSide.toLowerCase().includes('pass') || effectiveRecSide.toLowerCase().includes('no play')) && isActionableEdge) {
+                    effectiveRecSide = edge > 0 ? pred.homeTeam : pred.awayTeam;
                 }
 
-                let correct = false;
-                if (isHomeSide) {
-                    if (actualSpread < marketSpread) correct = true;
+                const recNorm = normalizeTeamName(effectiveRecSide || '').toLowerCase();
+                let isHomeSide = recNorm === hNorm || hNorm.includes(recNorm) || recNorm.includes(hNorm);
+                let isAwaySide = recNorm === aNorm || aNorm.includes(recNorm) || recNorm.includes(aNorm);
+                if (!isHomeSide && !isAwaySide && effectiveRecSide) {
+                    if (effectiveRecSide === pred.homeTeam) isHomeSide = true;
+                    else if (effectiveRecSide === pred.awayTeam) isAwaySide = true;
+                }
+
+                let correct: boolean | null = null;
+                let outcomeLabel = 'PASS';
+
+                if (!isActionableEdge || (!isHomeSide && !isAwaySide && effectiveRecSide !== 'Draw')) {
+                    // Truly a Pass / No Bet: cannot count as a Win or a Loss
+                    correct = null;
+                    outcomeLabel = 'PASS';
+                } else if (isHomeSide) {
+                    const adjustedHome = finalHomeScore + marketSpread;
+                    if (adjustedHome > finalAwayScore) {
+                        correct = true;
+                        outcomeLabel = 'HIT';
+                    } else if (adjustedHome < finalAwayScore) {
+                        correct = false;
+                        outcomeLabel = 'MISS';
+                    } else {
+                        correct = null; // Push
+                        outcomeLabel = 'PUSH';
+                    }
                 } else if (isAwaySide) {
-                    if (actualSpread > marketSpread) correct = true;
-                } else if (pred.recommendedSide === 'Draw') {
-                    if (finalHomeScore === finalAwayScore) correct = true;
+                    const awaySpread = -marketSpread;
+                    const adjustedAway = finalAwayScore + awaySpread;
+                    if (adjustedAway > finalHomeScore) {
+                        correct = true;
+                        outcomeLabel = 'HIT';
+                    } else if (adjustedAway < finalHomeScore) {
+                        correct = false;
+                        outcomeLabel = 'MISS';
+                    } else {
+                        correct = null; // Push
+                        outcomeLabel = 'PUSH';
+                    }
+                } else if (effectiveRecSide === 'Draw') {
+                    if (finalHomeScore === finalAwayScore) {
+                        correct = true;
+                        outcomeLabel = 'HIT';
+                    } else {
+                        correct = false;
+                        outcomeLabel = 'MISS';
+                    }
                 }
 
                 await resilientUpdateDoc('model_predictions', predId, {
@@ -320,12 +378,13 @@ export async function GET(request: NextRequest) {
                     actualScore: { home: finalHomeScore, away: finalAwayScore },
                     actualSpread: actualSpread,
                     correct: correct,
+                    recommendedSide: effectiveRecSide || null,
                     gradedAt: now.toISOString(),
                     isFrozen: true
                 });
 
-                results.graded.push(`${pred.sport}: ${pred.awayTeam} ${finalAwayScore} - ${finalHomeScore} ${pred.homeTeam} (${correct ? 'HIT' : 'MISS'})`);
-                console.log(`[sync-accuracy] GRADED ${pred.sport}: ${pred.awayTeam} ${finalAwayScore} - ${finalHomeScore} ${pred.homeTeam} => ${correct ? 'HIT' : 'MISS'}`);
+                results.graded.push(`${pred.sport}: ${pred.awayTeam} ${finalAwayScore} - ${finalHomeScore} ${pred.homeTeam} (${outcomeLabel})`);
+                console.log(`[sync-accuracy] GRADED ${pred.sport}: ${pred.awayTeam} ${finalAwayScore} - ${finalHomeScore} ${pred.homeTeam} => ${outcomeLabel}`);
             }
         }
 

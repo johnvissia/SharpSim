@@ -1,6 +1,8 @@
+import { verifyApiAuth } from '@/lib/api-auth';
 // src/app/api/calculate-power-ratings/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
+import { resilientGetCollection, resilientUpdateDoc } from '@/lib/firestore-rest';
 import {
   applyBayesianShrinkage,
   calculateDecayWeight,
@@ -463,24 +465,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth check (if CRON_SECRET is configured)
-    const authHeader = request.headers.get('Authorization');
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authResult = await verifyApiAuth(request);
+    if (!authResult.authorized) {
+      return authResult.errorResponse!;
     }
 
     console.log('🔢 Starting Complete Power Ratings Calculation...');
 
     // Step 1: Fetch all teams from Firestore
     console.log('📥 Fetching teams from Firestore...');
-    const teamsSnapshot = await db.collection('nba_team_stats').get();
-
-    if (teamsSnapshot.empty) {
+    const teams = await resilientGetCollection<TeamStats>('nba_team_stats', 50);
+    if (!teams || teams.length === 0) {
       throw new Error('No team data found. Please run "Sync All Teams" first.');
     }
-
-    const teams: TeamStats[] = teamsSnapshot.docs.map(doc => doc.data() as TeamStats);
     console.log(`✅ Loaded ${teams.length} teams`);
 
     // ========================================================================
@@ -665,27 +662,45 @@ export async function POST(request: NextRequest) {
     // ========================================================================
     console.log('\n💾 Saving Power Ratings to Firestore...');
 
-    const batch = db.batch();
-
-    teamsWithNetRatings.forEach(team => {
-      const teamRef = db.collection('nba_team_stats').doc(team.abbreviation);
-      batch.update(teamRef, {
-        'powerRatings': {
-          avgNetRating: team.avgNetRating,
-          srsRating: team.srsRating,
-          recencyRating: team.recencyRating,
-          blendedRating: team.blendedRating,
-          injuryAdjustment: team.injuryAdjustment,
-          baselineTPR: team.finalTPR,
-          avgPace: team.avgPace,
-          homeCourtAdvantage: team.teamHCA,
-          calculatedAt: new Date().toISOString(),
-        }
+    try {
+      const batch = db.batch();
+      teamsWithNetRatings.forEach(team => {
+        const teamRef = db.collection('nba_team_stats').doc(team.abbreviation);
+        batch.update(teamRef, {
+          'powerRatings': {
+            avgNetRating: team.avgNetRating,
+            srsRating: team.srsRating,
+            recencyRating: team.recencyRating,
+            blendedRating: team.blendedRating,
+            injuryAdjustment: team.injuryAdjustment,
+            baselineTPR: team.finalTPR,
+            avgPace: team.avgPace,
+            homeCourtAdvantage: team.teamHCA,
+            calculatedAt: new Date().toISOString(),
+          }
+        });
       });
-    });
-
-    await batch.commit();
-    console.log('✅ Power Ratings saved to Firestore');
+      await batch.commit();
+      console.log('✅ Power Ratings saved to Firestore via Admin SDK');
+    } catch (batchErr) {
+      console.warn('[calculate-power-ratings] Admin batch failed, saving via REST...');
+      for (const team of teamsWithNetRatings) {
+        await resilientUpdateDoc('nba_team_stats', team.abbreviation, {
+          powerRatings: {
+            avgNetRating: team.avgNetRating,
+            srsRating: team.srsRating,
+            recencyRating: team.recencyRating,
+            blendedRating: team.blendedRating,
+            injuryAdjustment: team.injuryAdjustment,
+            baselineTPR: team.finalTPR,
+            avgPace: team.avgPace,
+            homeCourtAdvantage: team.teamHCA,
+            calculatedAt: new Date().toISOString(),
+          }
+        });
+      }
+      console.log('✅ Power Ratings saved to Firestore via REST');
+    }
 
     // ========================================================================
     // RETURN RESULTS

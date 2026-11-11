@@ -1,3 +1,4 @@
+import { verifyApiAuth } from '@/lib/api-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 
@@ -42,6 +43,10 @@ function calculateBaseRuns(s: any): number {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await verifyApiAuth(request);
+    if (!authResult.authorized) {
+      return authResult.errorResponse!;
+    }
     const currentYear = new Date().getFullYear();
 
     // 1. Fetch MLB Teams from MLB Stats API

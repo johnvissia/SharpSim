@@ -1,3 +1,4 @@
+import { verifyApiAuth } from '@/lib/api-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import * as admin from 'firebase-admin';
@@ -6,10 +7,14 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes
 
 export async function GET(request: NextRequest) {
+    const authResult = await verifyApiAuth(request);
+    if (!authResult.authorized) return authResult.errorResponse!;
     return handleSync(request);
 }
 
 export async function POST(request: NextRequest) {
+    const authResult = await verifyApiAuth(request);
+    if (!authResult.authorized) return authResult.errorResponse!;
     return handleSync(request);
 }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import * as admin from 'firebase-admin';
+import { verifyApiAuth } from '@/lib/api-auth';
 
 function getMarketDisplayName(marketKey: string, sport: string): string {
     if (sport === 'NBA') {
@@ -27,14 +28,12 @@ function getMarketDisplayName(marketKey: string, sport: string): string {
 
 export async function POST(request: NextRequest) {
     try {
-        // Auth check (if CRON_SECRET is configured)
-        const authHeader = request.headers.get('Authorization');
-        const cronSecret = process.env.CRON_SECRET;
-        if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const authResult = await verifyApiAuth(request);
+        if (!authResult.authorized) {
+            return authResult.errorResponse!;
         }
 
-        const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
+        const API_KEY = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
         if (!API_KEY) throw new Error('Odds API Key missing');
 
         // Parse sport parameter (default to NBA)

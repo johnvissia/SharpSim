@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SiteLayout } from '@/components/layout/site-layout';
@@ -7,9 +7,45 @@ import { BetSlipProvider } from '@/context/BetSlipContext';
 import { AppModeProvider } from '@/context/AppModeContext';
 import { ActivityTracker } from '@/components/analytics/ActivityTracker';
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#090a0f',
+};
+
 export const metadata: Metadata = {
-  title: 'SharpSim: SportsEdge Trainer',
-  description: 'A sports betting simulation and coaching platform.',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://sharpsim.vercel.app'),
+  title: {
+    default: 'SharpSim: Sports Analytics & Edge Simulation',
+    template: '%s | SharpSim',
+  },
+  description: 'Real-time sports betting simulation, algorithmic edge modeling, live odds aggregation, and disciplined bankroll training.',
+  keywords: [
+    'sports betting simulation',
+    'sharp sports edge',
+    'sports betting model',
+    'bankroll tracker',
+    'odds comparison',
+    'NBA player props',
+    'EPL predictions',
+    'sports data analytics',
+  ],
+  authors: [{ name: 'SharpSim Team' }],
+  creator: 'SharpSim',
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://sharpsim.vercel.app',
+    title: 'SharpSim: Sports Analytics & Edge Simulation',
+    description: 'Algorithmic sports betting models, expected value detection, and risk-free simulation tracking.',
+    siteName: 'SharpSim',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'SharpSim: Sports Analytics & Edge Simulation',
+    description: 'Algorithmic sports betting models, expected value detection, and risk-free simulation tracking.',
+  },
 };
 
 export default function RootLayout({

@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyApiAuth } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // Allow 5 minutes total for full pipeline
 
 export async function GET(request: NextRequest) {
-    // Auth check (if CRON_SECRET is configured)
-    const authHeader = request.headers.get('Authorization');
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authResult = await verifyApiAuth(request);
+    if (!authResult.authorized) {
+        return authResult.errorResponse!;
     }
 
     const reqUrl = new URL(request.url);
     const baseUrl = `${reqUrl.protocol}//${reqUrl.host}`;
+    const cronSecret = process.env.CRON_SECRET;
     const headers: Record<string, string> = {};
     if (cronSecret) {
         headers['Authorization'] = `Bearer ${cronSecret}`;

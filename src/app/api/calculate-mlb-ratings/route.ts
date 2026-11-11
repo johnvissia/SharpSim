@@ -1,3 +1,4 @@
+import { verifyApiAuth } from '@/lib/api-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 
@@ -61,6 +62,11 @@ interface TeamCalcTrace {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await verifyApiAuth(request);
+    if (!authResult.authorized) {
+      return authResult.errorResponse!;
+    }
+
     if (!db) {
       throw new Error('Firestore database is not initialized');
     }

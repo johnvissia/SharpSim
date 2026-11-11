@@ -5,7 +5,6 @@ import { GameCard } from '@/components/dashboard/game-card';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, orderBy, query, where, writeBatch, increment, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { syncGameLinesAndScores, syncNBAPlayerStats } from '@/lib/api';
 import { fetchEspnSchedule, fetchAllTeamLogos } from '@/lib/espn';
 import type { Game, Sport, SystemStatus, DailyGame, TeamRanking, Team, SportsbookOdds, UserBet, ParlayLeg, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -45,6 +44,7 @@ const transformDailyGamesToGames = (
                 const moneyline = {
                     home: h2hMarket?.outcomes.find((o: any) => normalizeTeamName(o.name) === normalizedHome)?.price || 0,
                     away: h2hMarket?.outcomes.find((o: any) => normalizeTeamName(o.name) === normalizedAway)?.price || 0,
+                    draw: h2hMarket?.outcomes.find((o: any) => o.name?.toLowerCase() === 'draw')?.price || 0,
                 };
 
                 // Don't discard the whole bookmaker if moneyline is missing
@@ -111,9 +111,12 @@ const transformDailyGamesToGames = (
 
         if (allOdds.length > 0) {
             game.allOdds = allOdds;
-            // Search for an odds object that actually has a non-zero spread
-            const bestOdds = allOdds.find(o => o.odds.spread && o.odds.spread.points !== 0);
-            game.odds = bestOdds ? bestOdds.odds : allOdds[0].odds;
+            // Choose the most complete odds entry (spread, totals, or moneyline)
+            const bestOdds = allOdds.find(o => (o.odds.spread && o.odds.spread.points !== 0) && (o.odds.total && o.odds.total.points !== 0))
+                || allOdds.find(o => o.odds.total && o.odds.total.points !== 0)
+                || allOdds.find(o => o.odds.spread && o.odds.spread.points !== 0)
+                || allOdds[0];
+            game.odds = bestOdds.odds;
         }
 
         return game;
@@ -187,11 +190,18 @@ export default function DashboardPage() {
         }
         setIsSyncingLines(true);
         try {
-            await syncGameLinesAndScores(firestore);
-            await syncNBAPlayerStats(firestore, 3);
+            const token = user ? await user.getIdToken() : '';
+            const headers: Record<string, string> = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch('/api/force-sync', { headers });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `Sync returned HTTP ${res.status}`);
+            }
             toast({
                 title: 'Sync Complete',
-                description: 'Game lines, scores, and player stats have been updated.',
+                description: 'Game lines and scores have been refreshed from the server.',
             });
         } catch (error: any) {
             console.error('Failed to sync game lines:', error);
@@ -355,6 +365,7 @@ export default function DashboardPage() {
         if (rawModelPredictions) {
             rawModelPredictions.forEach((p: any) => {
                 if (p.gameId) predictionsMap.set(p.gameId, p);
+                if (p.id) predictionsMap.set(p.id, p);
                 const hName = normalizeTeamName(p.homeTeam || '');
                 const aName = normalizeTeamName(p.awayTeam || '');
                 if (hName && aName) {
@@ -403,11 +414,30 @@ export default function DashboardPage() {
             const awayName = normalizeTeamName(oddsGame.awayTeam.name);
             const dateStr = new Date(oddsGame.startTime).toLocaleDateString('en-CA');
             const key = `${oddsGame.sport}-${homeName}-${awayName}-${dateStr}`;
-            const existingGame = finalGames.get(key);
+            let existingGame = finalGames.get(key);
+            let targetKey = key;
+
+            if (!existingGame) {
+                // Secondary check: match by sport and normalized teams within 24h
+                const oddsTime = new Date(oddsGame.startTime).getTime();
+                for (const [k, g] of finalGames.entries()) {
+                    if (g.sport === oddsGame.sport &&
+                        normalizeTeamName(g.homeTeam.name) === homeName &&
+                        normalizeTeamName(g.awayTeam.name) === awayName) {
+                        const gTime = new Date(g.startTime).getTime();
+                        if (Math.abs(gTime - oddsTime) < 24 * 60 * 60 * 1000) {
+                            existingGame = g;
+                            targetKey = k;
+                            break;
+                        }
+                    }
+                }
+            }
+
             const pred = predictionsMap.get(oddsGame.id) || predictionsMap.get(`${oddsGame.sport}-${homeName}-${awayName}`);
 
             if (existingGame) {
-                finalGames.set(key, {
+                finalGames.set(targetKey, {
                     ...existingGame,
                     odds: oddsGame.odds,
                     allOdds: oddsGame.allOdds,

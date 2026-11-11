@@ -2,10 +2,8 @@
 
 import { useState } from 'react';
 import { Crown, X, CreditCard, Gift, Loader2, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { useUser, useFirestore } from '@/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { validatePromoCode } from '@/lib/promo';
 
 interface ManagePlanModalProps {
   isOpen: boolean;
@@ -16,7 +14,6 @@ interface ManagePlanModalProps {
 
 export function ManagePlanModal({ isOpen, onClose, isPro, membershipTier }: ManagePlanModalProps) {
   const { user } = useUser();
-  const firestore = useFirestore();
   const { toast } = useToast();
 
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'code'>('card');
@@ -27,54 +24,54 @@ export function ManagePlanModal({ isOpen, onClose, isPro, membershipTier }: Mana
   if (!isOpen) return null;
 
   const handleUpgrade = async () => {
-    if (!user || !firestore) {
+    if (!user) {
       toast({ title: 'Error', description: 'You must be logged in to upgrade.', variant: 'destructive' });
       return;
     }
 
-    // Validate promo code via Firestore (with local fallback checks)
-    if (paymentMethod === 'code') {
-      const { valid, message } = await validatePromoCode(firestore, promoCode);
-      if (!valid) {
-        toast({
-          title: 'Invalid Code',
-          description: message || 'The promo code entered is invalid.',
-          variant: 'destructive'
-        });
-        return;
-      }
+    if (paymentMethod === 'code' && !promoCode.trim()) {
+      toast({ title: 'Missing Code', description: 'Please enter a promo code.', variant: 'destructive' });
+      return;
     }
 
     setIsProcessing(true);
 
     try {
-      // Simulate network/payment processing delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      const userRef = doc(firestore, 'users', user.uid);
-      await updateDoc(userRef, {
-        isPro: true,
-        membershipTier: 'Sharp Elite'
+      const token = await user.getIdToken();
+      const res = await fetch('/api/redeem-promo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'upgrade',
+          paymentMethod,
+          promoCode: promoCode.trim()
+        })
       });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Upgrade failed.');
+      }
 
       toast({ 
         title: 'Upgrade Successful!', 
-        description: 'Welcome to Sharp Elite. All pro features are now unlocked.' 
+        description: data.message || 'Welcome to Sharp Elite. All pro features are now unlocked.' 
       });
       onClose();
-      
-      // Refresh to update application state
       window.location.reload();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upgrade error:', error);
-      toast({ title: 'Upgrade Failed', description: 'An error occurred during upgrade.', variant: 'destructive' });
+      toast({ title: 'Upgrade Failed', description: error.message || 'An error occurred during upgrade.', variant: 'destructive' });
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleCancelMembership = async () => {
-    if (!user || !firestore) {
+    if (!user) {
       toast({ title: 'Error', description: 'You must be logged in to manage your plan.', variant: 'destructive' });
       return;
     }
@@ -82,14 +79,22 @@ export function ManagePlanModal({ isOpen, onClose, isPro, membershipTier }: Mana
     setIsProcessing(true);
 
     try {
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      const userRef = doc(firestore, 'users', user.uid);
-      await updateDoc(userRef, {
-        isPro: false,
-        membershipTier: 'Free Tier'
+      const token = await user.getIdToken();
+      const res = await fetch('/api/redeem-promo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'cancel'
+        })
       });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Cancellation failed.');
+      }
 
       toast({ 
         title: 'Membership Canceled', 
@@ -97,12 +102,10 @@ export function ManagePlanModal({ isOpen, onClose, isPro, membershipTier }: Mana
       });
       setShowCancelConfirm(false);
       onClose();
-      
-      // Refresh to update application state
       window.location.reload();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Cancellation error:', error);
-      toast({ title: 'Operation Failed', description: 'An error occurred while canceling your membership.', variant: 'destructive' });
+      toast({ title: 'Operation Failed', description: error.message || 'An error occurred while canceling your membership.', variant: 'destructive' });
     } finally {
       setIsProcessing(false);
     }

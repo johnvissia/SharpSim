@@ -58,55 +58,67 @@ const getMascot = (fullName: string) => {
 };
 
 const getModelPick = (game: Game) => {
-  const isMlb = game.sport === 'MLB';
-  const unit = isMlb ? 'runs' : 'pts';
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const homeNorm = norm(game.homeTeam.name);
+  const awayNorm = norm(game.awayTeam.name);
 
-  // 1. If explicit model prediction from Firestore exists
+  const homeSpread = typeof game.odds?.spread?.points === 'number' ? game.odds.spread.points : undefined;
+  const awaySpread = homeSpread !== undefined ? -homeSpread : undefined;
+
+  const formatPts = (pts?: number) => {
+    if (pts === undefined) return '';
+    if (pts === 0) return 'PK';
+    return pts > 0 ? `+${pts}` : `${pts}`;
+  };
+
+  // 1. If explicit model prediction exists, compare market spread to model
   if (game.modelPrediction) {
-    const proj = game.modelPrediction.projectedSpread ?? 0;
-    if (proj < 0) {
-      const mascot = getMascot(game.homeTeam.name);
-      return {
-        teamName: game.homeTeam.name,
-        mascot,
-        text: `${mascot} by ${Math.abs(proj).toFixed(1)} ${unit}`
-      };
-    } else if (proj > 0) {
-      const mascot = getMascot(game.awayTeam.name);
-      return {
-        teamName: game.awayTeam.name,
-        mascot,
-        text: `${mascot} by ${proj.toFixed(1)} ${unit}`
-      };
-    } else if (game.modelPrediction.recommendedSide) {
-      const mascot = getMascot(game.modelPrediction.recommendedSide);
-      return {
-        teamName: game.modelPrediction.recommendedSide,
-        mascot,
-        text: `${mascot} to win`
-      };
-    }
-  }
+    const recSide = game.modelPrediction.recommendedSide ? norm(game.modelPrediction.recommendedSide) : '';
 
-  // 2. Derive from sportsbook spread odds if available
-  if (game.odds?.spread && game.odds.spread.points !== 0) {
-    const pts = game.odds.spread.points;
-    if (pts < 0) {
-      // Home favored
-      const mascot = getMascot(game.homeTeam.name);
-      return {
-        teamName: game.homeTeam.name,
-        mascot,
-        text: `${mascot} (${pts > 0 ? '+' : ''}${pts} ${unit})`
-      };
-    } else if (pts > 0) {
-      // Away favored
-      const mascot = getMascot(game.awayTeam.name);
-      return {
-        teamName: game.awayTeam.name,
-        mascot,
-        text: `${mascot} (-${pts} ${unit})`
-      };
+    if (recSide) {
+      if (recSide.includes(homeNorm) || homeNorm.includes(recSide)) {
+        const mascot = getMascot(game.homeTeam.name);
+        const spreadText = formatPts(homeSpread);
+        return {
+          teamName: game.homeTeam.name,
+          mascot,
+          spreadText,
+          text: `${mascot} ${spreadText}`.trim(),
+        };
+      } else if (recSide.includes(awayNorm) || awayNorm.includes(recSide)) {
+        const mascot = getMascot(game.awayTeam.name);
+        const spreadText = formatPts(awaySpread);
+        return {
+          teamName: game.awayTeam.name,
+          mascot,
+          spreadText,
+          text: `${mascot} ${spreadText}`.trim(),
+        };
+      }
+    }
+
+    // Fallback: If recommendedSide is missing but projectedSpread & market spread exist
+    if (game.modelPrediction.projectedSpread !== undefined && homeSpread !== undefined) {
+      const edge = homeSpread - game.modelPrediction.projectedSpread;
+      if (edge >= 0.3) {
+        const mascot = getMascot(game.homeTeam.name);
+        const spreadText = formatPts(homeSpread);
+        return {
+          teamName: game.homeTeam.name,
+          mascot,
+          spreadText,
+          text: `${mascot} ${spreadText}`.trim(),
+        };
+      } else if (edge <= -0.3) {
+        const mascot = getMascot(game.awayTeam.name);
+        const spreadText = formatPts(awaySpread);
+        return {
+          teamName: game.awayTeam.name,
+          mascot,
+          spreadText,
+          text: `${mascot} ${spreadText}`.trim(),
+        };
+      }
     }
   }
 
@@ -209,8 +221,8 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
                 {team.name}
               </span>
               {isPickedWinner && (
-                <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[8px] font-black uppercase tracking-tighter px-1 py-0 ml-1.5 shrink-0">
-                  PICK
+                <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[8px] font-black uppercase tracking-tighter px-1.5 py-0 ml-1.5 shrink-0">
+                  SPREAD PICK {modelPick?.spreadText ? `(${modelPick.spreadText})` : ''}
                 </Badge>
               )}
             </div>
@@ -246,10 +258,16 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
               <OddsButton 
                 onClick={(e) => handleBetSelection(e, `${team.name} ${spreadPoints! > 0 ? `+${spreadPoints}` : spreadPoints}`, spreadOdds!, 'spread')}
                 isSelected={isPickInSlip('spread', `${team.name} ${spreadPoints! > 0 ? `+${spreadPoints}` : spreadPoints}`)}
-                className={`h-11 text-xs ${isFav ? 'border-brand-500/50 bg-brand-500/5' : ''}`}
+                className={`h-11 text-xs transition-all ${
+                  isPickedWinner 
+                    ? 'border-emerald-500/70 bg-emerald-500/15 ring-1 ring-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
+                    : (isFav ? 'border-brand-500/50 bg-brand-500/5' : '')
+                }`}
               >
                 <div className="flex flex-col items-center leading-none">
-                  <span className="font-bold text-white uppercase">{spreadPoints! > 0 ? `+${spreadPoints}` : spreadPoints}</span>
+                  <span className={`font-bold uppercase ${isPickedWinner ? 'text-emerald-300 font-black' : 'text-white'}`}>
+                    {spreadPoints! > 0 ? `+${spreadPoints}` : spreadPoints}
+                  </span>
                   <span className="text-[10px] opacity-60">({spreadOdds! > 0 ? `+${spreadOdds}` : spreadOdds})</span>
                 </div>
               </OddsButton>
@@ -311,7 +329,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
         <div className="px-3 py-1 flex items-center justify-between bg-slate-950/70 border-b border-slate-800/40 text-[10px]">
           <div className="flex items-center gap-1.5 font-bold text-slate-300">
             <Trophy className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-            <span className="text-slate-400 uppercase tracking-wider text-[9px]">Model Pick:</span>
+            <span className="text-slate-400 uppercase tracking-wider text-[9px]">Model Spread Pick:</span>
             <span className="text-emerald-400 font-extrabold">{modelPick.text}</span>
           </div>
           {game.modelPrediction?.betSignal && (

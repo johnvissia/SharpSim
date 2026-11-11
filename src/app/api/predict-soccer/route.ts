@@ -12,7 +12,11 @@ interface SoccerPrediction {
   predictedHomeGoals: number;
   predictedAwayGoals: number;
   predictedMargin: number;
+  projectedSpread: number;
+  marketSpread: number | null;
+  recommendedSide: string | null;
   modelPick: string | null;
+  coverProb: number;
   winProbHome: number;
   winProbAway: number;
   drawProb: number;
@@ -148,7 +152,17 @@ function poissonProb(k: number, lambda: number): number {
   return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
 }
 
-function generateDixonColesPrediction(home: string, away: string, league: string): SoccerPrediction {
+function formatSpread(points: number): string {
+  if (points === 0) return 'PK';
+  return points > 0 ? `+${points}` : `${points}`;
+}
+
+function generateDixonColesPrediction(
+  home: string,
+  away: string,
+  league: string,
+  inputMarketSpread?: number | null
+): SoccerPrediction {
   const homeRatings = resolveTeamRating(home);
   const awayRatings = resolveTeamRating(away);
 
@@ -163,6 +177,9 @@ function generateDixonColesPrediction(home: string, away: string, league: string
   let pAway = 0;
   const rho = -0.05; // Dixon-Coles low scoring correlation parameter
 
+  // Matrix of probabilities for exact scores (h, a)
+  const scoreProbs: Array<{ h: number; a: number; prob: number }> = [];
+
   for (let h = 0; h <= 6; h++) {
     for (let a = 0; a <= 6; a++) {
       let prob = poissonProb(h, lambdaHome) * poissonProb(a, lambdaAway);
@@ -172,6 +189,8 @@ function generateDixonColesPrediction(home: string, away: string, league: string
       else if (h === 1 && a === 0) prob *= (1.0 + lambdaAway * rho);
       else if (h === 0 && a === 1) prob *= (1.0 + lambdaHome * rho);
       else if (h === 1 && a === 1) prob *= (1.0 - rho);
+
+      scoreProbs.push({ h, a, prob });
 
       if (h > a) pHome += prob;
       else if (h === a) pDraw += prob;
@@ -184,17 +203,81 @@ function generateDixonColesPrediction(home: string, away: string, league: string
   const draw = Math.round((pDraw / total) * 100);
   const winAway = Math.round((pAway / total) * 100);
 
+  // Goal margin (Home - Away)
   const margin = parseFloat((lambdaHome - lambdaAway).toFixed(2));
-  let modelPick: string | null = null;
-  if (winHome >= winAway && winHome >= draw) modelPick = home;
-  else if (winAway >= winHome && winAway >= draw) modelPick = away;
-  else modelPick = 'Draw';
+  // In betting spread terms (Home perspective), projectedSpread = -margin
+  const projectedSpread = parseFloat((-margin).toFixed(2));
 
-  const zScore = parseFloat((margin / 1.15).toFixed(2));
+  // Determine market spread: use provided market spread or derive standard consensus Asian handicap
+  let marketSpread: number;
+  if (inputMarketSpread !== undefined && inputMarketSpread !== null) {
+    marketSpread = inputMarketSpread;
+  } else {
+    // Benchmark handicap line rounded to nearest 0.5 (e.g. -1.5, -0.5, 0, +0.5, +1.5)
+    marketSpread = -Math.round(margin * 2) / 2;
+  }
+
+  // Calculate cover probabilities for the spread (Home covers if (h - a) > -marketSpread)
+  const targetThreshold = -marketSpread;
+  let pHomeCover = 0;
+  let pAwayCover = 0;
+
+  for (const item of scoreProbs) {
+    const diff = item.h - item.a;
+    if (diff > targetThreshold) {
+      pHomeCover += item.prob;
+    } else if (diff < targetThreshold) {
+      pAwayCover += item.prob;
+    }
+    // push outcomes (diff === targetThreshold) refund stake at standard -110 spread books
+  }
+
+  const totalDecisionProb = pHomeCover + pAwayCover || 1;
+  const homeCoverProb = Math.round((pHomeCover / totalDecisionProb) * 100);
+  const awayCoverProb = Math.round((pAwayCover / totalDecisionProb) * 100);
+
+  // Edge in goals: marketSpread - projectedSpread
+  const edge = parseFloat((marketSpread - projectedSpread).toFixed(2));
+  const absEdge = Math.abs(edge);
+  const zScore = parseFloat((edge / 1.25).toFixed(2));
+
+  let recommendedSide: string;
+  let pickSpreadStr: string;
+  let coverProb: number;
+
+  if (homeCoverProb >= awayCoverProb) {
+    recommendedSide = home;
+    pickSpreadStr = formatSpread(marketSpread);
+    coverProb = homeCoverProb;
+  } else {
+    recommendedSide = away;
+    // Away spread is opposite of home spread
+    pickSpreadStr = formatSpread(-marketSpread);
+    coverProb = awayCoverProb;
+  }
+
+  const modelPick = `${recommendedSide} ${pickSpreadStr}`;
+
+  // Evaluate Value Signal against standard -110 spread benchmark (~52.4% break-even)
+  // Standard deviation for soccer spreads is ~1.25 goals.
+  // A true edge requires significant discrepancy between projected margin and market spread (absEdge).
+  // A 0.1 or 0.2 goal edge is statistical noise and must be classified as 'No Play'.
   let betSignal: BetSignal = 'No Play';
-  if (Math.abs(zScore) >= 1.0 || Math.max(winHome, winAway) >= 65) betSignal = 'ELITE VALUE';
-  else if (Math.abs(zScore) >= 0.70 || Math.max(winHome, winAway) >= 54) betSignal = 'STRONG VALUE';
-  else if (Math.abs(zScore) >= 0.40) betSignal = 'PLAYABLE';
+  let confidence = 'No Play';
+
+  if (absEdge >= 1.05 && coverProb >= 58) {
+    betSignal = 'ELITE VALUE';
+    confidence = 'High Edge';
+  } else if (absEdge >= 0.70 && coverProb >= 55) {
+    betSignal = 'STRONG VALUE';
+    confidence = 'Solid Edge';
+  } else if (absEdge >= 0.35 && coverProb >= 52.5) {
+    betSignal = 'PLAYABLE';
+    confidence = 'Lean';
+  } else {
+    betSignal = 'No Play';
+    confidence = 'No Play';
+  }
 
   return {
     homeTeam: home,
@@ -202,14 +285,18 @@ function generateDixonColesPrediction(home: string, away: string, league: string
     predictedHomeGoals: parseFloat(lambdaHome.toFixed(2)),
     predictedAwayGoals: parseFloat(lambdaAway.toFixed(2)),
     predictedMargin: margin,
+    projectedSpread,
+    marketSpread,
+    recommendedSide,
     modelPick,
+    coverProb,
     winProbHome: winHome,
     winProbAway: winAway,
     drawProb: draw,
     betSignal,
-    confidence: Math.abs(zScore) > 0.8 ? 'High' : 'Medium',
+    confidence,
     zScore,
-    marketLine: null,
+    marketLine: marketSpread,
   };
 }
 
@@ -221,6 +308,15 @@ export async function GET(request: NextRequest) {
 
   if (!home || !away) {
     return NextResponse.json({ error: 'Missing required params: home, away' }, { status: 400 });
+  }
+
+  const marketSpreadParam = searchParams.get('marketSpread');
+  const hasExplicitMarketSpread = marketSpreadParam !== null && marketSpreadParam !== 'null' && marketSpreadParam !== '';
+  let marketSpread = hasExplicitMarketSpread ? parseFloat(marketSpreadParam!) : null;
+
+  // If no explicit market spread passed, look for one from daily_games
+  if (marketSpread === null) {
+    marketSpread = await findMarketSpreadFromDailyGames(home, away);
   }
 
   // 1. If league is EPL and microservice is running, attempt query
@@ -237,39 +333,62 @@ export async function GET(request: NextRequest) {
 
       if (res.ok) {
         const data = await res.json();
-        let bestSignal: BetSignal = 'No Play';
-        if (data.signals && data.signals.length > 0) {
-          for (const s of data.signals) {
-            if (s.signal === 'STRONG_VALUE') bestSignal = 'ELITE VALUE';
-            else if (s.signal === 'VALUE' && bestSignal !== 'ELITE VALUE') bestSignal = 'STRONG VALUE';
-          }
-        }
-
         const winHome = Math.round(data.p_home * 100);
         const winAway = Math.round(data.p_away * 100);
         const draw = Math.round(data.p_draw * 100);
 
-        let modelPick: string | null = null;
-        if (data.p_home >= data.p_away && data.p_home >= data.p_draw) modelPick = data.home_team;
-        else if (data.p_away >= data.p_home && data.p_away >= data.p_draw) modelPick = data.away_team;
-        else modelPick = 'Draw';
+        const lamHome = parseFloat(data.lambda_home);
+        const lamAway = parseFloat(data.lambda_away);
+        const margin = parseFloat((lamHome - lamAway).toFixed(2));
+        const projectedSpread = parseFloat((-margin).toFixed(2));
 
-        const zScore = parseFloat(((data.lambda_home - data.lambda_away) / 1.15).toFixed(2));
+        const effectiveSpread = marketSpread !== null ? marketSpread : -Math.round(margin * 2) / 2;
+        const edge = parseFloat((effectiveSpread - projectedSpread).toFixed(2));
+        const zScore = parseFloat((edge / 1.25).toFixed(2));
+
+        // Evaluate cover probability
+        let pHomeCover = 0;
+        let pAwayCover = 0;
+        const targetThreshold = -effectiveSpread;
+        for (let h = 0; h <= 6; h++) {
+          for (let a = 0; a <= 6; a++) {
+            const prob = poissonProb(h, lamHome) * poissonProb(a, lamAway);
+            if (h - a > targetThreshold) pHomeCover += prob;
+            else if (h - a < targetThreshold) pAwayCover += prob;
+          }
+        }
+        const totalCover = pHomeCover + pAwayCover || 1;
+        const homeCoverProb = Math.round((pHomeCover / totalCover) * 100);
+        const awayCoverProb = Math.round((pAwayCover / totalCover) * 100);
+
+        const isHomePick = homeCoverProb >= awayCoverProb;
+        const recommendedSide = isHomePick ? data.home_team : data.away_team;
+        const pickSpreadStr = isHomePick ? formatSpread(effectiveSpread) : formatSpread(-effectiveSpread);
+        const coverProb = Math.max(homeCoverProb, awayCoverProb);
+
+        let bestSignal: BetSignal = 'No Play';
+        if (coverProb >= 60 || Math.abs(zScore) >= 0.75) bestSignal = 'ELITE VALUE';
+        else if (coverProb >= 55 || Math.abs(zScore) >= 0.45) bestSignal = 'STRONG VALUE';
+        else if (coverProb >= 53) bestSignal = 'PLAYABLE';
 
         return NextResponse.json({
           homeTeam: data.home_team,
           awayTeam: data.away_team,
-          predictedHomeGoals: parseFloat(data.lambda_home.toFixed(2)),
-          predictedAwayGoals: parseFloat(data.lambda_away.toFixed(2)),
-          predictedMargin: parseFloat((data.lambda_home - data.lambda_away).toFixed(2)),
-          modelPick,
+          predictedHomeGoals: parseFloat(lamHome.toFixed(2)),
+          predictedAwayGoals: parseFloat(lamAway.toFixed(2)),
+          predictedMargin: margin,
+          projectedSpread,
+          marketSpread: effectiveSpread,
+          recommendedSide,
+          modelPick: `${recommendedSide} ${pickSpreadStr}`,
+          coverProb,
           winProbHome: winHome,
           winProbAway: winAway,
           drawProb: draw,
           betSignal: bestSignal,
-          confidence: Math.abs(zScore) > 0.8 ? 'High' : 'Medium',
+          confidence: coverProb >= 60 ? 'High Edge' : (coverProb >= 55 ? 'Solid Edge' : 'Lean'),
           zScore,
-          marketLine: null,
+          marketLine: effectiveSpread,
         } satisfies SoccerPrediction);
       }
     } catch {
@@ -279,7 +398,7 @@ export async function GET(request: NextRequest) {
 
   // 2. Fallback: Check saved Firestore model_predictions
   try {
-    const firestorePred = await getFirestorePrediction(home, away, league);
+    const firestorePred = await getFirestorePrediction(home, away, league, marketSpread);
     if (firestorePred) {
       return NextResponse.json(firestorePred);
     }
@@ -288,11 +407,47 @@ export async function GET(request: NextRequest) {
   }
 
   // 3. Robust In-Process Dixon-Coles Poisson Engine
-  const prediction = generateDixonColesPrediction(home, away, league);
+  const prediction = generateDixonColesPrediction(home, away, league, marketSpread);
   return NextResponse.json(prediction);
 }
 
-async function getFirestorePrediction(home: string, away: string, _league: string): Promise<SoccerPrediction | null> {
+async function findMarketSpreadFromDailyGames(home: string, away: string): Promise<number | null> {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const homeNorm = norm(home);
+  const awayNorm = norm(away);
+
+  try {
+    const docs = await getRestCollectionDocs('daily_games', 80);
+    for (const d of docs) {
+      const dHome = norm(d.homeTeam || '');
+      const dAway = norm(d.awayTeam || '');
+      const match = (dHome.includes(homeNorm) || homeNorm.includes(dHome)) &&
+                    (dAway.includes(awayNorm) || awayNorm.includes(dAway));
+      if (match && d.bookmakerOdds && d.bookmakerOdds.length > 0) {
+        for (const bo of d.bookmakerOdds) {
+          try {
+            const bm = typeof bo === 'string' ? JSON.parse(bo) : bo;
+            const sm = bm.markets?.find((m: any) => m.key === 'spreads');
+            if (sm && sm.outcomes) {
+              const homeOutcome = sm.outcomes.find((o: any) => norm(o.name).includes(homeNorm) || homeNorm.includes(norm(o.name)));
+              if (homeOutcome && typeof homeOutcome.point === 'number') {
+                return homeOutcome.point;
+              }
+            }
+          } catch { }
+        }
+      }
+    }
+  } catch { }
+  return null;
+}
+
+async function getFirestorePrediction(
+  home: string,
+  away: string,
+  _league: string,
+  inputMarketSpread?: number | null
+): Promise<SoccerPrediction | null> {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const homeNorm = norm(home);
   const awayNorm = norm(away);
@@ -304,20 +459,39 @@ async function getFirestorePrediction(home: string, away: string, _league: strin
                     (dAway.includes(awayNorm) || awayNorm.includes(dAway));
 
     if (isMatch && data.predictedHomeGoals !== undefined && data.predictedAwayGoals !== undefined) {
+      const hG = Number(data.predictedHomeGoals);
+      const aG = Number(data.predictedAwayGoals);
+      const margin = parseFloat((hG - aG).toFixed(2));
+      const projectedSpread = parseFloat((-margin).toFixed(2));
+      const effectiveSpread = inputMarketSpread !== undefined && inputMarketSpread !== null
+        ? inputMarketSpread
+        : (data.marketSpread !== undefined ? Number(data.marketSpread) : -Math.round(margin * 2) / 2);
+
+      const edge = parseFloat((effectiveSpread - projectedSpread).toFixed(2));
+      const zScore = parseFloat((edge / 1.25).toFixed(2));
+      const isHomeFavored = edge >= 0;
+      const recSide = isHomeFavored ? data.homeTeam : data.awayTeam;
+      const pickSpread = isHomeFavored ? effectiveSpread : -effectiveSpread;
+      const pickSpreadStr = formatSpread(pickSpread);
+
       return {
         homeTeam: data.homeTeam,
         awayTeam: data.awayTeam,
-        predictedHomeGoals: Number(data.predictedHomeGoals),
-        predictedAwayGoals: Number(data.predictedAwayGoals),
-        predictedMargin: parseFloat((Number(data.predictedHomeGoals) - Number(data.predictedAwayGoals)).toFixed(2)),
-        modelPick: data.recommendedSide ?? null,
+        predictedHomeGoals: hG,
+        predictedAwayGoals: aG,
+        predictedMargin: margin,
+        projectedSpread,
+        marketSpread: effectiveSpread,
+        recommendedSide: recSide,
+        modelPick: `${recSide} ${pickSpreadStr}`,
+        coverProb: Math.round(52.4 + Math.min(Math.abs(zScore) * 12, 35)),
         winProbHome: Number(data.winProbHome ?? 0),
         winProbAway: Number(data.winProbAway ?? 0),
         drawProb: Number(data.drawProb ?? 0),
         betSignal: (data.betSignal as BetSignal) ?? 'No Play',
-        confidence: Math.abs(data.zScore ?? 0) > 0.8 ? 'High' : 'Medium',
-        zScore: Number(data.zScore ?? 0),
-        marketLine: data.marketSpread !== undefined ? Number(data.marketSpread) : null,
+        confidence: Math.abs(zScore) >= 0.75 ? 'High Edge' : (Math.abs(zScore) >= 0.45 ? 'Solid Edge' : 'Lean'),
+        zScore,
+        marketLine: effectiveSpread,
       };
     }
     return null;

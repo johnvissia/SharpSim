@@ -13,8 +13,6 @@ import { EdgeDistributionChart } from '@/components/dashboard/EdgeDistributionCh
 import { ModelFormulaDialog } from '@/components/dashboard/ModelFormulaDialog';
 import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { Lock, Crown } from 'lucide-react';
-import { ProUpgradeModal } from '@/components/dashboard/ProUpgradeModal';
 
 type SupportedSport = 'NFL' | 'NBA' | 'MLB' | 'NCAAM' | 'UCL' | 'EPL' | 'NHL';
 
@@ -42,13 +40,20 @@ function ModelPageContent() {
   const [rankedPredictions, setRankedPredictions] = useState<PredictionResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [, setStats] = useState<{ today: ModelStats, week: ModelStats } | null>(null);
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   useEffect(() => {
+    if (sportQuery === 'UCL') {
+      window.location.replace('/soccer-cl');
+      return;
+    }
+    if (sportQuery === 'EPL') {
+      window.location.replace('/soccer-pl');
+      return;
+    }
     if (sportQuery && sportsList.includes(sportQuery) && sportQuery !== selectedSport) {
       setSelectedSport(sportQuery);
     }
-  }, [sportQuery]);
+  }, [sportQuery, selectedSport]);
 
   const { user } = useUser();
   const firestore = useFirestore();
@@ -73,7 +78,7 @@ function ModelPageContent() {
         const { dailyGames = [], predictions = [] } = await modelDataRes.json();
 
         // Map locked predictions
-        const lockedPredictionsMap = new Map(predictions.map((p: any) => [p.gameId, p]));
+        const lockedPredictionsMap = new Map(predictions.map((p: any) => [p.gameId || p.id, p]));
 
         // 3. Auto-trigger snapshot if any game is within lockdown window and not yet snapshotted
         const now = new Date();
@@ -94,9 +99,27 @@ function ModelPageContent() {
           }).catch(e => console.error('[ModelPage] Auto-snapshot error:', e));
         }
 
-        const filteredGames = allGames.filter(g => {
-          if (g.sport !== selectedSport) return false;
+        const formatNyDate = (date: Date) => {
+          const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/New_York',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          }).formatToParts(date);
+          return `${parts.find(p => p.type === 'year')?.value}-${parts.find(p => p.type === 'month')?.value}-${parts.find(p => p.type === 'day')?.value}`;
+        };
+        const todayNy = formatNyDate(now);
 
+        const sportGames = allGames.filter(g => g.sport === selectedSport);
+        const todayGames = sportGames.filter(g => {
+          const gameNy = formatNyDate(new Date(g.startTime));
+          const gameTime = new Date(g.startTime).getTime();
+          const staleCutoff = now.getTime() - (4 * 60 * 60 * 1000);
+          if (g.statusState === 'post' && gameTime < staleCutoff) return false;
+          return gameNy === todayNy || g.statusState === 'in';
+        });
+
+        const filteredGames = todayGames.length > 0 ? todayGames : sportGames.filter(g => {
           const gameTime = new Date(g.startTime).getTime();
           const timeUntilStart = gameTime - now.getTime();
           const twentyFourHours = 24 * 60 * 60 * 1000;
@@ -280,6 +303,14 @@ function ModelPageContent() {
                 <button
                   key={sport}
                   onClick={() => {
+                    if (sport === 'UCL') {
+                      window.location.href = '/soccer-cl';
+                      return;
+                    }
+                    if (sport === 'EPL') {
+                      window.location.href = '/soccer-pl';
+                      return;
+                    }
                     setSelectedSport(sport);
                     window.history.replaceState(null, '', `/model?sport=${sport}`);
                   }}

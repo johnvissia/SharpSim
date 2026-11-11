@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { useUser, useAuth, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { Settings as SettingsIcon, User, Moon, Sun, DollarSign, Bell, Shield, Star, Trophy } from 'lucide-react';
+import { Settings as SettingsIcon, User, Moon, Sun, DollarSign, Bell, Shield, Star, Trophy, Edit2, Check, X, KeyRound, Loader2, AlertTriangle, RotateCcw, Trash2 } from 'lucide-react';
+import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { ManagePlanModal } from '@/components/dashboard/ManagePlanModal';
 import { useAppMode } from '@/context/AppModeContext';
@@ -22,14 +24,23 @@ const AVAILABLE_LEAGUES = [
 
 export default function SettingsPage() {
     const { user, isUserLoading } = useUser();
+    const auth = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     const { isRealMoneyMode, toggleRealMoneyMode: toggleAppRealMoneyMode } = useAppMode();
 
-    // Basic state for some dummy/local settings
+    // Basic state for settings
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [notifications, setNotifications] = useState(true);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [nameInput, setNameInput] = useState('');
+    const [isSavingName, setIsSavingName] = useState(false);
+    const [isSendingReset, setIsSendingReset] = useState(false);
+    const [isResettingHistory, setIsResettingHistory] = useState(false);
+    const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+    const [confirmReset, setConfirmReset] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
 
     const firestore = useFirestore();
     const userProfileRef = useMemoFirebase(
@@ -89,6 +100,89 @@ export default function SettingsPage() {
             if (saved) setLocalFavoriteLeagues(JSON.parse(saved));
         } catch (e) { }
     }, []);
+
+    useEffect(() => {
+        if (user) {
+            setNameInput(user.displayName || userProfile?.displayName || '');
+        }
+    }, [user, userProfile]);
+
+    const handleSaveName = async () => {
+        if (!user) return;
+        const trimmed = nameInput.trim();
+        setIsSavingName(true);
+        try {
+            await updateProfile(user, { displayName: trimmed });
+            if (firestore) {
+                const userRef = doc(firestore, 'users', user.uid);
+                await updateDoc(userRef, { displayName: trimmed });
+            }
+            setIsEditingName(false);
+            toast({ title: 'Name Updated', description: 'Your display name has been updated.' });
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'Update Failed', description: e.message || 'Could not update name.' });
+        } finally {
+            setIsSavingName(false);
+        }
+    };
+
+    const handleSendPasswordReset = async () => {
+        if (!user?.email || !auth) return;
+        setIsSendingReset(true);
+        try {
+            await sendPasswordResetEmail(auth, user.email);
+            toast({ title: 'Password Reset Email Sent', description: `Instructions have been sent to ${user.email}.` });
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'Failed to Send', description: e.message || 'Could not send reset email.' });
+        } finally {
+            setIsSendingReset(false);
+        }
+    };
+
+    const handleResetBettingHistory = async () => {
+        if (!user) return;
+        setIsResettingHistory(true);
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch('/api/user/reset-history', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || 'Failed to reset betting history.');
+            }
+            toast({ title: 'History Reset', description: 'Your betting history and performance stats have been cleared.' });
+            setConfirmReset(false);
+            window.location.reload();
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'Reset Failed', description: e.message || 'Could not reset history.' });
+        } finally {
+            setIsResettingHistory(false);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!user) return;
+        setIsDeletingAccount(true);
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch('/api/user/delete-account', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || 'Failed to delete account.');
+            }
+            toast({ title: 'Account Deleted', description: 'Your account and personal data have been permanently removed.' });
+            await signOut(auth);
+            router.push('/signup');
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'Deletion Failed', description: e.message || 'Could not delete account.' });
+            setIsDeletingAccount(false);
+        }
+    };
 
     const favoriteLeagues = Array.from(new Set([
         ...(userProfile?.favoriteLeagues || []),
@@ -166,12 +260,86 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Content Fields */}
-                    <div className="space-y-6">
+                    <div className="space-y-5">
+                        {/* Display Name */}
+                        <div className="flex justify-between items-end pb-4 border-b border-slate-800/50">
+                            <div className="flex-1 mr-4">
+                                <p className="text-[10px] font-bold text-slate-500 tracking-wider mb-1 uppercase">Display Name</p>
+                                {isEditingName ? (
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <input
+                                            type="text"
+                                            value={nameInput}
+                                            onChange={(e) => setNameInput(e.target.value)}
+                                            placeholder="Enter display name"
+                                            className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-sm text-slate-100 focus:outline-none focus:border-brand-500 w-full max-w-[200px]"
+                                        />
+                                        <button
+                                            onClick={handleSaveName}
+                                            disabled={isSavingName}
+                                            className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors"
+                                            title="Save"
+                                        >
+                                            {isSavingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setIsEditingName(false);
+                                                setNameInput(user.displayName || userProfile?.displayName || '');
+                                            }}
+                                            className="p-1.5 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 transition-colors"
+                                            title="Cancel"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <p className="text-slate-200 text-sm font-medium">
+                                        {user.displayName || userProfile?.displayName || 'Not set'}
+                                    </p>
+                                )}
+                            </div>
+                            {!isEditingName && (
+                                <button
+                                    onClick={() => setIsEditingName(true)}
+                                    className="text-emerald-500 text-sm font-semibold hover:text-emerald-400 transition-colors flex items-center gap-1"
+                                >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                    Edit
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Email */}
+                        <div className="flex justify-between items-end pb-4 border-b border-slate-800/50">
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-500 tracking-wider mb-1 uppercase">Email</p>
+                                <p className="text-slate-200 text-sm font-medium">
+                                    {user.email || (user.isAnonymous ? 'Anonymous Session' : 'No email attached')}
+                                </p>
+                            </div>
+                            {user.email && (
+                                <button
+                                    onClick={handleSendPasswordReset}
+                                    disabled={isSendingReset}
+                                    className="text-emerald-500 text-sm font-semibold hover:text-emerald-400 transition-colors flex items-center gap-1"
+                                    title="Send password reset link"
+                                >
+                                    {isSendingReset ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        <KeyRound className="w-3.5 h-3.5" />
+                                    )}
+                                    Reset Password
+                                </button>
+                            )}
+                        </div>
+
                         {/* User ID */}
                         <div className="flex justify-between items-end pb-4 border-b border-slate-800/50">
                             <div>
                                 <p className="text-[10px] font-bold text-slate-500 tracking-wider mb-1 uppercase">User ID</p>
-                                <p className="text-slate-300 font-mono text-sm">{user.uid}</p>
+                                <p className="text-slate-400 font-mono text-xs">{user.uid}</p>
                             </div>
                             <button 
                                 onClick={() => {
@@ -181,17 +349,6 @@ export default function SettingsPage() {
                                 className="text-emerald-500 text-sm font-semibold hover:text-emerald-400 transition-colors"
                             >
                                 Copy
-                            </button>
-                        </div>
-
-                        {/* Email */}
-                        <div className="flex justify-between items-end pb-4 border-b border-slate-800/50">
-                            <div>
-                                <p className="text-[10px] font-bold text-slate-500 tracking-wider mb-1 uppercase">Email</p>
-                                <p className="text-slate-200 text-sm font-medium">{user.email || 'pro.bettor@quantedge.com'}</p>
-                            </div>
-                            <button className="text-emerald-500 text-sm font-semibold hover:text-emerald-400 transition-colors">
-                                Change
                             </button>
                         </div>
 
@@ -335,13 +492,93 @@ export default function SettingsPage() {
                 </div>
             </div>
             
-            {/* Danger Zone (Placeholder) */}
-            <div className="bg-red-950/20 border border-red-900/30 rounded-2xl p-6 backdrop-blur-sm mt-8">
-                <h3 className="text-red-400 font-bold mb-2">Danger Zone</h3>
-                <p className="text-sm text-slate-400 mb-4">Permanent actions regarding your account data.</p>
-                <button className="bg-red-950 text-red-400 hover:bg-red-900 hover:text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors border border-red-900/50">
-                    Reset Betting History
-                </button>
+            {/* Danger Zone */}
+            <div className="bg-red-950/20 border border-red-900/30 rounded-2xl p-6 backdrop-blur-sm mt-8 space-y-6">
+                <div>
+                    <h3 className="text-red-400 font-bold text-lg flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-red-400" />
+                        Danger Zone
+                    </h3>
+                    <p className="text-sm text-slate-400 mt-1">
+                        Permanent and irreversible actions regarding your account and stored data.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                    {/* Reset History Card */}
+                    <div className="bg-slate-900/60 border border-red-900/40 p-4 rounded-xl flex flex-col justify-between space-y-3">
+                        <div>
+                            <p className="text-sm font-bold text-slate-200">Reset Betting History</p>
+                            <p className="text-xs text-slate-400 mt-1">
+                                Permanently wipe all past and pending bets, reset win/loss stats, and restore your initial 100 coin bankroll.
+                            </p>
+                        </div>
+
+                        {confirmReset ? (
+                            <div className="flex items-center gap-2 pt-2">
+                                <button
+                                    onClick={handleResetBettingHistory}
+                                    disabled={isResettingHistory}
+                                    className="flex-1 bg-red-600 hover:bg-red-500 text-white text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                                >
+                                    {isResettingHistory ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                                    Confirm Reset
+                                </button>
+                                <button
+                                    onClick={() => setConfirmReset(false)}
+                                    className="px-3 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setConfirmReset(true)}
+                                className="w-full bg-red-950/60 hover:bg-red-900 text-red-300 hover:text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors border border-red-900/50 flex items-center justify-center gap-2"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Reset Betting History
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Delete Account Card */}
+                    <div className="bg-slate-900/60 border border-red-900/40 p-4 rounded-xl flex flex-col justify-between space-y-3">
+                        <div>
+                            <p className="text-sm font-bold text-slate-200">Delete Account Permanently</p>
+                            <p className="text-xs text-slate-400 mt-1">
+                                Exercising your right to be forgotten: permanently delete your login, profile, and all analytics data.
+                            </p>
+                        </div>
+
+                        {confirmDelete ? (
+                            <div className="flex items-center gap-2 pt-2">
+                                <button
+                                    onClick={handleDeleteAccount}
+                                    disabled={isDeletingAccount}
+                                    className="flex-1 bg-red-700 hover:bg-red-600 text-white text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                                >
+                                    {isDeletingAccount ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                    Confirm Delete
+                                </button>
+                                <button
+                                    onClick={() => setConfirmDelete(false)}
+                                    className="px-3 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setConfirmDelete(true)}
+                                className="w-full bg-red-950/60 hover:bg-red-900 text-red-300 hover:text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors border border-red-900/50 flex items-center justify-center gap-2"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete Account
+                            </button>
+                        )}
+                    </div>
+                </div>
             </div>
             
             <ManagePlanModal 

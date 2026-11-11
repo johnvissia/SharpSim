@@ -12,9 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { X, Ticket, BookOpen } from 'lucide-react';
 import { calculateParlay } from '@/lib/parlay';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser } from '@/firebase';
+import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc, writeBatch, increment } from 'firebase/firestore';
-import type { UserBet, ParlayLeg, SportName } from '@/lib/types';
+import type { UserBet, ParlayLeg, SportName, UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 export function BetSlip() {
@@ -25,6 +25,12 @@ export function BetSlip() {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user } = useUser();
+
+  const userProfileRef = useMemoFirebase(
+    () => (user && firestore ? doc(firestore, 'users', user.uid) : null),
+    [user, firestore]
+  );
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   const slipRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -164,6 +170,18 @@ export function BetSlip() {
       return;
     }
 
+    if (!isRealMoneyMode) {
+      const currentBalance = userProfile?.balance ?? 0;
+      if (stakeNum > currentBalance) {
+        toast({
+          variant: 'destructive',
+          title: 'Insufficient Balance',
+          description: `You only have ${currentBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} coins. Enter a smaller stake or collect daily coins in the Store.`,
+        });
+        return;
+      }
+    }
+
     if (picks.some(p =>
       (p.betType === 'player_prop' && !p.game.id) ||
       (p.betType !== 'player_prop' && !p.game.oddsApiId)
@@ -297,7 +315,10 @@ export function BetSlip() {
       const newBetRef = doc(betsCollectionRef);
       batch.set(newBetRef, newBet);
       
-      const userUpdate: any = { balance: increment(-stakeNum) };
+      const userUpdate: any = {};
+      if (!isRealMoneyMode) {
+        userUpdate.balance = increment(-stakeNum);
+      }
 
       // Update preferences based on picks
       picks.forEach(p => {

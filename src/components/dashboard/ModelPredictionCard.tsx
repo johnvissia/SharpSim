@@ -107,37 +107,43 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
     const projOnPick = isHomePick ? projectedSpread : -projectedSpread;
     const projDisplay = projOnPick > 0 ? `+${projOnPick.toFixed(1)}` : projOnPick.toFixed(1);
 
-    const signalColors: Record<string, string> = {
-        'ELITE VALUE': 'text-green-400 bg-green-950/40 border-green-500/50',
-        'STRONG VALUE': 'text-brand-400 bg-brand-950/40 border-brand-500/50',
-        'PLAYABLE': 'text-yellow-400 bg-yellow-950/40 border-yellow-500/50',
-        'No Play': 'text-slate-400 bg-slate-900 border-slate-700'
-    };
-    const activeColor = signalColors[prediction.betSignal] || signalColors['No Play'];
+    const absZ = Math.abs(prediction.zScore ?? 0);
+    let confidenceLabel = 'Moderate Edge';
+    let stars = 2;
+    if (absZ >= 1.25 || prediction.betSignal === 'ELITE VALUE') {
+        confidenceLabel = 'High Edge';
+        stars = 3;
+    } else if (absZ >= 0.6 || prediction.betSignal === 'STRONG VALUE' || prediction.betSignal === 'PLAYABLE') {
+        confidenceLabel = 'Solid Edge';
+        stars = 2;
+    } else {
+        confidenceLabel = 'Lean';
+        stars = 1;
+    }
 
     return (
         <>
             <Card className={`overflow-hidden border-slate-800 bg-slate-900 ${compact ? '' : 'h-full'}`}>
-                {/* Header */}
+                {/* Header - One clear badge */}
                 <div className="bg-slate-950 px-4 py-3 border-b border-slate-800 flex justify-between items-center text-white">
                     <div className="text-xs font-bold uppercase tracking-wider">
                         {game.awayTeam.name} @ {game.homeTeam.name}
                     </div>
-                    {prediction.betSignal !== 'No Play' && (
-                        <Badge variant="outline" className={`${prediction.betSignal.includes('ELITE') ? 'bg-green-600/20 text-green-400 border-green-500/30' : 'bg-yellow-600/20 text-yellow-400 border-yellow-500/30'} text-[10px] font-bold uppercase py-0 px-2`}>
-                            {prediction.betSignal}
+                    <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-slate-800 text-slate-200 border-slate-700 text-[10px] font-bold uppercase py-0.5 px-2.5">
+                            {confidenceLabel}
                         </Badge>
-                    )}
+                    </div>
                 </div>
 
                 <CardContent className="p-0">
                     <div className="p-5 flex flex-col gap-5">
 
-                        {/* Recommendation Box */}
-                        <div className={`p-4 rounded-xl border ${activeColor} relative overflow-hidden`}>
+                        {/* Recommendation Box - Toned down to neutral dark gray */}
+                        <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/70 relative overflow-hidden">
                             <div className="flex justify-between items-center z-10 relative">
                                 <div>
-                                    <div className="text-[10px] uppercase opacity-80 font-bold mb-1">Recommended Pick</div>
+                                    <div className="text-[10px] uppercase text-slate-400 font-bold mb-1">Recommended Spread Pick (-110)</div>
                                     <div className="flex items-center gap-3">
                                         {pickLogo && prediction.recommendedSide && (
                                             // eslint-disable-next-line @next/next/no-img-element
@@ -149,9 +155,12 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <div className="text-[10px] uppercase opacity-80 font-bold mb-1">Z-Score</div>
-                                    <div className="text-3xl font-black text-white">
-                                        {hasMarketSpread ? prediction.zScore.toFixed(2) : '-.--'}
+                                    <div className="text-[10px] uppercase text-slate-400 font-bold mb-1">Confidence</div>
+                                    <div className="text-sm font-bold text-white flex items-center justify-end gap-1.5">
+                                        <span>{confidenceLabel}</span>
+                                        <span className="text-amber-400 text-xs tracking-wider font-mono">
+                                            {'★'.repeat(stars)}{'☆'.repeat(3 - stars)}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -160,7 +169,7 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
                         {/* Vegas vs Model */}
                         <div className="flex items-center justify-between text-sm px-1">
                             <div className="text-center w-[45%]">
-                                <div className="text-[10px] text-slate-500 uppercase font-black mb-1">Vegas Line</div>
+                                <div className="text-[10px] text-slate-500 uppercase font-black mb-1">Vegas Spread Line</div>
                                 <div className="text-sm font-mono font-bold bg-slate-800 text-slate-300 px-3 py-2 rounded flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap">
                                     <span className="opacity-60">{isHomePick ? game.homeTeam.name : game.awayTeam.name}</span>
                                     <span>{hasMarketSpread ? pickSpreadDisplay : 'No Line'}</span>
@@ -168,7 +177,7 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
                             </div>
                             <div className="text-slate-700 font-black text-[10px]">VS</div>
                             <div className="text-center w-[45%]">
-                                <div className="text-[10px] text-brand-400 uppercase font-black mb-1">Model Proj</div>
+                                <div className="text-[10px] text-brand-400 uppercase font-black mb-1">Model Spread Proj</div>
                                 <div className="text-sm font-mono font-bold bg-brand-950/30 text-brand-300 border border-brand-500/30 px-3 py-2 rounded flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap">
                                     <span className="opacity-60">{isHomePick ? game.homeTeam.name : game.awayTeam.name}</span>
                                     <span>{projDisplay}</span>
@@ -210,10 +219,10 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
                         {data.trace && (
                             <button
                                 onClick={() => setShowDetail(true)}
-                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-brand-500/30 bg-brand-950/20 text-brand-400 text-xs font-bold hover:bg-brand-950/40 hover:border-brand-400/50 transition-all group"
+                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-800 bg-slate-950/40 text-slate-300 text-xs font-bold hover:bg-slate-800/60 hover:text-white transition-all group"
                             >
                                 <span>See Full Computation Breakdown</span>
-                                <ChevronDown className="h-3.5 w-3.5 group-hover:translate-y-0.5 transition-transform" />
+                                <ChevronDown className="h-3.5 w-3.5 group-hover:translate-y-0.5 transition-transform text-slate-400" />
                             </button>
                         )}
 

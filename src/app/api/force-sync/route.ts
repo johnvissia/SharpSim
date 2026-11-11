@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resilientSetDoc } from '@/lib/firestore-rest';
 import { sportKeyMapping } from '@/lib/sports';
+import { verifyApiAuth } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // Allow 5 minutes for syncing odds from 8 sports sequentially
 
 export async function GET(request: NextRequest) {
     try {
-        // Auth check (if CRON_SECRET is configured)
-        const authHeader = request.headers.get('Authorization');
-        const cronSecret = process.env.CRON_SECRET;
-        if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const authResult = await verifyApiAuth(request);
+        if (!authResult.authorized) {
+            return authResult.errorResponse!;
         }
 
-        const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
+        const API_KEY = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
         if (!API_KEY) throw new Error("Missing odds API key");
 
         console.log("=== API ROUTE FORCE SYNC ===");

@@ -4,15 +4,24 @@ import { fetchEspnSchedule } from '@/lib/espn';
 import { gradeUserBets } from '@/lib/bet-grading';
 import type { CompletedGame, UserBet } from '@/lib/types';
 import * as admin from 'firebase-admin';
+import { verifyApiAuth } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
+    const authResult = await verifyApiAuth(request);
+    if (!authResult.authorized) {
+        return authResult.errorResponse!;
+    }
     return handleSyncUserBets(request);
 }
 
 export async function POST(request: NextRequest) {
+    const authResult = await verifyApiAuth(request);
+    if (!authResult.authorized) {
+        return authResult.errorResponse!;
+    }
     return handleSyncUserBets(request);
 }
 

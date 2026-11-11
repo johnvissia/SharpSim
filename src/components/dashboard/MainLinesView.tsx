@@ -68,6 +68,7 @@ export function MainLinesView({ game }: { game: Game }) {
 
   const AwayIcon = sportIconMap[sport] || sportIconMap.Default;
   const HomeIcon = sportIconMap[sport] || sportIconMap.Default;
+  const isSoccer = sport === 'EPL' || sport === 'UCL' || sport === 'MLS';
 
   return (
     <div className="space-y-1">
@@ -92,35 +93,51 @@ export function MainLinesView({ game }: { game: Game }) {
           <span>{awayTeam.name}</span>
         </div>
         <div className="text-center">
-          {odds.spread ? (
+          {odds.spread && odds.spread.away ? (
             <OddsButton onClick={(e) => handlePick(`${awayTeam.name} ${awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}`, odds.spread.away, 'spread')} disabled={!canBet} isSelected={isPickInSlip('spread', `${awayTeam.name} ${awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}`)}>
               <span className="font-semibold text-primary">{awaySpreadPoints > 0 ? `+${awaySpreadPoints}` : awaySpreadPoints}</span>
               <span className="text-xs text-muted-foreground">{odds.spread.away > 0 ? `+${odds.spread.away}` : odds.spread.away}</span>
             </OddsButton>
           ) : (
-            <div className="font-semibold">N/A</div>
+            <div className="font-semibold text-xs text-muted-foreground">N/A</div>
           )}
         </div>
         <div className="text-center">
-          {odds.total ? (
+          {odds.total && odds.total.over ? (
             <OddsButton onClick={(e) => handlePick(`Over ${odds.total.points}`, odds.total.over, 'total')} disabled={!canBet} isSelected={isPickInSlip('total', `Over ${odds.total.points}`)}>
               <span className="font-semibold text-primary">O {odds.total.points}</span>
               <span className="text-xs text-muted-foreground">{odds.total.over > 0 ? `+${odds.total.over}` : odds.total.over}</span>
             </OddsButton>
           ) : (
-            <div className="font-semibold">N/A</div>
+            <div className="font-semibold text-xs text-muted-foreground">N/A</div>
           )}
         </div>
         <div className="text-center">
-          {odds.moneyline ? (
+          {odds.moneyline && odds.moneyline.away ? (
             <OddsButton onClick={(e) => handlePick(awayTeam.name, odds.moneyline.away, 'moneyline')} disabled={!canBet} isSelected={isPickInSlip('moneyline', awayTeam.name)}>
               <span className="font-semibold text-primary">{odds.moneyline.away > 0 ? `+${odds.moneyline.away}` : odds.moneyline.away}</span>
             </OddsButton>
           ) : (
-             <div className="font-semibold">N/A</div>
+             <div className="font-semibold text-xs text-muted-foreground">N/A</div>
           )}
         </div>
       </div>
+
+      {/* Draw Row for Soccer 3-Way Markets */}
+      {isSoccer && odds.moneyline?.draw ? (
+        <div className="grid grid-cols-4 items-center gap-2 p-2 rounded-lg hover:bg-muted/50 border-t border-muted/30">
+          <div className="col-span-1 flex items-center gap-2 font-semibold text-sm text-muted-foreground pl-1">
+            <span>Draw</span>
+          </div>
+          <div className="text-center font-semibold text-xs text-muted-foreground">—</div>
+          <div className="text-center font-semibold text-xs text-muted-foreground">—</div>
+          <div className="text-center">
+            <OddsButton onClick={(e) => handlePick('Draw', odds.moneyline.draw!, 'moneyline')} disabled={!canBet} isSelected={isPickInSlip('moneyline', 'Draw')}>
+              <span className="font-semibold text-primary">{odds.moneyline.draw > 0 ? `+${odds.moneyline.draw}` : odds.moneyline.draw}</span>
+            </OddsButton>
+          </div>
+        </div>
+      ) : null}
 
       {/* Home Team Row */}
       <div className="grid grid-cols-4 items-center gap-2 p-2 rounded-lg hover:bg-muted/50">
@@ -135,32 +152,32 @@ export function MainLinesView({ game }: { game: Game }) {
             <span>{homeTeam.name}</span>
         </div>
         <div className="text-center">
-          {odds.spread ? (
+          {odds.spread && odds.spread.home ? (
              <OddsButton onClick={(e) => handlePick(`${homeTeam.name} ${homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}`, odds.spread.home, 'spread')} disabled={!canBet} isSelected={isPickInSlip('spread', `${homeTeam.name} ${homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}`)}>
               <span className="font-semibold text-primary">{homeSpreadPoints > 0 ? `+${homeSpreadPoints}` : homeSpreadPoints}</span>
               <span className="text-xs text-muted-foreground">{odds.spread.home > 0 ? `+${odds.spread.home}` : odds.spread.home}</span>
             </OddsButton>
           ) : (
-             <div className="font-semibold">N/A</div>
+             <div className="font-semibold text-xs text-muted-foreground">N/A</div>
           )}
         </div>
         <div className="text-center">
-          {odds.total ? (
+          {odds.total && odds.total.under ? (
              <OddsButton onClick={(e) => handlePick(`Under ${odds.total.points}`, odds.total.under, 'total')} disabled={!canBet} isSelected={isPickInSlip('total', `Under ${odds.total.points}`)}>
               <span className="font-semibold text-primary">U {odds.total.points}</span>
               <span className="text-xs text-muted-foreground">{odds.total.under > 0 ? `+${odds.total.under}` : odds.total.under}</span>
             </OddsButton>
           ) : (
-            <div className="font-semibold">N/A</div>
+            <div className="font-semibold text-xs text-muted-foreground">N/A</div>
           )}
         </div>
         <div className="text-center">
-          {odds.moneyline ? (
+          {odds.moneyline && odds.moneyline.home ? (
             <OddsButton onClick={(e) => handlePick(homeTeam.name, odds.moneyline.home, 'moneyline')} disabled={!canBet} isSelected={isPickInSlip('moneyline', homeTeam.name)}>
               <span className="font-semibold text-primary">{odds.moneyline.home > 0 ? `+${odds.moneyline.home}` : odds.moneyline.home}</span>
             </OddsButton>
           ) : (
-            <div className="font-semibold">N/A</div>
+            <div className="font-semibold text-xs text-muted-foreground">N/A</div>
           )}
         </div>
       </div>

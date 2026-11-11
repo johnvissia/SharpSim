@@ -30,7 +30,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * @param firestore The Firestore instance.
  */
 export async function syncGameLinesAndScores(firestore: Firestore) {
-  const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
+  const API_KEY = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
 
   if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') {
     const message = 'API Key for The Odds API is missing. Please add your key to .env file and restart the development server.';
@@ -46,6 +46,9 @@ export async function syncGameLinesAndScores(firestore: Firestore) {
     { key: 'basketball_ncaab', label: 'NCAAM' },
     { key: 'baseball_mlb', label: 'MLB' },
     { key: 'icehockey_nhl', label: 'NHL' },
+    { key: 'soccer_epl', label: 'EPL' },
+    { key: 'soccer_uefa_champs_league', label: 'UCL' },
+    { key: 'soccer_usa_mls', label: 'MLS' },
   ];
 
   const allGames = [];
@@ -56,7 +59,8 @@ export async function syncGameLinesAndScores(firestore: Firestore) {
     for (const sport of sportsMap) {
       console.log(`Fetching odds for ${sport.label}...`);
       try {
-        const res = await fetch(`https://api.the-odds-api.com/v4/sports/${sport.key}/odds/?apiKey=${API_KEY}&regions=us&markets=h2h,spreads,totals&oddsFormat=american`);
+        const regions = sport.key.startsWith('soccer_') ? 'us,uk,eu' : 'us';
+        const res = await fetch(`https://api.the-odds-api.com/v4/sports/${sport.key}/odds/?apiKey=${API_KEY}&regions=${regions}&markets=h2h,spreads,totals&oddsFormat=american`);
         if (!res.ok) {
           const text = await res.text();
           throw new Error(`HTTP error ${res.status} for ${sport.label}: ${text}`);
@@ -399,7 +403,7 @@ export async function syncNBAPlayerStats(firestore: Firestore, daysBack: number 
  * Fetches player prop odds (Points) from The Odds API and saves them to Firestore.
  */
 export async function syncPlayerProps(firestore: Firestore) {
-  const API_KEY = process.env.NEXT_PUBLIC_ODDS_API_KEY;
+  const API_KEY = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
   if (!API_KEY) throw new Error('Odds API Key missing');
 
   console.log("[PROPS] Starting Player Props sync...");

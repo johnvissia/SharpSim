@@ -1,3 +1,4 @@
+import { verifyApiAuth } from '@/lib/api-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { syncAllInjuriesFromESPN } from '@/lib/services/espn-injuries';
 
@@ -6,6 +7,8 @@ export const maxDuration = 300; // Allow 5 minutes for processing 30 teams
 
 export async function POST(request: NextRequest) {
     try {
+        const authResult = await verifyApiAuth(request);
+        if (!authResult.authorized) return authResult.errorResponse!;
         // Auth check (if CRON_SECRET is configured)
         const authHeader = request.headers.get('Authorization');
         const cronSecret = process.env.CRON_SECRET;

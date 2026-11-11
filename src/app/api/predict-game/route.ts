@@ -9,6 +9,7 @@ import {
     type RestContext
 } from '@/lib/math-utils';
 import { db } from '@/lib/firebase';
+import { resilientGetCollection } from '@/lib/firestore-rest';
 import { nbaTeamNameToAbbreviation } from '@/lib/nba-data';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,9 @@ const SCHEDULE_RESIDUAL = 0; // Placeholder for Schedule Strength adjustment if 
 
 // Altitude Cities (Elevation > 1200m)
 const altitudeTeams = ['Denver Nuggets', 'Utah Jazz'];
+
+let nbaTeamsCache: any[] | null = null;
+let nbaTeamsCacheTime = 0;
 
 async function getTeamStats(abbrevOrName: string) {
     const normalized = abbrevOrName.trim();
@@ -38,13 +42,40 @@ async function getTeamStats(abbrevOrName: string) {
         }
     }
 
-    // 2. Fetch by Abbreviation (Primary Document ID)
-    let doc = await db.collection('nba_team_stats').doc(searchId).get();
-    if (doc.exists) return doc.data();
+    try {
+        if (db) {
+            // 2. Fetch by Abbreviation (Primary Document ID)
+            let doc = await db.collection('nba_team_stats').doc(searchId).get();
+            if (doc.exists) return doc.data();
 
-    // 3. Fallback: Search by teamName field if abbreviation lookup failed
-    const snapshot = await db.collection('nba_team_stats').where('teamName', '==', normalized).limit(1).get();
-    if (!snapshot.empty) return snapshot.docs[0].data();
+            // 3. Fallback: Search by teamName field if abbreviation lookup failed
+            const snapshot = await db.collection('nba_team_stats').where('teamName', '==', normalized).limit(1).get();
+            if (!snapshot.empty) return snapshot.docs[0].data();
+        }
+    } catch (e: any) {
+        // Admin SDK not authenticated or failed, fall back to REST
+    }
+
+    try {
+        const now = Date.now();
+        if (!nbaTeamsCache || now - nbaTeamsCacheTime > 60000) {
+            nbaTeamsCache = await resilientGetCollection('nba_team_stats', 50);
+            nbaTeamsCacheTime = now;
+        }
+
+        if (nbaTeamsCache && nbaTeamsCache.length > 0) {
+            let found = nbaTeamsCache.find(t => (t.id || t.abbreviation)?.toUpperCase() === searchId);
+            if (found) return found;
+
+            found = nbaTeamsCache.find(t => t.teamName?.toLowerCase() === normalized.toLowerCase());
+            if (found) return found;
+
+            found = nbaTeamsCache.find(t => t.teamName?.toLowerCase().includes(normalized.toLowerCase()) || normalized.toLowerCase().includes(t.teamName?.toLowerCase()));
+            if (found) return found;
+        }
+    } catch (restErr: any) {
+        console.error('[predict-game] REST fallback error:', restErr.message);
+    }
 
     return null;
 }
@@ -470,17 +501,19 @@ export async function GET(request: NextRequest) {
         // 5. EDGE & BET SIGNAL
         const MODEL_STD_DEV = 11.8;
         const edge = hasMarketSpread ? marketSpread - projectedSpread : 0;
+        const absEdge = Math.abs(edge);
         const zScore = hasMarketSpread ? calculateZScoreEdge(marketSpread, projectedSpread) : 0;
+        const absZ = Math.abs(zScore);
 
         let betSignal = "No Play";
-        const absZ = Math.abs(zScore);
         if (hasMarketSpread) {
-            if (absZ >= 1.0) betSignal = "ELITE VALUE";
-            else if (absZ >= 0.75) betSignal = "STRONG VALUE";
-            else if (absZ >= 0.55) betSignal = "PLAYABLE";
+            if (absEdge >= 4.5 || absZ >= 0.38) betSignal = "ELITE VALUE";
+            else if (absEdge >= 2.5 || absZ >= 0.21) betSignal = "STRONG VALUE";
+            else if (absEdge >= 1.5 || absZ >= 0.13) betSignal = "PLAYABLE";
         }
 
-        const recommendedSide = (hasMarketSpread && zScore > 0) ? homeName : (hasMarketSpread && zScore < 0 ? awayName : null);
+        const rawSide = (hasMarketSpread && zScore > 0) ? homeName : (hasMarketSpread && zScore < 0 ? awayName : null);
+        const recommendedSide = (hasMarketSpread && absEdge >= 1.5) ? rawSide : null;
         const steamConfirmed = checkSteam(projectedSpread, marketSpread, marketSpread);
 
         return NextResponse.json({
@@ -490,7 +523,7 @@ export async function GET(request: NextRequest) {
                 marketSpread: hasMarketSpread ? marketSpread : null,
                 zScore: parseFloat(zScore.toFixed(2)),
                 betSignal,
-                recommendedSide: hasMarketSpread ? recommendedSide : null,
+                recommendedSide,
                 confidence: hasMarketSpread ? Math.min(absZ * 25, 99).toFixed(0) + '%' : '0%'
             },
             components: {
@@ -591,7 +624,7 @@ export async function GET(request: NextRequest) {
                     zScore: parseFloat(zScore.toFixed(4)),
                     absZ: parseFloat(absZ.toFixed(4)),
                     signal: betSignal,
-                    recommendedSide: absZ >= 0.55 ? recommendedSide : null,
+                    recommendedSide: recommendedSide,
                     confidence: Math.min(absZ * 25, 99).toFixed(1) + '%',
                 },
             }

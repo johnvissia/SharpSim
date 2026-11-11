@@ -162,11 +162,7 @@ export default function DataPage() {
     setLoadingAction(key);
     try {
       if (type === 'rankings') {
-        await fetch('/api/sync-all-nba-teams', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ batch: 1 })
-        });
+        await fetch('/api/sync-all-nba-teams', { method: 'POST' });
         const res = await fetch('/api/calculate-power-ratings', { method: 'POST' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'NBA calculation failed');
@@ -184,13 +180,20 @@ export default function DataPage() {
         };
         setActiveResults(prev => ({ ...prev, NBA: result }));
       } else {
-        await fetch('/api/update-injuries', { method: 'POST' }).catch(() => {});
-        await fetch('/api/sync-accuracy');
+        const res = await fetch('/api/run-nba-engine', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'NBA simulation failed');
+
         const result: SportOperationResult = {
           sport: 'NBA',
           action: 'predictions',
-          summary: 'Updated live lines, player injuries and 24-hour game projections.',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          summary: `Simulated ${data.games?.length || 0} matchups (restricted to next 24 hours).`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          games: data.games?.map((g: any) => ({
+            matchup: g.matchup || `${g.awayTeam} @ ${g.homeTeam}`,
+            projectedSpread: g.projectedSpread !== undefined ? g.projectedSpread : g.marketSpread,
+            signal: g.signal || g.betSignal || 'No Play'
+          }))
         };
         setActiveResults(prev => ({ ...prev, NBA: result }));
       }

@@ -1,6 +1,8 @@
+import { verifyApiAuth } from '@/lib/api-auth';
 // src/app/api/sync-all-nba-teams/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
+import { resilientGetCollection, resilientSetDoc } from '@/lib/firestore-rest';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes (ESPN is faster)
@@ -361,11 +363,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth check (if CRON_SECRET is configured)
-    const authHeader = request.headers.get('Authorization');
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authResult = await verifyApiAuth(request);
+    if (!authResult.authorized) {
+      return authResult.errorResponse!;
     }
 
     let body: { batch?: number } = {};
@@ -397,17 +397,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`🚀 Starting sync for ${teamsToProcess.length} teams (ESPN API)...`);
 
-    // Process in parallel with small limit or sequential is fine since it's fast
-    for (const [teamName, teamId] of teamsToProcess) {
-      try {
-        const data = await scrapeTeamESPN(teamName, teamId);
-        results.success.push(data);
-      } catch (e: any) {
-        console.error(`❌ Failed ${teamName}:`, e.message);
-        results.failed.push(teamName);
-      }
-      // Small delay to be nice to ESPN
-      await new Promise(r => setTimeout(r, 200));
+    // Process in concurrent chunks of 5 teams for fast ingestion
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < teamsToProcess.length; i += CHUNK_SIZE) {
+      const chunk = teamsToProcess.slice(i, i + CHUNK_SIZE);
+      await Promise.all(chunk.map(async ([teamName, teamId]) => {
+        try {
+          const data = await scrapeTeamESPN(teamName, teamId);
+          results.success.push(data);
+        } catch (e: any) {
+          console.error(`❌ Failed ${teamName}:`, e.message);
+          results.failed.push(teamName);
+        }
+      }));
+      await new Promise(r => setTimeout(r, 100));
     }
 
     // Calculate SOS (limited to current set if batching, but best effort)
@@ -420,9 +423,8 @@ export async function POST(request: NextRequest) {
 
     // Attempt to load others from DB for better SOS if possible
     try {
-      const existing = await db.collection('nba_team_stats').get();
-      existing.docs.forEach(d => {
-        const d2 = d.data();
+      const existing = await resilientGetCollection('nba_team_stats', 50);
+      existing.forEach(d2 => {
         const mov = d2.summary?.avgAdjustedMargin;
         if (d2.teamName && typeof mov === 'number' && !teamMOVMap.has(d2.teamName)) {
           teamMOVMap.set(d2.teamName, mov);
@@ -451,8 +453,8 @@ export async function POST(request: NextRequest) {
       return team;
     });
 
-    // Save to Firestore
-    if (db) {
+    // Save to Firestore (Admin SDK first, resilient REST fallback)
+    try {
       const batch = db.batch();
       finalResults.forEach(team => {
         const ref = db.collection('nba_team_stats').doc(team.abbreviation);
@@ -461,12 +463,19 @@ export async function POST(request: NextRequest) {
           updatedAt: new Date().toISOString()
         }, { merge: true });
       });
-      try {
-        await batch.commit();
-        console.log('✅ Saved to Firestore');
-      } catch (e) {
-        console.error('❌ Failed to save to Firestore (Auth?)');
-      }
+      await batch.commit();
+      console.log('✅ Saved to Firestore via Admin SDK');
+    } catch (e) {
+      console.warn('Admin SDK batch failed, saving teams via REST fallback...');
+      await Promise.all(
+        finalResults.map(team =>
+          resilientSetDoc('nba_team_stats', team.abbreviation, {
+            ...team,
+            updatedAt: new Date().toISOString()
+          })
+        )
+      );
+      console.log(`✅ Saved ${finalResults.length} teams to Firestore via REST fallback`);
     }
 
     return NextResponse.json({

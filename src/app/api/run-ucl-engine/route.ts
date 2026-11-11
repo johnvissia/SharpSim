@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { resilientSetDoc } from '@/lib/firestore-rest';
+import { resilientSetDoc, resilientGetCollection } from '@/lib/firestore-rest';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,6 +136,7 @@ export async function POST() {
 
         const events = Array.from(eventsMap.values());
         const calculatedFixtures: any[] = [];
+        const dailyGames = await resilientGetCollection<any>('daily_games', 100).catch(() => []);
 
         for (const event of events) {
             const eventTime = new Date(event.date).getTime();
@@ -193,22 +194,80 @@ export async function POST() {
             const draw = Math.round((pDraw / total) * 100);
             const winAway = Math.round((pAway / total) * 100);
             const margin = parseFloat((lamHome - lamAway).toFixed(2));
+            const projectedSpread = parseFloat((-margin).toFixed(2));
 
-            let recSide = homeTeam;
-            let spreadLine = -0.5;
-            if (winAway > winHome) {
-                recSide = awayTeam;
-                spreadLine = 0.5;
-            } else if (draw > winHome && draw > winAway) {
-                recSide = 'Draw';
-                spreadLine = 0;
+            // Determine marketSpread from daily_games or power-rating consensus
+            const hNorm = homeTeam.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const aNorm = awayTeam.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            const dg = dailyGames.find((d: any) => {
+                const dh = (d.homeTeam || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const da = (d.awayTeam || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                return (dh.includes(hNorm) || hNorm.includes(dh)) && (da.includes(aNorm) || aNorm.includes(da));
+            });
+
+            let marketSpread: number | null = null;
+            let spreadSource = 'Consensus Handicap';
+
+            if (dg?.bookmakerOdds) {
+                for (const bkStr of dg.bookmakerOdds) {
+                    try {
+                        const bm = typeof bkStr === 'string' ? JSON.parse(bkStr) : bkStr;
+                        const sm = bm.markets?.find((m: any) => m.key === 'spreads');
+                        if (sm?.outcomes) {
+                            const outcome = sm.outcomes.find((o: any) => {
+                                const on = (o.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                                return on.includes(hNorm) || hNorm.includes(on);
+                            });
+                            if (outcome && typeof outcome.point === 'number') {
+                                marketSpread = outcome.point;
+                                spreadSource = bm.title || 'Market';
+                                break;
+                            }
+                        }
+                    } catch { }
+                }
             }
 
-            const zScore = parseFloat((margin / 1.15).toFixed(2));
+            if (marketSpread === null) {
+                marketSpread = -Math.round(margin * 2) / 2;
+                spreadSource = 'Consensus Handicap';
+            }
+
+            // Calculate cover probabilities for marketSpread
+            const targetThreshold = -marketSpread;
+            let pHomeCover = 0;
+            let pAwayCover = 0;
+
+            for (let h = 0; h <= 6; h++) {
+                for (let a = 0; a <= 6; a++) {
+                    let p = poisson(h, lamHome) * poisson(a, lamAway);
+                    if (h === 0 && a === 0) p *= (1 - lamHome * lamAway * rho);
+                    else if (h === 1 && a === 0) p *= (1 + lamAway * rho);
+                    else if (h === 0 && a === 1) p *= (1 + lamHome * rho);
+                    else if (h === 1 && a === 1) p *= (1 - rho);
+
+                    if (h - a > targetThreshold) pHomeCover += p;
+                    else if (h - a < targetThreshold) pAwayCover += p;
+                }
+            }
+
+            const totalCover = pHomeCover + pAwayCover || 1;
+            const homeCoverProb = Math.round((pHomeCover / totalCover) * 100);
+            const awayCoverProb = Math.round((pAwayCover / totalCover) * 100);
+
+            const isHomePick = homeCoverProb >= awayCoverProb;
+            const recSide = isHomePick ? homeTeam : awayTeam;
+            const coverProb = Math.max(homeCoverProb, awayCoverProb);
+
+            const edge = parseFloat((marketSpread - projectedSpread).toFixed(2));
+            const absEdge = Math.abs(edge);
+            const zScore = parseFloat((edge / 1.25).toFixed(2));
+
             let signal = 'No Play';
-            if (Math.abs(zScore) >= 1.0 || Math.max(winHome, winAway) >= 65) signal = 'ELITE VALUE';
-            else if (Math.abs(zScore) >= 0.70 || Math.max(winHome, winAway) >= 54) signal = 'STRONG VALUE';
-            else if (Math.abs(zScore) >= 0.40) signal = 'PLAYABLE';
+            if (absEdge >= 1.05 && coverProb >= 58) signal = 'ELITE VALUE';
+            else if (absEdge >= 0.70 && coverProb >= 55) signal = 'STRONG VALUE';
+            else if (absEdge >= 0.35 && coverProb >= 52.5) signal = 'PLAYABLE';
 
             const isWithin15m = timeUntilStart <= 15 * 60 * 1000;
             const predRecord = {
@@ -218,9 +277,9 @@ export async function POST() {
                 homeTeam,
                 awayTeam,
                 startTime: event.date,
-                marketSpread: 0,
-                spreadSource: 'Consensus',
-                projectedSpread: -margin,
+                marketSpread,
+                spreadSource,
+                projectedSpread,
                 recommendedSide: recSide,
                 betSignal: signal,
                 status: 'pending',
@@ -231,6 +290,7 @@ export async function POST() {
                 winProbHome: winHome,
                 winProbAway: winAway,
                 drawProb: draw,
+                coverProb,
                 over25Prob: Math.round(pOver25 * 100),
                 updatedAt: new Date().toISOString()
             };

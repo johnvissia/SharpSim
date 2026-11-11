@@ -95,9 +95,17 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             try {
               await setDoc(userDocRef, {
                 uid: firebaseUser.uid,
+                email: firebaseUser.email || null,
+                displayName: firebaseUser.displayName || null,
+                photoURL: firebaseUser.photoURL || null,
                 isAnonymous: firebaseUser.isAnonymous,
                 balance: 100, // Default starting balance
                 createdAt: serverTimestamp(),
+                lastLoginAt: serverTimestamp(),
+                membershipTier: 'Free Tier',
+                isPro: false,
+                favoriteTeams: [],
+                favoriteLeagues: [],
                 lastCoinCollection: new Date(0).toISOString(), // Initialize to epoch
                 preferences: {
                   sports: {},
@@ -110,6 +118,34 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
               });
             } catch (error) {
               console.error("Failed to create user profile:", error);
+            }
+          } else {
+            const data = docSnap.data();
+            const updates: Record<string, any> = {
+              lastLoginAt: serverTimestamp(),
+            };
+            if (firebaseUser.email && data?.email !== firebaseUser.email) {
+              updates.email = firebaseUser.email;
+            }
+            if (firebaseUser.displayName && data?.displayName !== firebaseUser.displayName) {
+              updates.displayName = firebaseUser.displayName;
+            }
+            if (firebaseUser.photoURL && data?.photoURL !== firebaseUser.photoURL) {
+              updates.photoURL = firebaseUser.photoURL;
+            }
+            if (data?.balance === undefined || data?.balance === null) {
+              updates.balance = 100;
+            }
+            if (!data?.membershipTier) {
+              updates.membershipTier = data?.isPro ? 'Sharp Elite' : 'Free Tier';
+            }
+            if (data?.isAnonymous !== firebaseUser.isAnonymous) {
+              updates.isAnonymous = firebaseUser.isAnonymous;
+            }
+            try {
+              await setDoc(userDocRef, updates, { merge: true });
+            } catch (updateErr) {
+              console.error("Failed to update user profile on sign in:", updateErr);
             }
           }
         }

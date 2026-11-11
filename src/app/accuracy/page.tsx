@@ -19,7 +19,8 @@ import {
     LayoutGrid, 
     ListFilter,
     ShieldCheck,
-    Clock
+    Clock,
+    MinusCircle
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -77,14 +78,83 @@ export default function AccuracyPage() {
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
+    const resolveEffectiveSpread = (p: GradedPrediction) => {
+        const isSoccer = p.sport?.toUpperCase() === 'UCL' || p.sport?.toUpperCase() === 'EPL';
+        if (isSoccer && p.marketSpread === 0 && Math.abs(p.projectedSpread ?? 0) >= 0.8) {
+            return -Math.round((-p.projectedSpread!) * 2) / 2;
+        }
+        return p.marketSpread ?? 0;
+    };
+
+    const resolveEffectivePick = (p: GradedPrediction): string | null => {
+        if (p.recommendedSide && !p.recommendedSide.toLowerCase().includes('pass') && !p.recommendedSide.toLowerCase().includes('no play')) {
+            return p.recommendedSide;
+        }
+        const proj = p.projectedSpread ?? 0;
+        const market = resolveEffectiveSpread(p);
+        const edge = market - proj;
+        const sportUpper = p.sport?.toUpperCase() || '';
+        const isSoccer = sportUpper === 'UCL' || sportUpper === 'EPL';
+        const isMlb = sportUpper === 'MLB';
+        const isBasketballOrFootball = sportUpper === 'NBA' || sportUpper === 'NCAAM' || sportUpper === 'NFL';
+
+        let isActionableEdge = false;
+        if (isSoccer) isActionableEdge = Math.abs(edge) >= 0.35;
+        else if (isMlb) isActionableEdge = Math.abs(edge) >= 0.40;
+        else if (isBasketballOrFootball) isActionableEdge = Math.abs(edge) >= 1.50;
+        else isActionableEdge = Math.abs(edge) > 0;
+
+        if (isActionableEdge) {
+            return edge > 0 ? p.homeTeam : p.awayTeam;
+        }
+        return null;
+    };
+
+    const getEffectiveSignal = (p: GradedPrediction): string => {
+        const isSoccer = p.sport?.toUpperCase() === 'UCL' || p.sport?.toUpperCase() === 'EPL';
+        const isMlb = p.sport?.toUpperCase() === 'MLB';
+        const proj = p.projectedSpread ?? 0;
+        const market = resolveEffectiveSpread(p);
+        const edge = Math.abs(proj - market);
+
+        if (isSoccer) {
+            if (edge >= 1.05) return 'ELITE VALUE';
+            if (edge >= 0.70) return 'STRONG VALUE';
+            if (edge >= 0.35) return 'PLAYABLE';
+            return 'NO PLAY';
+        }
+
+        if (isMlb) {
+            if (edge >= 1.3) return 'ELITE VALUE';
+            if (edge >= 0.8) return 'STRONG VALUE';
+            if (edge >= 0.4) return 'PLAYABLE';
+            return 'NO PLAY';
+        }
+
+        // Basketball & Football (points)
+        if (edge >= 4.5) return 'ELITE VALUE';
+        if (edge >= 2.5) return 'STRONG VALUE';
+        if (edge >= 1.5) return 'PLAYABLE';
+
+        return 'NO PLAY';
+    };
+
+    const isActionable = (p: GradedPrediction): boolean => {
+        const sig = getEffectiveSignal(p);
+        if (sig === 'NO PLAY') return false;
+        const pick = resolveEffectivePick(p);
+        if (!pick) return false;
+        return p.correct !== null && p.correct !== undefined;
+    };
+
     const calculateStats = (data: GradedPrediction[]) => {
-        const graded = data.filter(p => p.status === 'graded');
-        const wins = graded.filter(p => p.correct).length;
-        const losses = graded.length - wins;
-        const winRate = graded.length > 0 ? (wins / graded.length) * 100 : 0;
+        const actionableGraded = data.filter(p => p.status === 'graded' && isActionable(p));
+        const wins = actionableGraded.filter(p => p.correct === true).length;
+        const losses = actionableGraded.filter(p => p.correct === false).length;
+        const winRate = actionableGraded.length > 0 ? (wins / actionableGraded.length) * 100 : 0;
 
         return {
-            total: graded.length,
+            total: actionableGraded.length,
             wins,
             losses,
             winRate,
@@ -160,7 +230,7 @@ export default function AccuracyPage() {
         const counts = { ALL: 0, 'ELITE VALUE': 0, 'STRONG VALUE': 0, 'PLAYABLE': 0, 'NO PLAY': 0 };
         baseFilteredPredictions.forEach(p => {
             counts.ALL += 1;
-            const sig = p.betSignal?.toUpperCase() || 'NO PLAY';
+            const sig = getEffectiveSignal(p);
             if (sig.includes('ELITE')) counts['ELITE VALUE'] += 1;
             else if (sig.includes('STRONG')) counts['STRONG VALUE'] += 1;
             else if (sig.includes('PLAYABLE')) counts['PLAYABLE'] += 1;
@@ -172,13 +242,16 @@ export default function AccuracyPage() {
     // Final filtered predictions with signal and search query
     const filteredPredictions = useMemo(() => {
         return baseFilteredPredictions.filter(p => {
-            const matchesSignal = activeTab === 'ALL' || (p.betSignal?.toUpperCase() || 'NO PLAY').includes(activeTab.replace(' VALUE', ''));
+            const sig = getEffectiveSignal(p);
+            const matchesSignal = activeTab === 'ALL' || sig === activeTab;
             
             let matchesSearch = true;
             if (searchQuery.trim()) {
                 const q = searchQuery.toLowerCase();
+                const effectiveRec = resolveEffectivePick(p);
                 matchesSearch = (p.homeTeam?.toLowerCase().includes(q) ?? false) ||
                                 (p.awayTeam?.toLowerCase().includes(q) ?? false) ||
+                                (effectiveRec?.toLowerCase().includes(q) ?? false) ||
                                 (p.recommendedSide?.toLowerCase().includes(q) ?? false);
             }
 
@@ -307,7 +380,7 @@ export default function AccuracyPage() {
         const unit = isMlb ? 'runs' : isSoccer ? 'goals' : 'pts';
 
         const proj = p.projectedSpread ?? 0;
-        const market = p.marketSpread ?? 0;
+        const market = resolveEffectiveSpread(p);
         const diff = Math.abs(proj - market);
 
         return {
@@ -684,12 +757,16 @@ export default function AccuracyPage() {
                                         const recMascot = getMascot(p.recommendedSide || '');
                                         
                                         // Pick spread line calculation
-                                        const isHomePick = p.recommendedSide === p.homeTeam;
-                                        const pickLine = isHomePick ? p.marketSpread : -p.marketSpread;
+                                        const effectiveSpread = resolveEffectiveSpread(p);
+                                        const effectiveRec = resolveEffectivePick(p);
+                                        const effSignal = getEffectiveSignal(p);
+                                        const hasActivePlay = effectiveRec && effSignal !== 'NO PLAY';
+                                        const isHomePick = effectiveRec === p.homeTeam;
+                                        const pickLine = isHomePick ? effectiveSpread : -effectiveSpread;
                                         const pickLineDisplay = pickLine > 0 ? `+${pickLine}` : pickLine === 0 ? 'PK' : `${pickLine}`;
 
                                         // Original Vegas spread
-                                        const origLineDisplay = p.marketSpread > 0 ? `+${p.marketSpread}` : p.marketSpread === 0 ? 'PK' : `${p.marketSpread}`;
+                                        const origLineDisplay = effectiveSpread > 0 ? `+${effectiveSpread}` : effectiveSpread === 0 ? 'PK' : `${effectiveSpread}`;
 
                                         // Edge
                                         const edgeInfo = getEdgeInfo(p);
@@ -721,23 +798,23 @@ export default function AccuracyPage() {
 
                                                 {/* 2. RECOMMENDED PICK */}
                                                 <td className="py-4 px-5 align-top">
-                                                    {p.recommendedSide ? (
+                                                    {hasActivePlay ? (
                                                         <div className="space-y-1.5">
                                                             <div className="flex items-baseline gap-2">
                                                                 <span className="text-base font-black text-white">
-                                                                    {recMascot || p.recommendedSide}
+                                                                    {recMascot || effectiveRec}
                                                                 </span>
                                                                 <span className="text-base font-extrabold text-indigo-400 font-mono">
                                                                     {pickLineDisplay}
                                                                 </span>
                                                             </div>
                                                             <div>
-                                                                {renderSignalBadge(p.betSignal)}
+                                                                {renderSignalBadge(effSignal)}
                                                             </div>
                                                         </div>
                                                     ) : (
                                                         <div className="space-y-1">
-                                                            <span className="text-xs text-slate-500 font-medium">Pass (No Edge)</span>
+                                                            <span className="text-xs text-slate-500 font-medium">Pass (No Bet)</span>
                                                             <div>{renderSignalBadge('NO PLAY')}</div>
                                                         </div>
                                                     )}
@@ -773,21 +850,35 @@ export default function AccuracyPage() {
                                                 {/* 4. RESULT & STATUS */}
                                                 <td className="py-4 px-5 align-top">
                                                     {p.status === 'graded' ? (
-                                                        <div className="space-y-1.5">
-                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold ${
-                                                                p.correct 
-                                                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                                                                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                                                            }`}>
-                                                                {p.correct ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                                                                {p.correct ? 'Covered (Win)' : 'Missed (Loss)'}
-                                                            </span>
-                                                            {p.actualScore && (
-                                                                <div className="text-xs text-slate-400 font-mono">
-                                                                    Final: <span className="text-slate-200 font-bold">{getMascot(p.awayTeam)} {p.actualScore.away} - {p.actualScore.home} {getMascot(p.homeTeam)}</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                                        isActionable(p) ? (
+                                                            <div className="space-y-1.5">
+                                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold ${
+                                                                    p.correct 
+                                                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                                                                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                                                }`}>
+                                                                    {p.correct ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                                                                    {p.correct ? 'Covered (Win)' : 'Missed (Loss)'}
+                                                                </span>
+                                                                {p.actualScore && (
+                                                                    <div className="text-xs text-slate-400 font-mono">
+                                                                        Final: <span className="text-slate-200 font-bold">{getMascot(p.awayTeam)} {p.actualScore.away} - {p.actualScore.home} {getMascot(p.homeTeam)}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-1.5">
+                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-400 bg-slate-800/80 border border-slate-700/80">
+                                                                    <MinusCircle className="w-3.5 h-3.5 text-slate-500" />
+                                                                    Pass · No Bet
+                                                                </span>
+                                                                {p.actualScore && (
+                                                                    <div className="text-xs text-slate-500 font-mono">
+                                                                        Final: {getMascot(p.awayTeam)} {p.actualScore.away} - {p.actualScore.home} {getMascot(p.homeTeam)}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )
                                                     ) : isLocked ? (
                                                         <div className="space-y-1">
                                                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
@@ -822,12 +913,16 @@ export default function AccuracyPage() {
                             {filteredPredictions.map((p) => {
                                 const pickInfo = getModelPickInfo(p);
                                 const homeMascot = getMascot(p.homeTeam || '');
-                                const recMascot = getMascot(p.recommendedSide || '');
                                 
-                                const isHomePick = p.recommendedSide === p.homeTeam;
-                                const pickLine = isHomePick ? p.marketSpread : -p.marketSpread;
+                                const effectiveSpread = resolveEffectiveSpread(p);
+                                const effectiveRec = resolveEffectivePick(p);
+                                const effSignal = getEffectiveSignal(p);
+                                const hasActivePlay = effectiveRec && effSignal !== 'NO PLAY';
+                                const recMascot = getMascot(effectiveRec || '');
+                                const isHomePick = effectiveRec === p.homeTeam;
+                                const pickLine = isHomePick ? effectiveSpread : -effectiveSpread;
                                 const pickLineDisplay = pickLine > 0 ? `+${pickLine}` : pickLine === 0 ? 'PK' : `${pickLine}`;
-                                const origLineDisplay = p.marketSpread > 0 ? `+${p.marketSpread}` : p.marketSpread === 0 ? 'PK' : `${p.marketSpread}`;
+                                const origLineDisplay = effectiveSpread > 0 ? `+${effectiveSpread}` : effectiveSpread === 0 ? 'PK' : `${effectiveSpread}`;
                                 const edgeInfo = getEdgeInfo(p);
                                 const timeUntilStart = p.startTime ? new Date(p.startTime).getTime() - Date.now() : Infinity;
                                 const isLocked = timeUntilStart <= 15 * 60 * 1000;
@@ -846,12 +941,19 @@ export default function AccuracyPage() {
                                             </div>
 
                                             {p.status === 'graded' ? (
-                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
-                                                    p.correct ? 'text-emerald-400 bg-emerald-500/10' : 'text-rose-400 bg-rose-500/10'
-                                                }`}>
-                                                    {p.correct ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                                    {p.correct ? 'Covered' : 'Missed'}
-                                                </span>
+                                                isActionable(p) ? (
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
+                                                        p.correct ? 'text-emerald-400 bg-emerald-500/10' : 'text-rose-400 bg-rose-500/10'
+                                                    }`}>
+                                                        {p.correct ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                                        {p.correct ? 'Covered' : 'Missed'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold text-slate-400 bg-slate-800/80 border border-slate-700/60">
+                                                        <MinusCircle className="w-3 h-3 text-slate-500" />
+                                                        Pass · No Bet
+                                                    </span>
+                                                )
                                             ) : isLocked ? (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-amber-400 bg-amber-500/10">
                                                     <Lock className="w-3 h-3" /> Locked
@@ -876,12 +978,18 @@ export default function AccuracyPage() {
                                             <div>
                                                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Recommended Pick</div>
                                                 <div className="text-base font-black text-white mt-0.5">
-                                                    {recMascot || p.recommendedSide || 'No Pick'}{' '}
-                                                    <span className="text-indigo-400 font-mono">{p.recommendedSide ? pickLineDisplay : ''}</span>
+                                                    {hasActivePlay ? (
+                                                        <>
+                                                            {recMascot || effectiveRec}{' '}
+                                                            <span className="text-indigo-400 font-mono">{pickLineDisplay}</span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-slate-400 text-sm font-medium">Pass (No Bet)</span>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div>
-                                                {renderSignalBadge(p.betSignal)}
+                                                {renderSignalBadge(effSignal)}
                                             </div>
                                         </div>
 

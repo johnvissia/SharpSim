@@ -1,5 +1,6 @@
+import { verifyApiAuth } from '@/lib/api-auth';
 // src/app/api/calculate-ncaam-ratings/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 
 export const dynamic = 'force-dynamic';
@@ -40,8 +41,13 @@ function calculateNetRating(margin: number, possessions: number): number {
     return 100 * (margin / possessions);
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
     try {
+        const authResult = await verifyApiAuth(request);
+        if (!authResult.authorized) {
+            return authResult.errorResponse!;
+        }
+
         const snapshot = await db.collection('ncaam_team_stats').get();
         if (snapshot.empty) throw new Error('No team data found');
 

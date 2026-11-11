@@ -10,11 +10,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Coins } from 'lucide-react';
+import { Coins, Clock, Sparkles, Loader2, Gift } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, increment } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export default function StorePage() {
   const { toast } = useToast();
@@ -26,57 +28,82 @@ export default function StorePage() {
     [user, firestore]
   );
 
-  const { data: userProfile, isLoading: isProfileLoading } =
-    useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const [canCollect, setCanCollect] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (userProfile) {
-      const now = new Date();
-      // If lastCoinCollection is not set or is from a previous day, allow collection.
-      const lastCollection = userProfile.lastCoinCollection
-        ? new Date(userProfile.lastCoinCollection)
-        : new Date(0); // Treat as epoch if never collected
+    const calculateStatus = () => {
+      if (!userProfile) return;
+      const lastCollectedTime = userProfile.lastCoinCollection
+        ? new Date(userProfile.lastCoinCollection).getTime()
+        : 0;
 
-      const lastReset = new Date(lastCollection);
-      lastReset.setHours(0, 1, 0, 0); // Set to 12:01 AM on that day
+      const now = Date.now();
+      const elapsed = now - lastCollectedTime;
 
-      // Can collect if it has been more than 24 hours since the last 12:01 AM reset point
-      if (now.getTime() >= lastReset.getTime() + 24 * 60 * 60 * 1000) {
+      if (elapsed >= COOLDOWN_MS) {
         setCanCollect(true);
+        setTimeLeft('');
       } else {
         setCanCollect(false);
+        const remaining = COOLDOWN_MS - elapsed;
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
       }
-    }
+    };
+
+    calculateStatus();
+    const interval = setInterval(calculateStatus, 1000);
+    return () => clearInterval(interval);
   }, [userProfile]);
 
   const handleCollect = async () => {
-    if (!userProfileRef) return;
+    if (!user) {
+      toast({
+        title: 'Sign In Required',
+        description: 'You must be logged in to claim daily coins.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      await updateDoc(userProfileRef, {
-        balance: increment(10),
-        lastCoinCollection: new Date().toISOString(),
+      const token = await user.getIdToken();
+      const res = await fetch('/api/collect-coins', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
 
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to collect daily coins.');
+      }
+
       toast({
-        title: 'Success!',
-        description: '10 coins have been added to your balance!',
-        variant: 'default',
+        title: 'Daily Reward Claimed!',
+        description: `+${data.reward} simulation coins have been added to your bankroll!`,
       });
-      setCanCollect(false); // Immediately update UI state
+      setCanCollect(false);
     } catch (error: any) {
       console.error('Failed to collect coins:', error);
       toast({
-        title: 'Oops!',
-        description:
-          error.message || 'Could not collect daily coins. Please try again.',
+        title: 'Collection Failed',
+        description: error.message || 'Could not collect daily coins. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const isLoading = isUserLoading || isProfileLoading;
@@ -84,25 +111,22 @@ export default function StorePage() {
   if (isLoading) {
     return (
       <div className="p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-10rem)]">
-        <Card className="w-full max-w-md shadow-lg">
+        <Card className="w-full max-w-md border-slate-800 bg-slate-950/80 shadow-2xl backdrop-blur-xl">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <Coins className="h-6 w-6 text-accent" />
+            <CardTitle className="flex items-center gap-2 text-2xl text-white">
+              <Coins className="h-6 w-6 text-amber-400" />
               Coin Store
             </CardTitle>
-            <CardDescription>
-              Your daily stop for more coins to play with.
+            <CardDescription className="text-slate-400">
+              Loading bankroll and streak status...
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center space-y-6">
-            <div className="p-6 bg-secondary rounded-lg">
-              <p className="text-lg text-muted-foreground">Current Balance</p>
-              <Skeleton className="h-12 w-32 mx-auto mt-2" />
+            <div className="p-6 bg-slate-900/60 rounded-xl border border-slate-800">
+              <Skeleton className="h-4 w-28 mx-auto mb-2" />
+              <Skeleton className="h-12 w-32 mx-auto" />
             </div>
-            <Skeleton className="h-12 w-full" />
-            <p className="text-xs text-muted-foreground">
-              Coin collection resets daily at 12:01 AM.
-            </p>
+            <Skeleton className="h-12 w-full rounded-xl" />
           </CardContent>
         </Card>
       </div>
@@ -111,37 +135,62 @@ export default function StorePage() {
 
   return (
     <div className="p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-10rem)]">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-2xl">
-            <Coins className="h-6 w-6 text-accent" />
-            Coin Store
+      <Card className="w-full max-w-md border-slate-800 bg-slate-950/80 shadow-2xl backdrop-blur-xl">
+        <CardHeader className="text-center pb-2">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3">
+            <Gift className="h-7 w-7 text-amber-400" />
+          </div>
+          <CardTitle className="flex items-center justify-center gap-2 text-2xl font-bold tracking-tight text-white">
+            Daily Coin Reload
           </CardTitle>
-          <CardDescription>
-            Your daily stop for more coins to play with.
+          <CardDescription className="text-slate-400">
+            Claim 50 free coins every 24 hours to keep testing your betting models.
           </CardDescription>
         </CardHeader>
-        <CardContent className="text-center space-y-6">
-          <div className="p-6 bg-secondary rounded-lg">
-            <p className="text-lg text-muted-foreground">Current Balance</p>
-            <p className="text-5xl font-bold text-primary">
-              {userProfile?.balance?.toFixed(0) ?? '0'}
-            </p>
+        <CardContent className="text-center space-y-6 pt-4">
+          <div className="p-6 bg-slate-900/70 border border-slate-800 rounded-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-3 opacity-10">
+              <Coins className="h-24 w-24 text-amber-400" />
+            </div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Current Bankroll</p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <Coins className="h-7 w-7 text-amber-400" />
+              <p className="text-4xl font-extrabold text-white font-mono tracking-tight">
+                {(userProfile?.balance ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            </div>
           </div>
+
           <Button
             onClick={handleCollect}
             disabled={!canCollect || loading}
-            className="w-full text-lg py-6"
+            className={`w-full py-6 text-base font-bold rounded-xl transition-all shadow-lg ${
+              canCollect 
+                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20' 
+                : 'bg-slate-800 text-slate-400 border border-slate-700/50 cursor-not-allowed'
+            }`}
             size="lg"
           >
-            {loading
-              ? 'Collecting...'
-              : canCollect
-              ? 'Collect Daily 10 Coins'
-              : 'Collected for Today'}
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Validating with server...
+              </span>
+            ) : canCollect ? (
+              <span className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Claim +50 Free Coins
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-slate-500" />
+                Cooldown: {timeLeft}
+              </span>
+            )}
           </Button>
-          <p className="text-xs text-muted-foreground">
-            Coin collection resets daily at 12:01 AM.
+
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Reload cooldown is verified server-side. Virtual coins have no real-world monetary value and are solely for strategy simulation.
           </p>
         </CardContent>
       </Card>

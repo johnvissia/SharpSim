@@ -29,7 +29,7 @@ export type Team = {
 };
 
 export type Odds = {
-  moneyline: { home: number; away: number };
+  moneyline: { home: number; away: number; draw?: number };
   spread: { points: number; home: number; away: number };
   total: { points: number; over: number; under: number };
 };
@@ -102,9 +102,14 @@ export interface BettingPreferences {
 
 export interface UserProfile {
   uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
   isAnonymous: boolean;
   balance: number;
   createdAt: any; // Firestore ServerTimestamp
+  lastLoginAt?: any; // Firestore ServerTimestamp
+  updatedAt?: any; // Firestore ServerTimestamp
   lastCoinCollection?: string; // ISO 8601 string
   favoriteTeams?: string[];
   favoriteLeagues?: string[];

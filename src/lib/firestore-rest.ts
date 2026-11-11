@@ -72,6 +72,21 @@ export async function getFirebaseAuthToken(): Promise<string> {
     }
 }
 
+export async function getRestDoc<T = any>(collectionName: string, docId: string): Promise<T | null> {
+    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collectionName}/${encodeURIComponent(docId)}?key=${API_KEY}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+        throw new Error(`getRestDoc failed: ${res.statusText}`);
+    }
+    const d = await res.json();
+    const obj: any = { id: docId };
+    for (const [k, v] of Object.entries(d.fields || {})) {
+        obj[k] = parseFirestoreValue(v);
+    }
+    return obj as T;
+}
+
 export async function getRestCollectionDocs<T = any>(collectionName: string, pageSize = 300): Promise<T[]> {
     const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collectionName}?key=${API_KEY}&pageSize=${pageSize}`;
     const res = await fetch(url, { cache: 'no-store' });
@@ -163,6 +178,20 @@ export async function deleteRestDoc(collectionName: string, docId: string): Prom
         throw new Error(`deleteRestDoc error on ${docId}: ${res.status} ${err}`);
     }
     return true;
+}
+
+/**
+ * Resilient helper to fetch a single document: tries Admin SDK first, falls back to REST
+ */
+export async function resilientGetDoc<T = any>(collectionName: string, docId: string): Promise<T | null> {
+    try {
+        const doc = await db.collection(collectionName).doc(docId).get();
+        if (doc.exists) return { id: doc.id, ...doc.data() } as T;
+        return null;
+    } catch (err: any) {
+        console.warn(`[firestore-rest] Admin SDK failed on ${collectionName}/${docId}, falling back to REST:`, err.message);
+        return await getRestDoc<T>(collectionName, docId);
+    }
 }
 
 /**
