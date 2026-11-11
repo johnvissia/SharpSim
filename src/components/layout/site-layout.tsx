@@ -188,17 +188,19 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const isPublicPath = pathname === '/' || pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password' || pathname === '/terms' || pathname === '/privacy';
+  const isPublicAuthPath = pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
+  const isPublicInfoPath = pathname === '/' || pathname === '/terms' || pathname === '/privacy';
+  const isPublicPath = isPublicAuthPath || isPublicInfoPath;
 
   useEffect(() => {
     if (!isUserLoading) {
       if (!user && !isPublicPath) {
         router.push('/login');
-      } else if (user && isPublicPath && pathname !== '/') {
+      } else if (user && isPublicAuthPath) {
         router.push('/dashboard');
       }
     }
-  }, [user, isUserLoading, isPublicPath, pathname, router]);
+  }, [user, isUserLoading, isPublicPath, isPublicAuthPath, router]);
 
   const userProfileRef = useMemoFirebase(
     () => (user && firestore ? doc(firestore, 'users', user.uid) : null),

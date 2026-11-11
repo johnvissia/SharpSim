@@ -28,6 +28,9 @@ const formSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }).optional().or(z.literal('')),
   email: z.string().email({ message: 'Invalid email address.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
+  agreeTerms: z.literal(true, {
+    errorMap: () => ({ message: 'You must agree to the Terms of Service & Privacy Policy.' }),
+  }),
 });
 
 export default function SignUpPage() {
@@ -51,6 +54,7 @@ export default function SignUpPage() {
       name: '',
       email: '',
       password: '',
+      agreeTerms: false as unknown as true,
     },
   });
 
@@ -209,6 +213,37 @@ export default function SignUpPage() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="agreeTerms"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <div className="flex items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        id="agreeTerms"
+                        checked={field.value}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-900 text-brand-500 focus:ring-brand-500 focus:ring-offset-slate-950 cursor-pointer"
+                      />
+                      <label htmlFor="agreeTerms" className="text-xs text-slate-400 leading-snug cursor-pointer select-none">
+                        I agree to the{' '}
+                        <Link href="/terms" target="_blank" className="text-brand-400 hover:text-brand-300 underline font-medium">
+                          Terms of Service
+                        </Link>{' '}
+                        and{' '}
+                        <Link href="/privacy" target="_blank" className="text-brand-400 hover:text-brand-300 underline font-medium">
+                          Privacy Policy
+                        </Link>
+                        .
+                      </label>
+                    </div>
+                    <FormMessage className="text-rose-400 text-xs" />
+                  </FormItem>
+                )}
+              />
+
               <Button
                 type="submit"
                 className="w-full h-11 bg-brand-500 hover:bg-brand-400 text-white font-semibold shadow-lg shadow-brand-500/20"
