@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +14,7 @@ export async function POST(request: NextRequest) {
     let uid: string;
 
     try {
-      const decoded = await admin.auth().verifyIdToken(idToken);
+      const decoded = await auth.verifyIdToken(idToken);
       uid = decoded.uid;
     } catch {
       return NextResponse.json({ success: false, error: 'Unauthorized: Invalid token.' }, { status: 401 });
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
     await batch.commit();
 
     // 3. Delete user from Firebase Auth
-    await admin.auth().deleteUser(uid);
+    await auth.deleteUser(uid);
 
     return NextResponse.json({
       success: true,

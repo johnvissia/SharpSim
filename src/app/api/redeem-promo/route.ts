@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     let uid: string;
 
     try {
-      const decoded = await admin.auth().verifyIdToken(idToken);
+      const decoded = await auth.verifyIdToken(idToken);
       uid = decoded.uid;
     } catch (e: any) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Invalid token.' }, { status: 401 });
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       await userRef.update({
         isPro: false,
         membershipTier: 'Free Tier',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       return NextResponse.json({ success: true, message: 'Membership canceled successfully.' });
     }
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         await userRef.update({
           isPro: true,
           membershipTier: 'Sharp Elite',
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         });
         return NextResponse.json({ success: true, message: 'Upgraded to Sharp Elite successfully.' });
       }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
           await userRef.update({
             isPro: true,
             membershipTier: 'Sharp Elite',
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
           });
           return NextResponse.json({ success: true, message: 'Promo code applied! Welcome to Sharp Elite.' });
         }
@@ -81,14 +81,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, error: 'This promo code has reached its usage limit.' }, { status: 400 });
           }
           await promoDoc.ref.update({
-            usesRemaining: admin.firestore.FieldValue.increment(-1),
+            usesRemaining: FieldValue.increment(-1),
           });
         }
 
         await userRef.update({
           isPro: true,
           membershipTier: 'Sharp Elite',
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         });
 
         return NextResponse.json({ success: true, message: 'Promo code applied! Welcome to Sharp Elite.' });

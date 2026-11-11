@@ -1,7 +1,7 @@
 import { verifyApiAuth } from '@/lib/api-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes
@@ -102,7 +102,7 @@ async function handleSync(request: NextRequest) {
                 stats: {
                     points: pts
                 },
-                sys_updated: admin.firestore.FieldValue.serverTimestamp()
+                sys_updated: FieldValue.serverTimestamp()
             }, { merge: true });
 
             count++;

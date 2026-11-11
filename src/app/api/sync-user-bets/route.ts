@@ -3,7 +3,7 @@ import { db } from '@/lib/firebase';
 import { fetchEspnSchedule } from '@/lib/espn';
 import { gradeUserBets } from '@/lib/bet-grading';
 import type { CompletedGame, UserBet } from '@/lib/types';
-import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { verifyApiAuth } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
@@ -171,7 +171,7 @@ async function handleSyncUserBets(request: NextRequest) {
             if (payoutForThisBet > 0) {
                 try {
                     await db.collection('users').doc(userId).update({
-                        balance: admin.firestore.FieldValue.increment(payoutForThisBet)
+                        balance: FieldValue.increment(payoutForThisBet)
                     });
                     totalPayoutApplied += payoutForThisBet;
                     console.log(`[sync-user-bets] Credited +${payoutForThisBet} coins to user ${userId}`);

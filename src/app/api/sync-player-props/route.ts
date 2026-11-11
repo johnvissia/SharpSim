@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import * as admin from 'firebase-admin';
 import { verifyApiAuth } from '@/lib/api-auth';
 
 function getMarketDisplayName(marketKey: string, sport: string): string {

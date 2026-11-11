@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
+import { auth } from '@/lib/firebase';
 import { ADMIN_UIDS } from './admin';
-
-// Initialize Firebase Admin if not already initialized
-import '@/lib/firebase';
 
 export async function verifyApiAuth(request: NextRequest): Promise<{ authorized: boolean; errorResponse?: NextResponse }> {
   const cronSecret = process.env.CRON_SECRET;
@@ -22,11 +19,9 @@ export async function verifyApiAuth(request: NextRequest): Promise<{ authorized:
   if (authHeader.startsWith('Bearer ')) {
     const idToken = authHeader.substring(7);
     try {
-      if (admin.apps.length > 0) {
-        const decoded = await admin.auth().verifyIdToken(idToken);
-        if (decoded.admin === true || ADMIN_UIDS.includes(decoded.uid)) {
-          return { authorized: true };
-        }
+      const decoded = await auth.verifyIdToken(idToken);
+      if (decoded.admin === true || ADMIN_UIDS.includes(decoded.uid)) {
+        return { authorized: true };
       }
     } catch {
       // Token not valid or not an admin

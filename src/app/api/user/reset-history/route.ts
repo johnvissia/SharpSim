@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     let uid: string;
 
     try {
-      const decoded = await admin.auth().verifyIdToken(idToken);
+      const decoded = await auth.verifyIdToken(idToken);
       uid = decoded.uid;
     } catch {
       return NextResponse.json({ success: false, error: 'Unauthorized: Invalid token.' }, { status: 401 });
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         conferences: {},
         performance: { wins: 0, losses: 0, pushes: 0 }
       },
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     await batch.commit();

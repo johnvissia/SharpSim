@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
 import { db } from '@/lib/firebase';
+import { FieldValue } from 'firebase-admin/firestore';
+import { auth } from '@/lib/firebase';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
     let uid: string;
 
     try {
-      const decoded = await admin.auth().verifyIdToken(idToken);
+      const decoded = await auth.verifyIdToken(idToken);
       uid = decoded.uid;
     } catch {
       return NextResponse.json({ success: false, error: 'Unauthorized: Invalid token.' }, { status: 401 });
@@ -49,9 +50,9 @@ export async function POST(request: NextRequest) {
     // Award coins and record collection timestamp
     const newTimestamp = new Date(now).toISOString();
     await userRef.update({
-      balance: admin.firestore.FieldValue.increment(DAILY_REWARD_COINS),
+      balance: FieldValue.increment(DAILY_REWARD_COINS),
       lastCoinCollection: newTimestamp,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     const currentBalance = (userData.balance || 0) + DAILY_REWARD_COINS;
