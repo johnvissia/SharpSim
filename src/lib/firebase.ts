@@ -1,4 +1,6 @@
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -9,10 +11,14 @@ if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
 }
 
-if (!admin.apps.length) {
+function initAdmin() {
+    if (getApps().length > 0) {
+        return getApps()[0];
+    }
+
     const projectId = process.env.FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY || process.env.FIREBASE_ADMIN_PRIVATE_KEY;
 
     if (privateKey) {
         // Strip surrounding quotes if present
@@ -24,8 +30,8 @@ if (!admin.apps.length) {
 
     if (projectId && clientEmail && privateKey) {
         try {
-            admin.initializeApp({
-                credential: admin.credential.cert({
+            return initializeApp({
+                credential: cert({
                     projectId,
                     clientEmail,
                     privateKey,
@@ -36,17 +42,17 @@ if (!admin.apps.length) {
             throw e;
         }
     } else {
-        // Fallback to Application Default Credentials for Cloud Run / App Hosting environments
         try {
-            admin.initializeApp();
+            return initializeApp();
         } catch (adcError: any) {
-            const missing = [];
-            if (!projectId) missing.push('FIREBASE_PROJECT_ID');
-            if (!clientEmail) missing.push('FIREBASE_CLIENT_EMAIL');
-            if (!privateKey) missing.push('FIREBASE_PRIVATE_KEY');
-            console.warn(`[Firebase Admin] Missing variables (${missing.join(', ')}). ADC fallback failed: ${adcError.message}`);
+            console.warn(`[Firebase Admin] Fallback failed: ${adcError.message}`);
+            return initializeApp();
         }
     }
 }
 
-export const db = admin.firestore();
+const adminApp = initAdmin();
+
+export const db = getFirestore(adminApp);
+export const auth = getAuth(adminApp);
+export default adminApp;
