@@ -112,18 +112,20 @@ export async function GET(request: NextRequest) {
         const pendingPredictions = allPredictions.filter(p => p.status === 'pending');
         const knownGameIds = new Set(allPredictions.map(p => p.gameId || p.id));
 
-        // 3. Snapshot Upcoming Games (within 15m window before start)
+        // 3. Snapshot Today's Upcoming Games
         for (const game of allGames) {
             const gameTime = new Date(game.startTime);
             const timeUntilStart = gameTime.getTime() - now.getTime();
             const hName = normalizeTeamName(game.homeTeam.name);
             const aName = normalizeTeamName(game.awayTeam.name);
 
-            // Accuracy predictions are locked at 15 minutes before game start.
-            const isRelevantForSnapshot = timeUntilStart <= 15 * 60 * 1000 && timeUntilStart >= 0 && game.statusState !== 'in' && game.statusState !== 'post';
+            // Snapshot any game scheduled for today (within the next 24 hours) that has not started yet
+            const isRelevantForSnapshot = timeUntilStart <= 24 * 60 * 60 * 1000 && timeUntilStart >= 0 && game.statusState !== 'in' && game.statusState !== 'post';
 
-            // If prediction already exists in Firestore but is not frozen yet, freeze it as soon as we enter the window or start
-            if ((timeUntilStart <= 15 * 60 * 1000 || game.statusState === 'in') && game.statusState !== 'post') {
+            // Freeze the prediction 15 minutes before kickoff or if the game is already in progress
+            const shouldFreeze = (timeUntilStart <= 15 * 60 * 1000 || game.statusState === 'in') && game.statusState !== 'post';
+
+            if (shouldFreeze) {
                 const existingPred = allPredictions.find(p => (p.gameId || p.id) === game.id);
                 if (existingPred && !existingPred.isFrozen && existingPred.status === 'pending') {
                     console.log(`[sync-accuracy] Freezing existing prediction for ${game.sport}: ${aName} @ ${hName}`);
