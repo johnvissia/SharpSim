@@ -14,6 +14,7 @@ import { MainLinesView } from './MainLinesView';
 import { GameLeadersView } from './GameLeadersView';
 import { ModelCalculationView } from './ModelCalculationView';
 import { MLBLiveGameTracker } from './MLBLiveGameTracker';
+import { LiveGameHub } from './LiveGameHub';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
@@ -366,15 +367,32 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                             onToggleFavorite={() => handleToggleFavorite(game.awayTeam.name)}
                             isUpdating={isUpdatingFavorite}
                         />
-                        <div className="flex flex-col items-center self-center text-center pt-10">
-                            <span className="text-4xl font-bold text-muted-foreground">VS</span>
-                            <div className="text-sm text-muted-foreground mt-2">{gameTimeOrStatus}</div>
-                            {isLive && (
-                                <Badge className="bg-red-600 hover:bg-red-600 text-white animate-pulse text-xs mt-2">
-                                    LIVE
-                                </Badge>
-                            )}
-                        </div>
+                        {isLive || isFinal ? (
+                            <div className="flex flex-col items-center self-center text-center pt-6">
+                                <div className="flex items-center gap-3 sm:gap-6 text-3xl sm:text-5xl font-black tracking-tight text-white font-mono">
+                                    <span>{game.liveScore?.away ?? 0}</span>
+                                    <span className="text-slate-600 font-normal text-2xl">-</span>
+                                    <span>{game.liveScore?.home ?? 0}</span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-2">
+                                    {isLive ? (
+                                        <Badge className="bg-red-600 hover:bg-red-600 text-white animate-pulse text-xs">
+                                            LIVE
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="outline" className="text-slate-400 border-slate-700 text-xs">
+                                            FINAL
+                                        </Badge>
+                                    )}
+                                    <span className="text-xs font-semibold text-slate-300">{gameTimeOrStatus}</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center self-center text-center pt-10">
+                                <span className="text-4xl font-bold text-muted-foreground">VS</span>
+                                <div className="text-sm text-muted-foreground mt-2">{gameTimeOrStatus}</div>
+                            </div>
+                        )}
                         <TeamHeader
                             team={game.homeTeam}
                             sport={game.sport}
@@ -424,17 +442,7 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
                         )
                     ) : (
                         <div className="space-y-6">
-                            {game.sport === 'MLB' ? (
-                                <MLBLiveGameTracker game={game} />
-                            ) : (
-                                <>
-                                    <Card className="bg-slate-900 border-slate-800">
-                                        <CardHeader><CardTitle>Model Retroactive Analysis</CardTitle></CardHeader>
-                                        <CardContent><ModelCalculationView game={game} /></CardContent>
-                                    </Card>
-                                    <GameLeadersView game={game} />
-                                </>
-                            )}
+                            <LiveGameHub game={game} />
                         </div>
                     )}
                 </div>
