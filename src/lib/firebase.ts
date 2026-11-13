@@ -1,3 +1,13 @@
+import { Buffer } from 'buffer';
+
+// Polyfill SlowBuffer for Node 22+ / Webpack serverless environments
+if (typeof (Buffer as any).SlowBuffer === 'undefined') {
+    (Buffer as any).SlowBuffer = Buffer;
+}
+if (typeof globalThis !== 'undefined' && (globalThis as any).Buffer && typeof (globalThis as any).Buffer.SlowBuffer === 'undefined') {
+    (globalThis as any).Buffer.SlowBuffer = (globalThis as any).Buffer;
+}
+
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';

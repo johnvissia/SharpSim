@@ -134,6 +134,48 @@ export async function updateRestDoc(collectionName: string, docId: string, data:
     return await res.json();
 }
 
+export async function batchSetRestDocs(
+    collectionName: string,
+    docs: Array<{ id: string; data: Record<string, any> }>
+): Promise<void> {
+    if (!docs || docs.length === 0) return;
+    const token = await getFirebaseAuthToken();
+    const CHUNK_SIZE = 400;
+
+    for (let i = 0; i < docs.length; i += CHUNK_SIZE) {
+        const chunk = docs.slice(i, i + CHUNK_SIZE);
+        const writes = chunk.map(({ id, data }) => {
+            const fields: Record<string, any> = {};
+            for (const [k, v] of Object.entries(data)) {
+                if (v !== undefined) {
+                    fields[k] = toFirestoreValue(v);
+                }
+            }
+            return {
+                update: {
+                    name: `projects/${PROJECT_ID}/databases/(default)/documents/${collectionName}/${encodeURIComponent(id)}`,
+                    fields
+                }
+            };
+        });
+
+        const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:commit`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ writes })
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`batchSetRestDocs error on ${collectionName}: ${res.status} ${errText}`);
+        }
+    }
+}
+
 export async function setRestDoc(collectionName: string, docId: string, data: Record<string, any>): Promise<any> {
     const token = await getFirebaseAuthToken();
     const fields: Record<string, any> = {};

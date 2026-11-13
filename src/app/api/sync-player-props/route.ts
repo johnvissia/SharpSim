@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { verifyApiAuth } from '@/lib/api-auth';
+import { batchSetRestDocs } from '@/lib/firestore-rest';
 
 function getMarketDisplayName(marketKey: string, sport: string): string {
     if (sport === 'NBA') {
@@ -96,8 +97,6 @@ export async function POST(request: NextRequest) {
         console.log(`[PLAYER PROPS API] Found ${events.length} active ${sport} events`);
 
         let count = 0;
-        const batchSize = 500;
-        let batch = db.batch();
 
         // 3. For each event, fetch player props
         for (const event of events) {
@@ -164,24 +163,21 @@ export async function POST(request: NextRequest) {
                     }
                 });
 
+                const propsToSave: Array<{ id: string; data: Record<string, any> }> = [];
                 for (const prop of playerMap.values()) {
                     if (prop.line === undefined || prop.overOdds === undefined || prop.underOdds === undefined) continue;
-                    const propRef = db.collection('player_props').doc(prop.id);
-                    batch.set(propRef, prop, { merge: true });
+                    propsToSave.push({ id: prop.id, data: prop });
                     count++;
+                }
 
-                    if (count % batchSize === 0) {
-                        await batch.commit();
-                        batch = db.batch();
-                    }
+                if (propsToSave.length > 0) {
+                    await batchSetRestDocs('player_props', propsToSave);
                 }
             }
 
             // Small delay to respect rate limits
             await new Promise(r => setTimeout(r, 300));
         }
-
-        await batch.commit();
 
         console.log(`[PLAYER PROPS API] Successfully synced ${count} ${sport} props.`);
         return NextResponse.json({ success: true, count, sport });

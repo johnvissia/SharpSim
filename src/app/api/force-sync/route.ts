@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
 import { sportKeyMapping } from '@/lib/sports';
 import { verifyApiAuth } from '@/lib/api-auth';
+import { batchSetRestDocs } from '@/lib/firestore-rest';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // Allow 5 minutes for syncing odds from 8 sports sequentially
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
         const API_KEY = process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
         if (!API_KEY) throw new Error("Missing odds API key");
 
-        console.log("=== API ROUTE FORCE SYNC VIA ADMIN SDK ===");
+        console.log("=== API ROUTE FORCE SYNC VIA REST ===");
         let totalGames = 0;
 
         for (const sport of Object.values(sportKeyMapping)) {
@@ -27,8 +27,7 @@ export async function GET(request: NextRequest) {
             const data = await res.json();
             if (!data || data.length === 0) continue;
 
-            const batch = db.batch();
-            let batchCount = 0;
+            const docsToSave: Array<{ id: string; data: Record<string, any> }> = [];
 
             for (const game of data) {
                 const gameStart = new Date(game.commence_time).getTime();
@@ -49,21 +48,14 @@ export async function GET(request: NextRequest) {
                     bookmakerOdds: game.bookmakers?.map((b: any) => JSON.stringify(b)) || [],
                 };
 
-                const docRef = db.collection('daily_games').doc(game.id);
-                batch.set(docRef, gameData, { merge: true });
-                batchCount++;
+                docsToSave.push({ id: game.id, data: gameData });
                 totalGames++;
-
-                if (batchCount >= 400) {
-                    await batch.commit();
-                    batchCount = 0;
-                }
             }
 
-            if (batchCount > 0) {
-                await batch.commit();
+            if (docsToSave.length > 0) {
+                await batchSetRestDocs('daily_games', docsToSave);
             }
-            console.log(`Saved ${data.length} games for ${sport}`);
+            console.log(`Saved ${docsToSave.length} games for ${sport}`);
         }
 
         return NextResponse.json({ success: true, totalGames });
