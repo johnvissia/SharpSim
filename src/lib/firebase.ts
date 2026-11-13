@@ -9,8 +9,8 @@ if (typeof globalThis !== 'undefined' && (globalThis as any).Buffer && typeof (g
 }
 
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getAuth, Auth } from 'firebase-admin/auth';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -61,8 +61,56 @@ function initAdmin() {
     }
 }
 
-const adminApp = initAdmin();
+let _adminApp: any = null;
+function getAdminApp() {
+    if (!_adminApp) {
+        _adminApp = initAdmin();
+    }
+    return _adminApp;
+}
 
-export const db = getFirestore(adminApp);
-export const auth = getAuth(adminApp);
-export default adminApp;
+let _db: any = null;
+function getDbInstance() {
+    if (!_db) {
+        try {
+            const app = getAdminApp();
+            _db = getFirestore(app);
+        } catch (e: any) {
+            console.warn('[firebase-admin] getFirestore deferred error:', e.message);
+        }
+    }
+    return _db;
+}
+
+let _auth: any = null;
+function getAuthInstance() {
+    if (!_auth) {
+        try {
+            const app = getAdminApp();
+            _auth = getAuth(app);
+        } catch (e: any) {
+            console.warn('[firebase-admin] getAuth deferred error:', e.message);
+        }
+    }
+    return _auth;
+}
+
+export const db: Firestore = new Proxy({}, {
+    get(target, prop) {
+        const instance = getDbInstance();
+        if (!instance) return undefined;
+        const val = (instance as any)[prop];
+        return typeof val === 'function' ? val.bind(instance) : val;
+    }
+}) as unknown as Firestore;
+
+export const auth: Auth = new Proxy({}, {
+    get(target, prop) {
+        const instance = getAuthInstance();
+        if (!instance) return undefined;
+        const val = (instance as any)[prop];
+        return typeof val === 'function' ? val.bind(instance) : val;
+    }
+}) as unknown as Auth;
+
+export default getAdminApp;

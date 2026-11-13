@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
+import { resilientGetCollection } from '@/lib/firestore-rest';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
     try {
-        const propsSnapshot = await db.collection('player_props').get();
-        const allProps = propsSnapshot.docs.map(doc => doc.data());
+        const allProps = await resilientGetCollection('player_props');
 
         const now = new Date().getTime();
         // Filter out props for games that have already started, and restrict predictions to NBA

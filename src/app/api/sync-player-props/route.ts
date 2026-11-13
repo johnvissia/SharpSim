@@ -3,6 +3,9 @@ import { db } from '@/lib/firebase';
 import { verifyApiAuth } from '@/lib/api-auth';
 import { batchSetRestDocs } from '@/lib/firestore-rest';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
+
 function getMarketDisplayName(marketKey: string, sport: string): string {
     if (sport === 'NBA') {
         if (marketKey === 'player_points') return 'Points';

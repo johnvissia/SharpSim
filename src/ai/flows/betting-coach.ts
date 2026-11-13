@@ -25,7 +25,7 @@ export async function analyzeBettingPerformance(input: { bettingHistory: string 
     const snapshot = await db.collection('model_predictions')
       .where('gameId', 'in', chunk)
       .get();
-    snapshot.docs.forEach(doc => predictionsMap.set(doc.data().gameId, doc.data()));
+    snapshot.docs.forEach((doc: any) => predictionsMap.set(doc.data().gameId, doc.data()));
   }
 
   // 2. Perform Grouped Analytics (ROI, Win Rate)
