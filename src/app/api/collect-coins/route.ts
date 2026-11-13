@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, auth } from '@/lib/firebase';
 import { FieldValue } from 'firebase-admin/firestore';
-import { resilientGetDoc, setRestDoc } from '@/lib/firestore-rest';
+import { resilientGetDoc, updateRestDoc } from '@/lib/firestore-rest';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Invalid token or expired session.' }, { status: 401 });
     }
 
-    // Resiliently fetch user profile (Admin SDK with REST fallback)
-    const userData = await resilientGetDoc<any>('users', uid);
+    // Resiliently fetch user profile (Admin SDK with REST fallback, using verified idToken for auth)
+    const userData = await resilientGetDoc<any>('users', uid, idToken);
 
     if (!userData) {
       return NextResponse.json({ success: false, error: 'User profile not found.' }, { status: 404 });
@@ -91,13 +91,13 @@ export async function POST(request: NextRequest) {
       console.warn('[collect-coins] Admin SDK update failed, using resilient REST patch:', adminErr.message);
     }
 
-    // Fallback to REST patch if Admin SDK failed
+    // Fallback to REST patch if Admin SDK failed (passing user's idToken for security rules authorization)
     if (!updated) {
-      await setRestDoc('users', uid, {
+      await updateRestDoc('users', uid, {
         balance: newBalance,
         lastCoinCollection: newTimestamp,
         updatedAt: newTimestamp,
-      });
+      }, idToken);
     }
 
     return NextResponse.json({

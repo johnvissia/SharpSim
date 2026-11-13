@@ -72,9 +72,13 @@ export async function getFirebaseAuthToken(): Promise<string> {
     }
 }
 
-export async function getRestDoc<T = any>(collectionName: string, docId: string): Promise<T | null> {
+export async function getRestDoc<T = any>(collectionName: string, docId: string, authToken?: string): Promise<T | null> {
     const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collectionName}/${encodeURIComponent(docId)}?key=${API_KEY}`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const headers: Record<string, string> = {};
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    const res = await fetch(url, { headers, cache: 'no-store' });
     if (res.status === 404) return null;
     if (!res.ok) {
         throw new Error(`getRestDoc failed: ${res.statusText}`);
@@ -105,8 +109,8 @@ export async function getRestCollectionDocs<T = any>(collectionName: string, pag
     });
 }
 
-export async function updateRestDoc(collectionName: string, docId: string, data: Record<string, any>): Promise<any> {
-    const token = await getFirebaseAuthToken();
+export async function updateRestDoc(collectionName: string, docId: string, data: Record<string, any>, authToken?: string): Promise<any> {
+    const token = authToken || await getFirebaseAuthToken();
     const fields: Record<string, any> = {};
     const fieldPaths: string[] = [];
 
@@ -176,8 +180,8 @@ export async function batchSetRestDocs(
     }
 }
 
-export async function setRestDoc(collectionName: string, docId: string, data: Record<string, any>): Promise<any> {
-    const token = await getFirebaseAuthToken();
+export async function setRestDoc(collectionName: string, docId: string, data: Record<string, any>, authToken?: string): Promise<any> {
+    const token = authToken || await getFirebaseAuthToken();
     const fields: Record<string, any> = {};
 
     for (const [k, v] of Object.entries(data)) {
@@ -225,14 +229,14 @@ export async function deleteRestDoc(collectionName: string, docId: string): Prom
 /**
  * Resilient helper to fetch a single document: tries Admin SDK first, falls back to REST
  */
-export async function resilientGetDoc<T = any>(collectionName: string, docId: string): Promise<T | null> {
+export async function resilientGetDoc<T = any>(collectionName: string, docId: string, authToken?: string): Promise<T | null> {
     try {
         const doc = await db.collection(collectionName).doc(docId).get();
         if (doc.exists) return { id: doc.id, ...doc.data() } as T;
         return null;
     } catch (err: any) {
         console.warn(`[firestore-rest] Admin SDK failed on ${collectionName}/${docId}, falling back to REST:`, err.message);
-        return await getRestDoc<T>(collectionName, docId);
+        return await getRestDoc<T>(collectionName, docId, authToken);
     }
 }
 
