@@ -38,6 +38,24 @@ const OddsButton = ({
   </Button>
 );
 
+const getAbbreviatedLeague = (game: Game): string => {
+  const sport = (game.sport || '').toUpperCase();
+  const ctx = (game.leagueContext || '').toLowerCase();
+
+  if (sport === 'NHL' || ctx.includes('hockey')) return 'NHL';
+  if (sport === 'NBA' || ctx.includes('basketball association')) return 'NBA';
+  if (sport === 'NFL' || ctx.includes('football league')) return 'NFL';
+  if (sport === 'MLB' || ctx.includes('baseball')) return 'MLB';
+  if (sport === 'NCAAM' || ctx.includes('mens college') || ctx.includes('ncaa')) return 'NCAAM';
+  if (sport === 'EPL' || ctx.includes('premier league') || ctx.includes('eng.1')) return 'EPL';
+  if (sport === 'MLS' || ctx.includes('major league soccer') || ctx.includes('usa.1')) return 'MLS';
+  if (sport === 'UCL' || ctx.includes('champions league') || ctx.includes('uefa')) return 'UCL';
+  if (sport === 'WNBA') return 'WNBA';
+
+  if (game.sport) return game.sport.toUpperCase();
+  return (game.leagueContext || '').slice(0, 8).toUpperCase();
+};
+
 const getMascot = (fullName: string) => {
   if (!fullName) return '';
   if (fullName.includes('Red Sox')) return 'Red Sox';
@@ -313,7 +331,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
       <div className="px-3 py-1 flex justify-between items-center bg-slate-950/40 border-b border-slate-800/50">
         <div className="flex items-center gap-2">
            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
-             {game.leagueContext || game.sport}
+             {getAbbreviatedLeague(game)}
            </span>
         </div>
         <div className="flex items-center gap-2">

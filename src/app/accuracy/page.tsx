@@ -653,13 +653,13 @@ export default function AccuracyPage() {
                 <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
                     <div>
                         <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-                            <span>Lockdown Tracked Predictions</span>
+                            <span>Tracked Predictions</span>
                             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
                                 {filteredPredictions.length}
                             </span>
                         </CardTitle>
-                        <p className="text-xs text-slate-400 mt-1">
-                            Snapshot locked before game start. Compare model prediction with closing market line.
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            Model predictions locked against closing Vegas lines.
                         </p>
                     </div>
 
@@ -740,15 +740,14 @@ export default function AccuracyPage() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-slate-800 bg-slate-950/40 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                        <th className="py-3 px-5">Matchup & Time</th>
-                                        <th className="py-3 px-5">Recommended Pick</th>
-                                        <th className="py-3 px-5">Model vs Vegas (Edge)</th>
-                                        <th className="py-3 px-5">Result & Status</th>
+                                        <th className="py-3 px-5">Game</th>
+                                        <th className="py-3 px-5">Model Pick</th>
+                                        <th className="py-3 px-5">Line & Edge</th>
+                                        <th className="py-3 px-5">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/70">
                                     {filteredPredictions.map((p) => {
-                                        const pickInfo = getModelPickInfo(p);
                                         const homeMascot = getMascot(p.homeTeam || '');
                                         const recMascot = getMascot(p.recommendedSide || '');
                                         
@@ -773,9 +772,9 @@ export default function AccuracyPage() {
 
                                         return (
                                             <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
-                                                {/* 1. MATCHUP & TIME */}
-                                                <td className="py-4 px-5 align-top">
-                                                    <div className="space-y-1.5">
+                                                {/* 1. GAME & TIME */}
+                                                <td className="py-3.5 px-5 align-middle">
+                                                    <div className="space-y-1">
                                                         <div className="flex items-center gap-2">
                                                             <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${getSportBadgeColor(p.sport)}`}>
                                                                 {p.sport || 'NFL'}
@@ -784,7 +783,7 @@ export default function AccuracyPage() {
                                                                 {formatGameTime(p.startTime)}
                                                             </span>
                                                         </div>
-                                                        <div className="text-sm font-semibold text-slate-100">
+                                                        <div className="text-sm font-bold text-slate-100">
                                                             <span>{p.awayTeam}</span>
                                                             <span className="text-slate-500 font-normal mx-1.5">@</span>
                                                             <span>{p.homeTeam}</span>
@@ -793,9 +792,9 @@ export default function AccuracyPage() {
                                                 </td>
 
                                                 {/* 2. RECOMMENDED PICK */}
-                                                <td className="py-4 px-5 align-top">
+                                                <td className="py-3.5 px-5 align-middle">
                                                     {hasActivePlay ? (
-                                                        <div className="space-y-1.5">
+                                                        <div className="space-y-1">
                                                             <div className="flex items-baseline gap-2">
                                                                 <span className="text-base font-black text-white">
                                                                     {recMascot || effectiveRec}
@@ -809,92 +808,59 @@ export default function AccuracyPage() {
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <div className="space-y-1">
-                                                            <span className="text-xs text-slate-500 font-medium">Pass (No Bet)</span>
-                                                            <div>{renderSignalBadge('NO PLAY')}</div>
-                                                        </div>
+                                                        <span className="text-xs text-slate-500 font-medium">Pass (No Bet)</span>
                                                     )}
                                                 </td>
 
-                                                {/* 3. MODEL VS MARKET (THE EDGE) */}
-                                                <td className="py-4 px-5 align-top">
-                                                    <div className="space-y-1 text-xs">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-slate-400 font-medium">Vegas Line:</span>
-                                                            <span className="font-bold text-slate-200 font-mono">
-                                                                {homeMascot || p.homeTeam} {origLineDisplay}
-                                                            </span>
-                                                            {p.spreadSource && p.spreadSource !== 'none' && (
-                                                                <span className="text-[10px] text-slate-500">
-                                                                    ({p.spreadSource})
-                                                                </span>
-                                                            )}
+                                                {/* 3. LINE & EDGE */}
+                                                <td className="py-3.5 px-5 align-middle">
+                                                    <div className="space-y-0.5 text-xs">
+                                                        <div className="text-slate-300 font-medium">
+                                                            <span className="text-slate-500">Vegas: </span>
+                                                            <span className="font-semibold text-slate-200">{homeMascot || p.homeTeam} {origLineDisplay}</span>
                                                         </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-slate-400 font-medium">Model Project:</span>
-                                                            <span className="font-semibold text-indigo-300">
-                                                                {pickInfo.text}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5 pt-0.5 text-emerald-400 font-semibold">
-                                                            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                                                        <div className="flex items-center gap-1 text-emerald-400 font-bold">
+                                                            <TrendingUp className="w-3.5 h-3.5" />
                                                             <span>{edgeInfo.text}</span>
                                                         </div>
                                                     </div>
                                                 </td>
 
                                                 {/* 4. RESULT & STATUS */}
-                                                <td className="py-4 px-5 align-top">
+                                                <td className="py-3.5 px-5 align-middle">
                                                     {p.status === 'graded' ? (
                                                         isActionable(p) ? (
-                                                            <div className="space-y-1.5">
+                                                            <div className="space-y-1">
                                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold ${
                                                                     p.correct 
                                                                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
                                                                         : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                                                                 }`}>
                                                                     {p.correct ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                                                                    {p.correct ? 'Covered (Win)' : 'Missed (Loss)'}
+                                                                    {p.correct ? 'Covered' : 'Missed'}
                                                                 </span>
                                                                 {p.actualScore && (
-                                                                    <div className="text-xs text-slate-400 font-mono">
-                                                                        Final: <span className="text-slate-200 font-bold">{getMascot(p.awayTeam)} {p.actualScore.away} - {p.actualScore.home} {getMascot(p.homeTeam)}</span>
+                                                                    <div className="text-[11px] text-slate-400 font-mono">
+                                                                        {p.actualScore.away} - {p.actualScore.home}
                                                                     </div>
                                                                 )}
                                                             </div>
                                                         ) : (
-                                                            <div className="space-y-1.5">
-                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-slate-400 bg-slate-800/80 border border-slate-700/80">
-                                                                    <MinusCircle className="w-3.5 h-3.5 text-slate-500" />
-                                                                    Pass · No Bet
-                                                                </span>
-                                                                {p.actualScore && (
-                                                                    <div className="text-xs text-slate-500 font-mono">
-                                                                        Final: {getMascot(p.awayTeam)} {p.actualScore.away} - {p.actualScore.home} {getMascot(p.homeTeam)}
-                                                                    </div>
-                                                                )}
-                                                            </div>
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-slate-400 bg-slate-800/80 border border-slate-700/80">
+                                                                <MinusCircle className="w-3.5 h-3.5 text-slate-500" />
+                                                                Pass
+                                                            </span>
                                                         )
                                                     ) : isLocked ? (
-                                                        <div className="space-y-1">
-                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                                                                <Lock className="w-3 h-3" />
-                                                                Locked (T-15m)
-                                                            </span>
-                                                            <div className="text-[11px] text-slate-400">
-                                                                Snapshot frozen for grading
-                                                            </div>
-                                                        </div>
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                                            <Lock className="w-3 h-3" />
+                                                            Locked
+                                                        </span>
                                                     ) : (
-                                                        <div className="space-y-1">
-                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
-                                                                <Clock className="w-3 h-3 text-slate-400" />
-                                                                Pending Game
-                                                            </span>
-                                                            <div className="text-[11px] text-slate-500">
-                                                                Locks 15m before kickoff
-                                                            </div>
-                                                        </div>
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                                                            <Clock className="w-3 h-3 text-slate-400" />
+                                                            Upcoming
+                                                        </span>
                                                     )}
                                                 </td>
                                             </tr>
