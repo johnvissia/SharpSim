@@ -22,11 +22,15 @@ export function getAuthErrorMessage(error: any): string {
     case 'auth/too-many-requests':
       return 'Access to this account has been temporarily disabled due to many failed login attempts. Please wait a few minutes or reset your password.';
     case 'auth/popup-blocked':
-      return 'Sign-in popup was blocked by your browser. Please allow popups for this site and try again.';
+      return 'Sign-in popup was blocked by your browser. Please allow popups or use the Redirect option below.';
     case 'auth/popup-closed-by-user':
-      return 'Sign-in was cancelled before completing.';
+      return 'The Google sign-in window was closed before finishing. If your browser blocks popups or cookies, please use the Redirect option.';
     case 'auth/cancelled-popup-request':
-      return 'Only one popup request is allowed at a time.';
+      return 'A sign-in request is already in progress. Please complete or close the existing window.';
+    case 'auth/unauthorized-domain':
+      return 'This domain is not authorized in Firebase Authentication. Please access the site using http://localhost:9002 (do not use 127.0.0.1) or add this host to Firebase Console -> Authentication -> Settings -> Authorized Domains.';
+    case 'auth/account-exists-with-different-credential':
+      return 'An account already exists with this email using a different sign-in method. Please log in with your email and password.';
     case 'auth/network-request-failed':
       return 'Network connection error. Please check your internet connection and try again.';
     case 'auth/operation-not-allowed':

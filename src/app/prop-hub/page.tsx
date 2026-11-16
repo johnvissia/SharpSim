@@ -267,7 +267,7 @@ export default function PropHubPage() {
     const { toast } = useToast();
     const firestore = useFirestore();
 
-    const [selectedSport, setSelectedSport] = useState<'ALL' | 'NBA' | 'MLB'>('ALL');
+    const [selectedSport, setSelectedSport] = useState<'ALL' | 'NBA' | 'MLB' | 'NHL'>('ALL');
     const [searchQuery, setSearchQuery] = useState('');
 
     const propsQuery = useMemoFirebase(() => {
@@ -490,6 +490,12 @@ export default function PropHubPage() {
                         >
                             ⚾ MLB
                         </TabsTrigger>
+                        <TabsTrigger 
+                            value="NHL" 
+                            className="text-xs uppercase font-black px-4 py-2 rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all"
+                        >
+                            🏒 NHL
+                        </TabsTrigger>
                     </TabsList>
                 </Tabs>
 
@@ -534,8 +540,28 @@ export default function PropHubPage() {
                 </Card>
             )}
             
+            {/* NHL TBD State */}
+            {selectedSport === 'NHL' && (
+                <Card className="border-slate-800/80 bg-slate-950/20 backdrop-blur-md rounded-2xl shadow-xl">
+                    <CardContent className="p-12 text-center flex flex-col items-center justify-center gap-4">
+                        <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-2xl">
+                            🏒
+                        </div>
+                        <div className="space-y-1">
+                            <h3 className="text-lg font-bold text-white uppercase tracking-wider">NHL Player Props: TBD</h3>
+                            <p className="text-sm text-slate-400 max-w-md">
+                                NHL player proposition markets and statistical models are currently in development and coming soon. NBA & MLB props and real-time game scores remain active.
+                            </p>
+                            <Badge variant="outline" className="border-amber-500/30 text-amber-400 bg-amber-500/10 text-xs font-semibold mt-3">
+                                Coming Soon
+                            </Badge>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* No Active Props State */}
-            {!isLoadingProps && !loading && filteredGames.length === 0 && (
+            {selectedSport !== 'NHL' && !isLoadingProps && !loading && filteredGames.length === 0 && (
                 <Card className="border-slate-800/80 bg-slate-950/20 backdrop-blur-md rounded-2xl shadow-xl">
                     <CardContent className="p-12 text-center flex flex-col items-center justify-center gap-4">
                         <div className="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 text-2xl">
@@ -554,7 +580,7 @@ export default function PropHubPage() {
             )}
 
             {/* Games and Props Accordions */}
-            {!isLoadingProps && !loading && filteredGames.length > 0 && (
+            {selectedSport !== 'NHL' && !isLoadingProps && !loading && filteredGames.length > 0 && (
                 <Accordion type="multiple" className="w-full space-y-4">
                     {filteredGames.map(game => (
                         <GameAccordion key={game.gameId} game={game} />

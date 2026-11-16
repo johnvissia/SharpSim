@@ -69,6 +69,12 @@ function ModelPageContent() {
       setLoading(true);
       setRankedPredictions([]);
 
+      // NHL model is TBD (Coming Soon)
+      if (selectedSport === 'NHL') {
+        setLoading(false);
+        return;
+      }
+
       try {
         // 1. Fetch Today's Games from ESPN
         const allGames = await fetchEspnSchedule();
@@ -172,13 +178,12 @@ function ModelPageContent() {
             } catch (e) { }
           }
 
-          let endpoint = '/api/predict-game';
+          let endpoint = '/api/predict-game'; // Default NBA endpoint
           if (selectedSport === 'NFL') endpoint = '/api/predict-nfl';
           else if (selectedSport === 'NCAAM') endpoint = '/api/predict-ncaam';
           else if (selectedSport === 'MLB') endpoint = '/api/predict-mlb';
           else if (selectedSport === 'UCL') endpoint = '/api/predict-soccer?league=UCL';
           else if (selectedSport === 'EPL') endpoint = '/api/predict-soccer?league=EPL';
-          else if (selectedSport === 'NHL') endpoint = '/api/predict-game';
 
           const paramChar = endpoint.includes('?') ? '&' : '?';
 
@@ -335,8 +340,30 @@ function ModelPageContent() {
         {/* Main Content */}
         <div className="space-y-8">
 
+          {/* NHL MODEL TBD BANNER */}
+          {selectedSport === 'NHL' && (
+            <div className="text-center py-20 px-6 rounded-2xl border border-slate-800 bg-slate-900/40 backdrop-blur-md flex flex-col items-center gap-4 max-w-2xl mx-auto shadow-2xl">
+              <div className="h-16 w-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                <BrainCircuit className="h-8 w-8 text-indigo-400" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white tracking-tight uppercase">NHL Model: TBD</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  Our NHL algorithmic projection model is currently in development and coming soon. 
+                  Live scores, schedule updates, and Vegas lines remain active.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="outline" className="border-indigo-500/30 text-indigo-400 bg-indigo-500/10 px-3 py-1 font-bold">
+                  Coming Soon
+                </Badge>
+                <span className="text-xs text-slate-500">Active Models: NBA, NFL, MLB, NCAAM, EPL, UCL</span>
+              </div>
+            </div>
+          )}
+
           {/* CHART SECTION */}
-          {!loading && edgeChartData.length > 0 && (
+          {selectedSport !== 'NHL' && !loading && edgeChartData.length > 0 && (
             <Card className="bg-slate-900 border-slate-800 overflow-hidden">
               <CardHeader className="bg-slate-950/50 border-b border-slate-800 pb-3">
                 <div className="flex items-center justify-between">
@@ -362,7 +389,7 @@ function ModelPageContent() {
           )}
 
           {/* PREDICTION CARDS */}
-          {!loading && (
+          {selectedSport !== 'NHL' && !loading && (
             <div className="grid gap-6">
               {rankedPredictions.length > 0 ? (
                 rankedPredictions.map((item, idx) => (

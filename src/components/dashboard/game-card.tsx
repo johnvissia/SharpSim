@@ -76,6 +76,11 @@ const getMascot = (fullName: string) => {
 };
 
 const getModelPick = (game: Game) => {
+  // For NHL games, model is TBD (Coming Soon)
+  if (game.sport === 'NHL' || getAbbreviatedLeague(game) === 'NHL') {
+    return null;
+  }
+
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const homeNorm = norm(game.homeTeam.name);
   const awayNorm = norm(game.awayTeam.name);
@@ -343,7 +348,18 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
       </div>
 
       {/* Model Pick Sub-Header (Only shown pre-game) */}
-      {canBet && modelPick && (
+      {canBet && (game.sport === 'NHL' || getAbbreviatedLeague(game) === 'NHL') ? (
+        <div className="px-3 py-1 flex items-center justify-between bg-slate-950/70 border-b border-slate-800/40 text-[10px]">
+          <div className="flex items-center gap-1.5 font-bold text-slate-400">
+            <Trophy className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+            <span className="text-slate-500 uppercase tracking-wider text-[9px]">Model & Props:</span>
+            <span className="text-amber-400 font-semibold text-[9px]">TBD (Coming Soon)</span>
+          </div>
+          <Badge className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0 bg-slate-800/80 text-slate-400 border-slate-700">
+            TBD
+          </Badge>
+        </div>
+      ) : canBet && modelPick ? (
         <div className="px-3 py-1 flex items-center justify-between bg-slate-950/70 border-b border-slate-800/40 text-[10px]">
           <div className="flex items-center gap-1.5 font-bold text-slate-300">
             <Trophy className="h-3.5 w-3.5 text-amber-400 shrink-0" />
@@ -361,7 +377,7 @@ export function GameCard({ game, onGameClick, hasActiveBet }: { game: Game, onGa
             </Badge>
           )}
         </div>
-      )}
+      ) : null}
 
       <div className="p-3 flex flex-col gap-2">
         {/* Column Labels */}

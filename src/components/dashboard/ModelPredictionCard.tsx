@@ -36,6 +36,11 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
     const [showDetail, setShowDetail] = useState(false);
 
     useEffect(() => {
+        if (game.sport === 'NHL') {
+            setLoading(false);
+            return;
+        }
+
         if (preloadedData) {
             setData(preloadedData);
             setLoading(false);
@@ -71,6 +76,23 @@ export function ModelPredictionCard({ game, compact = false, preloadedData }: { 
             fetchModelData();
         }
     }, [game, preloadedData]);
+
+    if (game.sport === 'NHL' || (data && (data as any).tbd)) {
+        return (
+            <Card className="bg-slate-900/60 border-slate-800 p-6 flex flex-col items-center justify-center text-center gap-3">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-500">{game.awayTeam.name} vs {game.homeTeam.name}</span>
+                </div>
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider">NHL Model: TBD (Coming Soon)</h4>
+                <p className="text-xs text-slate-400 max-w-sm">
+                    NHL algorithmic projection modeling is currently in development. Real-time scores and live odds remain active.
+                </p>
+                <Badge variant="outline" className="border-indigo-500/30 text-indigo-400 bg-indigo-500/10 text-[10px] font-semibold">
+                    Coming Soon
+                </Badge>
+            </Card>
+        );
+    }
 
     if (loading) {
         return (

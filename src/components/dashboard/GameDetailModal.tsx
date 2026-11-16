@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import type { Game, UserProfile, PlayerProp, Team } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, Loader2, User, ChevronDown, WandSparkles, Search, BarChart3, TrendingUp, TrendingDown, Flame, Activity, Sparkles, Shield, Layers, X } from 'lucide-react';
+import { Heart, Loader2, User, ChevronDown, WandSparkles, Search, BarChart3, TrendingUp, TrendingDown, Flame, Activity, Sparkles, Shield, Layers, X, Clock, BrainCircuit } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { sportIconMap } from '@/lib/team-logos';
@@ -666,6 +666,23 @@ const PlayerCard = ({
 };
 
 const PlayerPropsView = ({ game }: { game: Game }) => {
+    if (game.sport === 'NHL') {
+        return (
+            <div className="text-center py-16 px-4 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col items-center gap-3 my-2">
+                <div className="h-12 w-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                    <Clock className="h-6 w-6 text-amber-400" />
+                </div>
+                <h4 className="text-base font-bold text-white tracking-tight">NHL Player Props: TBD</h4>
+                <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+                    NHL player proposition markets and statistical projections are currently in development and coming soon. Real-time game odds and live scores remain active.
+                </p>
+                <Badge variant="outline" className="border-amber-500/30 text-amber-400 bg-amber-500/10 text-[10px] font-semibold mt-1">
+                    Coming Soon
+                </Badge>
+            </div>
+        );
+    }
+
     const [playerProps, setPlayerProps] = useState<PlayerProp[] | null>(null);
     const [playerPhotos, setPlayerPhotos] = useState<Record<string, PhotoInfo>>({});
     const [searchQuery, setSearchQuery] = useState('');
@@ -1079,7 +1096,22 @@ export function GameDetailModal({ game, isOpen, onClose }: GameDetailModalProps)
 
                         <TabsContent value="model">
                             {canBet ? (
-                                <ModelCalculationView game={game} />
+                                game.sport === 'NHL' ? (
+                                    <div className="text-center py-16 px-4 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col items-center gap-3 my-2">
+                                        <div className="h-12 w-12 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                                            <BrainCircuit className="h-6 w-6 text-indigo-400" />
+                                        </div>
+                                        <h4 className="text-base font-bold text-white tracking-tight">NHL Algorithmic Model: TBD</h4>
+                                        <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+                                            Our NHL predictive model is currently in development and coming soon. Scores, live updates, and Vegas lines are active and real-time.
+                                        </p>
+                                        <Badge variant="outline" className="border-indigo-500/30 text-indigo-400 bg-indigo-500/10 text-[10px] font-semibold mt-1">
+                                            Coming Soon
+                                        </Badge>
+                                    </div>
+                                ) : (
+                                    <ModelCalculationView game={game} />
+                                )
                             ) : (
                                 <MainLinesView game={game} />
                             )}

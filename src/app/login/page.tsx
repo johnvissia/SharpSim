@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth, useUser } from '@/firebase';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -37,12 +37,42 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  // If already authenticated, redirect to dashboard
+  // If already authenticated with permanent account, redirect to dashboard
   useEffect(() => {
-    if (!isUserLoading && user) {
+    if (!isUserLoading && user && !user.isAnonymous) {
       router.replace('/dashboard');
     }
   }, [user, isUserLoading, router]);
+
+  // Handle redirect result if user signed in via redirect
+  useEffect(() => {
+    let isMounted = true;
+    getRedirectResult(auth)
+      .then((result) => {
+        if (!isMounted) return;
+        if (result?.user) {
+          toast({
+            title: 'Login Successful',
+            description: `Welcome back, ${result.user.displayName || 'Sharp User'}!`,
+          });
+          router.replace('/dashboard');
+        }
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        console.error('Google redirect sign-in error:', error);
+        if (error.code === 'auth/popup-closed-by-user') return;
+        toast({
+          variant: 'destructive',
+          title: 'Google Sign-In Failed',
+          description: getAuthErrorMessage(error),
+        });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [auth, router, toast]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -73,11 +103,37 @@ export default function LoginPage() {
     }
   }
 
-  async function handleGoogleSignIn() {
+  async function handleGoogleSignIn(forceRedirect = false) {
+    if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
+      toast({
+        title: 'Switching to localhost',
+        description: 'Firebase OAuth requires localhost. Redirecting you now...',
+      });
+      window.location.replace(window.location.href.replace('://127.0.0.1', '://localhost'));
+      return;
+    }
+
     setGoogleLoading(true);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    if (forceRedirect) {
+      try {
+        await signInWithRedirect(auth, provider);
+        return;
+      } catch (redirectError: any) {
+        console.error('Google redirect sign-in error:', redirectError);
+        toast({
+          variant: 'destructive',
+          title: 'Google Sign-In Failed',
+          description: getAuthErrorMessage(redirectError),
+        });
+        setGoogleLoading(false);
+        return;
+      }
+    }
+
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
       await signInWithPopup(auth, provider);
       toast({
         title: 'Login Successful',
@@ -86,7 +142,20 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Google sign-in error:', error);
-      if (error.code === 'auth/popup-closed-by-user') return;
+      // If popup was blocked by browser or cross-origin headers, auto-fallback to redirect
+      if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
+        try {
+          toast({
+            title: 'Redirecting to Google...',
+            description: 'Popup was blocked by your browser. Redirecting directly...',
+          });
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectError: any) {
+          console.error('Google sign-in fallback error:', redirectError);
+        }
+      }
+
       toast({
         variant: 'destructive',
         title: 'Google Sign-In Failed',
@@ -125,7 +194,7 @@ export default function LoginPage() {
             type="button"
             variant="outline"
             className="w-full h-11 font-medium border-slate-700 bg-slate-900/60 hover:bg-slate-800 hover:text-white"
-            onClick={handleGoogleSignIn}
+            onClick={() => handleGoogleSignIn(false)}
             disabled={loading || googleLoading}
           >
             {googleLoading ? (
@@ -135,6 +204,17 @@ export default function LoginPage() {
             )}
             {googleLoading ? 'Connecting with Google...' : 'Sign in with Google'}
           </Button>
+
+          <div className="flex justify-center mt-2.5">
+            <button
+              type="button"
+              onClick={() => handleGoogleSignIn(true)}
+              disabled={loading || googleLoading}
+              className="text-[12px] text-slate-400 hover:text-brand-400 transition-colors underline underline-offset-2"
+            >
+              Having trouble with popups? Sign in via redirect
+            </button>
+          </div>
 
           <div className="relative my-6">
             <span className="absolute inset-0 flex items-center">

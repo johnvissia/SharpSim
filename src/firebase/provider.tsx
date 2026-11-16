@@ -133,12 +133,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             if (firebaseUser.photoURL && data?.photoURL !== firebaseUser.photoURL) {
               updates.photoURL = firebaseUser.photoURL;
             }
-            if (data?.balance === undefined || data?.balance === null) {
-              updates.balance = 100;
-            }
-            if (!data?.membershipTier) {
-              updates.membershipTier = data?.isPro ? 'Sharp Elite' : 'Free Tier';
-            }
             if (data?.isAnonymous !== firebaseUser.isAnonymous) {
               updates.isAnonymous = firebaseUser.isAnonymous;
             }

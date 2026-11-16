@@ -13,6 +13,16 @@ export async function GET(request: NextRequest) {
     const awayTeam = (searchParams.get('awayTeam') || '').toLowerCase();
     const forceRefresh = searchParams.get('force') === 'true';
 
+    // NHL player props are TBD (Coming Soon)
+    if (sport === 'NHL') {
+      return NextResponse.json({
+        success: true,
+        tbd: true,
+        props: [],
+        message: 'NHL player props and projections are TBD and coming soon.'
+      });
+    }
+
     // 1. FAST CACHE CHECK: Query Firestore pre-synced props first (0 Odds API cost)
     if (!forceRefresh) {
       try {

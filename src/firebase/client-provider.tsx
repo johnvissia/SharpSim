@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, type ReactNode } from 'react';
+import React, { useMemo, useEffect, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
 
@@ -9,6 +9,13 @@ interface FirebaseClientProviderProps {
 }
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
+  useEffect(() => {
+    // If loaded via 127.0.0.1, redirect to localhost so Firebase OAuth domain restrictions are satisfied
+    if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
+      window.location.replace(window.location.href.replace('://127.0.0.1', '://localhost'));
+    }
+  }, []);
+
   const firebaseServices = useMemo(() => {
     // Initialize Firebase on the client side, once per component mount.
     return initializeFirebase();

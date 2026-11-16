@@ -176,9 +176,10 @@ export function LiveGameHub({ game }: LiveGameHubProps) {
         return () => { isMounted = false; };
     }, [game.id, game.sport]);
 
-    // Model Pick Snapshot Details
-    const hasModelPrediction = !!game.modelPrediction;
-    const modelPick = game.modelPrediction?.recommendedSide;
+    // Model Pick Snapshot Details (NHL model is TBD Coming Soon)
+    const isNhl = game.sport === 'NHL';
+    const hasModelPrediction = !isNhl && !!game.modelPrediction;
+    const modelPick = isNhl ? null : game.modelPrediction?.recommendedSide;
     const betSignal = game.modelPrediction?.betSignal || 'MODEL PICK';
     const projSpread = game.modelPrediction?.projectedSpread;
     const vegasSpread = game.odds?.spread?.points;
@@ -344,10 +345,14 @@ export function LiveGameHub({ game }: LiveGameHubProps) {
                     <div className="flex items-center gap-2">
                         <Trophy className="h-4 w-4 text-amber-400" />
                         <CardTitle className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
-                            Model Pre-Game Pick & Value Analysis
+                            {isNhl ? "Closing Vegas Line & Game Margin" : "Model Pre-Game Pick & Value Analysis"}
                         </CardTitle>
                     </div>
-                    {hasModelPrediction && (
+                    {isNhl ? (
+                        <Badge className="bg-slate-800 text-amber-400/90 border-slate-700 text-xs">
+                            NHL Model: TBD (Coming Soon)
+                        </Badge>
+                    ) : hasModelPrediction && (
                         <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30 text-xs">
                             {betSignal}
                         </Badge>

@@ -197,7 +197,7 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
     if (!isUserLoading) {
       if (!user && !isPublicPath) {
         router.push('/login');
-      } else if (user && isPublicAuthPath) {
+      } else if (user && !user.isAnonymous && isPublicAuthPath) {
         router.push('/dashboard');
       }
     }
